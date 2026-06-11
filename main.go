@@ -5,9 +5,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os/signal"
 	"runtime"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,23 +28,24 @@ var version = "dev"
 
 func main() {
 	var cfgPath string
-	var once, debug bool
+	var once, debug, trace bool
 	root := &cobra.Command{
 		Use:     "obs_exporter",
 		Version: version,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(cfgPath, once, debug)
+			return run(cfgPath, once, debug, trace)
 		},
 	}
 	root.Flags().StringVar(&cfgPath, "config", "config.yaml", "path to config file")
 	root.Flags().BoolVar(&once, "once", false, "run a single collection cycle and exit")
 	root.Flags().BoolVar(&debug, "debug", false, "verbose logging")
+	root.Flags().BoolVar(&trace, "trace", false, "log every management API response body (live-cluster payload validation; very verbose)")
 	if err := root.Execute(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(cfgPath string, once, debug bool) error {
+func run(cfgPath string, once, debug, trace bool) error {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -55,11 +59,14 @@ func run(cfgPath string, once, debug bool) error {
 	defer stop()
 
 	if once {
-		targets := buildTargets(cfg)
+		targets := buildTargets(cfg, trace)
 		col := ecs.NewCollector(targets, store, cfg.Collection.Interval, cfg.Collection.Timeout)
 		log.Info("running single collection cycle")
 		snap := col.CollectOnce(ctx)
 		closeTargets(targets)
+		if debug {
+			dumpSamples(snap)
+		}
 		for _, cs := range snap.Clusters {
 			log.WithFields(log.Fields{"cluster": cs.Cluster, "ok": cs.OK, "samples": len(cs.Samples)}).
 				Info("collection done")
@@ -91,7 +98,7 @@ func run(cfgPath string, once, debug bool) error {
 	// runner owns the live collection loop and its clients so config reloads can
 	// rebuild and swap them in place. The SnapshotStore is shared and never
 	// replaced, so /metrics and /health keep serving across a swap.
-	runner := newCollectorRunner(store, postCycle)
+	runner := newCollectorRunner(store, postCycle, trace)
 	defer runner.stop()
 
 	if w, err := config.NewWatcher(cfgPath); err == nil {
@@ -180,14 +187,15 @@ func run(cfgPath string, once, debug bool) error {
 type collectorRunner struct {
 	store     *ecs.SnapshotStore
 	postCycle func()
+	trace     bool
 	mu        sync.Mutex
 	targets   []ecs.Target
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 }
 
-func newCollectorRunner(store *ecs.SnapshotStore, postCycle func()) *collectorRunner {
-	return &collectorRunner{store: store, postCycle: postCycle}
+func newCollectorRunner(store *ecs.SnapshotStore, postCycle func(), trace bool) *collectorRunner {
+	return &collectorRunner{store: store, postCycle: postCycle, trace: trace}
 }
 
 // apply stops any running loop, then builds clients + a collector from cfg, runs one
@@ -196,7 +204,7 @@ func newCollectorRunner(store *ecs.SnapshotStore, postCycle func()) *collectorRu
 func (r *collectorRunner) apply(parent context.Context, cfg *config.Config) {
 	r.shutdownCurrent()
 
-	targets := buildTargets(cfg)
+	targets := buildTargets(cfg, r.trace)
 	col := ecs.NewCollector(targets, r.store, cfg.Collection.Interval, cfg.Collection.Timeout)
 	col.PostCycle = r.postCycle
 	loopCtx, cancel := context.WithCancel(parent)
@@ -232,16 +240,37 @@ func (r *collectorRunner) stop() { r.shutdownCurrent() }
 
 // buildTargets constructs one ECS client (plus its collector set) per configured
 // cluster.
-func buildTargets(cfg *config.Config) []ecs.Target {
+func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 	targets := make([]ecs.Target, 0, len(cfg.Clusters))
 	for _, cl := range cfg.Clusters {
 		client := ecsclient.NewClusterClient(ecsclient.Config{
 			Name: cl.Name, BaseURL: cl.BaseURL(), Username: cl.Username,
 			Password: cl.Password, InsecureSkipVerify: cl.InsecureSkipVerify,
+			Trace: trace,
 		})
 		targets = append(targets, ecs.Target{Client: client, Collectors: ecs.Registry(cl)})
 	}
 	return targets
+}
+
+// dumpSamples prints every collected sample in Prometheus exposition style,
+// sorted, so a `--once --debug` run against a live cluster can be diffed against
+// docs/metrics.md to spot silently-absent metrics.
+func dumpSamples(snap *ecs.Snapshot) {
+	var lines []string
+	for _, cs := range snap.Clusters {
+		for _, s := range cs.Samples {
+			parts := make([]string, 0, len(s.Labels))
+			for _, l := range s.Labels {
+				parts = append(parts, fmt.Sprintf("%s=%q", l.Key, l.Value))
+			}
+			lines = append(lines, fmt.Sprintf("%s{%s} %v", s.Name, strings.Join(parts, ","), s.Value))
+		}
+	}
+	sort.Strings(lines)
+	for _, l := range lines {
+		fmt.Println(l)
+	}
 }
 
 // closeTargets logs every client out so ECS session tokens are released (ECS caps

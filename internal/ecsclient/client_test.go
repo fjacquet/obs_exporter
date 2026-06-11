@@ -119,6 +119,28 @@ func TestBadCredentialsNoRetry(t *testing.T) {
 	}
 }
 
+func TestTraceDoesNotBreakCalls(t *testing.T) {
+	hooks := &serverHooks{}
+	srv, _ := newTestServer(t, hooks)
+	c := NewClusterClient(Config{
+		Name: "test", BaseURL: srv.URL,
+		Username: "monitor", Password: "secret",
+		HTTPClient: srv.Client(),
+		Trace:      true,
+	})
+	var out struct {
+		Name string `json:"name"`
+	}
+	// Exercises the OnAfterResponse trace hook on both the login (skipped) and
+	// the data call (logged); the decoded result must be unaffected.
+	if err := c.Get(context.Background(), "/dashboard/zones/localzone", &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Name != "vdc1" {
+		t.Errorf("name = %q", out.Name)
+	}
+}
+
 func TestCloseLogsOut(t *testing.T) {
 	hooks := &serverHooks{}
 	_, c := newTestServer(t, hooks)

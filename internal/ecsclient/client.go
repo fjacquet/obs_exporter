@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/go-resty/resty/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 // Client is the per-cluster ECS management API abstraction. It is satisfied by the
@@ -36,6 +37,10 @@ type Config struct {
 	Password           string
 	InsecureSkipVerify bool
 	HTTPClient         *http.Client
+	// Trace logs every management API response body (method, path, status, body)
+	// for validating payload shapes against a live cluster. Headers are never
+	// logged, so the session token cannot leak. Verbose — debugging only.
+	Trace bool
 }
 
 // ClusterClient is the live per-cluster ECS management REST client.
@@ -66,6 +71,22 @@ func NewClusterClient(cfg Config) *ClusterClient {
 		}
 		return r != nil && r.StatusCode() >= 500
 	})
+	if cfg.Trace {
+		// Deliberately not resty's SetDebug: that dumps request headers including
+		// X-SDS-AUTH-TOKEN. This logs only method/path/status and the body.
+		rc.OnAfterResponse(func(_ *resty.Client, r *resty.Response) error {
+			if r.Request.URL == cfg.BaseURL+loginPath {
+				return nil // login body is uninteresting; the token lives in a header
+			}
+			log.WithFields(log.Fields{
+				"cluster": cfg.Name,
+				"method":  r.Request.Method,
+				"url":     r.Request.URL,
+				"status":  r.StatusCode(),
+			}).Infof("API trace:\n%s", r.Body())
+			return nil
+		})
+	}
 	return &ClusterClient{cfg: cfg, rc: rc}
 }
 
