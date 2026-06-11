@@ -1,0 +1,5 @@
+{
+    "namespace": "s3",
+    "blockSize": 10,
+    "notificationSize": 8
+}

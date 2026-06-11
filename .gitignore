@@ -1,2 +1,12 @@
-bin/prometheus-emcecs-exporter
-dist/*
+bin/
+dist/
+vendor/
+log/
+*.log
+.DS_Store
+site/
+coverage.out
+/obs_exporter
+/mockecs
+.env
+.vscode/

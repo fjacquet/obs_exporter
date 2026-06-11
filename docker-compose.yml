@@ -1,0 +1,62 @@
+---
+# End-to-end demo stack — exporter BUILT FROM SOURCE.
+#   docker compose up --build      (or: make demo)
+# Then open Grafana at http://localhost:3000 (admin/admin) → "ObjectScale — Overview".
+#
+# Services: mockecs (fake ECS management API) -> obs_exporter -> prometheus -> grafana.
+# mockecs serves demo fixtures so the dashboard populates without real hardware.
+services:
+  mockecs:
+    build:
+      context: .
+      dockerfile: deploy/mockecs/Dockerfile
+    image: obs_mockecs
+    pull_policy: build
+    container_name: obs_mockecs
+    restart: unless-stopped
+
+  obs_exporter:
+    build: .
+    image: obs_exporter
+    # Build-only image (no registry). Without this, `docker compose pull`/`up`
+    # tries to pull `obs_exporter` from Docker Hub and fails with access-denied.
+    pull_policy: build
+    container_name: obs_exporter
+    command: ["--config", "/etc/obs_exporter/config.yaml"]
+    ports:
+      - "9438:9438"
+    volumes:
+      - ./config.demo.yaml:/etc/obs_exporter/config.yaml:ro
+    depends_on:
+      - mockecs
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: obs_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - obs_exporter
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: obs_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Test-stack credentials (admin / admin). Change for anything non-local.
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      # Datasource + dashboard providers (auto-provisioned on startup).
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      # Bundled dashboards.
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped

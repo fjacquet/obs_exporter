@@ -1,0 +1,14 @@
+{
+    "namespace": [
+        {
+            "name": "s3",
+            "id": "s3",
+            "inactive": false
+        },
+        {
+            "name": "swift",
+            "id": "swift",
+            "inactive": false
+        }
+    ]
+}

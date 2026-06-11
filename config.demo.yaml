@@ -1,0 +1,17 @@
+---
+# Exporter config for the Compose demo stacks. Points at the bundled `mockecs`
+# service (a fake ECS management API), so the dashboard populates without real
+# hardware. For a real cluster, change `host` and credentials and drop mockecs.
+server:
+  host: "0.0.0.0"
+  port: "9438"
+  uri: "/metrics"
+collection:
+  interval: "30s" # tighter than the 5m default so the demo refreshes quickly
+  timeout: "15s"
+clusters:
+  - name: ecs-demo-01
+    host: mockecs # the mockecs service; :4443 implied
+    username: monitor
+    password: "demo"
+    insecureSkipVerify: true

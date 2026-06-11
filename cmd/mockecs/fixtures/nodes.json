@@ -1,0 +1,49 @@
+{
+    "title": "nodes List",
+    "_links": {
+        "self": { "href": "/dashboard/zones/localzone/nodes" }
+    },
+    "_embedded": {
+        "instances": [{
+            "apiChange": "1",
+            "id": "node-id1",
+            "displayName": "supr01-r01",
+            "healthStatus": "Good",
+            "numDisks": "40",
+            "numGoodDisks": "40",
+            "numBadDisks": "0",
+            "numMaintenanceDisks": "0",
+            "numReadyToReplaceDisks": "0",
+            "storagePoolName": "SP2",
+            "diskSpaceTotal": [ {"t": "12345678", "Space": 500}, {"t": "23435455", "Space": 510} ],
+            "diskSpaceFree": [ {"t": "12345678", "Space": 100}, {"t": "23435455", "Space": 90} ],
+            "diskSpaceAllocated": [ {"t": "12345678", "Space": 400}, {"t": "23435455", "Space": 420} ],
+            "nodeCpuUtilization": [ {"t": "12345678", "Percent": 10}, {"t": "23435455", "Percent": 43} ],
+            "nodeMemoryUtilization": [ {"t": "12345678", "Percent": 30}, {"t": "23435455", "Percent": 35} ],
+            "nodeMemoryUtilizationBytes": [ {"t": "12345678", "Bytes": 10000}, {"t": "23435455", "Bytes": 11000} ],
+            "nodeNicReceivedBandwidth": [ {"t": "12345678", "Bandwidth": 1000}, {"t": "23435455", "Bandwidth": 4300} ],
+            "nodeNicTransmittedBandwidth": [ {"t": "12345678", "Bandwidth": 900}, {"t": "23435455", "Bandwidth": 3009} ],
+            "nodeNicUtilization": [ {"t": "12345678", "Percent": 12}, {"t": "23435455", "Percent": 14} ],
+            "transactionReadLatency": [ {"t": "12345678", "Latency": 9} ],
+            "transactionWriteLatency": [ {"t": "12345678", "Latency": 19} ],
+            "transactionReadBandwidth": [ {"t": "12345678", "Bandwidth": 80} ],
+            "transactionWriteBandwidth": [ {"t": "12345678", "Bandwidth": 160} ],
+            "transactionReadTransactionsPerSec": [ {"t": "12345678", "TPS": 800} ],
+            "transactionWriteTransactionsPerSec": [ {"t": "12345678", "TPS": 1600} ]
+        }, {
+            "apiChange": "1",
+            "id": "node-id2",
+            "displayName": "supr01-r02",
+            "healthStatus": "Bad",
+            "numDisks": "40",
+            "numGoodDisks": "39",
+            "numBadDisks": "1",
+            "numMaintenanceDisks": "0",
+            "numReadyToReplaceDisks": "1",
+            "diskSpaceTotal": [ {"t": "12345678", "Space": 500} ],
+            "diskSpaceFree": [ {"t": "12345678", "Space": 50} ],
+            "diskSpaceAllocated": [ {"t": "12345678", "Space": 450} ],
+            "nodeCpuUtilization": [ {"t": "12345678", "Percent": 88} ]
+        }]
+    }
+}
