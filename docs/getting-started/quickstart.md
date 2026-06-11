@@ -3,13 +3,13 @@
 ## Against a real cluster
 
 ```bash
-export ECS01_PASSWORD='...'
+export OBS1_PASSWORD='...'
 cat > config.yaml <<'YAML'
 clusters:
   - name: ecs-prod-01
     host: ecs01.example.com
     username: ecs-monitor
-    password: "${ECS01_PASSWORD}"
+    password: "${OBS1_PASSWORD}"
 YAML
 obs_exporter --config config.yaml
 curl -s localhost:9438/metrics | grep '^ecs_up'

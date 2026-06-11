@@ -21,13 +21,13 @@ Prometheus servers scrape it. An optional OTLP gRPC push reads the same snapshot
 ## Quick start
 
 ```bash
-export ECS01_PASSWORD='...'
+export OBS1_PASSWORD='...'
 cat > config.yaml <<'YAML'
 clusters:
   - name: ecs-prod-01
     host: ecs01.example.com
     username: ecs-monitor
-    password: "${ECS01_PASSWORD}"
+    password: "${OBS1_PASSWORD}"
 YAML
 ./obs_exporter --config config.yaml      # serves :9438/metrics and /health
 ```

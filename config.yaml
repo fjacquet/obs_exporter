@@ -12,10 +12,14 @@ otlp:
   insecure: false
   interval: "10s"
 clusters:
-  - name: ecs-prod-01
-    host: ecs01.example.com
-    username: ecs-monitor
-    password: "${ECS01_PASSWORD}"
+  # Single-cluster quickstart: set OBS1_HOSTNAME, OBS1_USERNAME, OBS1_PASSWORD in
+  # the environment (or a .env file) and the values below expand automatically.
+  # config.yaml is the source of truth — for multiple clusters add one entry per
+  # cluster, with literal values or your own ${OBS2_*} refs.
+  - name: obs-prod-01
+    host: "${OBS1_HOSTNAME}"
+    username: "${OBS1_USERNAME}"
+    password: "${OBS1_PASSWORD}"
     # mgmtPort: 4443
     # insecureSkipVerify disables TLS certificate verification (man-in-the-middle
     # risk). Leave it off in production; only enable for dev/test against a
