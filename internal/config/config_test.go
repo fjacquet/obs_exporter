@@ -1,0 +1,155 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func write(t *testing.T, content string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestLoadDefaults(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: secret
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Server.Port != "9438" || cfg.Server.URI != "/metrics" {
+		t.Errorf("server defaults wrong: %+v", cfg.Server)
+	}
+	if cfg.Collection.Interval != 5*time.Minute || cfg.Collection.Timeout != 60*time.Second {
+		t.Errorf("collection defaults wrong: %+v", cfg.Collection)
+	}
+	c := cfg.Clusters[0]
+	if c.MgmtPort != 4443 || c.ObjPort != 9021 || c.DTPort != 9101 {
+		t.Errorf("port defaults wrong: %+v", c)
+	}
+	if c.BaseURL() != "https://ecs1.example.com:4443" {
+		t.Errorf("BaseURL = %s", c.BaseURL())
+	}
+	if !c.MeteringEnabled() {
+		t.Error("metering should default to enabled")
+	}
+	if c.CollectDT {
+		t.Error("DT collection should default to disabled")
+	}
+}
+
+func TestLoadEnvInterpolation(t *testing.T) {
+	t.Setenv("ECS1_PASSWORD", "s3cr3t")
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: "${ECS1_PASSWORD}"
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].Password != "s3cr3t" {
+		t.Errorf("password = %q", cfg.Clusters[0].Password)
+	}
+}
+
+func TestLoadMissingEnvFails(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: "${DEFINITELY_NOT_SET_12345}"
+`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for unset env var")
+	}
+}
+
+func TestLoadPasswordFile(t *testing.T) {
+	pwFile := filepath.Join(t.TempDir(), "pw")
+	if err := os.WriteFile(pwFile, []byte("filepw\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    passwordFile: `+pwFile+`
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].Password != "filepw" {
+		t.Errorf("password = %q", cfg.Clusters[0].Password)
+	}
+}
+
+func TestLoadNoClustersFails(t *testing.T) {
+	p := write(t, `server: {port: "9438"}`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for empty cluster list")
+	}
+}
+
+func TestLoadMeteringDisable(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    collectMetering: false
+    collectDT: true
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].MeteringEnabled() {
+		t.Error("metering should be disabled")
+	}
+	if !cfg.Clusters[0].CollectDT {
+		t.Error("DT should be enabled")
+	}
+}
+
+func TestWatcherTrigger(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+`)
+	w, err := NewWatcher(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	w.Trigger()
+	select {
+	case cfg := <-w.Updates():
+		if cfg.Clusters[0].Name != "ecs1" {
+			t.Errorf("unexpected config: %+v", cfg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no update received")
+	}
+}

@@ -1,0 +1,34 @@
+{
+    "_links": {
+        "self": { "href": "/dashboard/zones/localzone/replicationgroups" }
+    },
+    "_embedded": {
+        "instances": [{
+            "_links": {
+                "self": { "href": "/dashboard/replicationgroups/rg-id1" }
+            },
+            "apiChange": "1",
+            "id": "rg-id1",
+            "name": "rg_name1",
+            "numZones": 3,
+            "replicationRpoLag": "7200",
+            "replicationIngressTraffic": [ {"t": "12345678", "Bandwidth": 10000}, {"t": "23435455", "Bandwidth": 12000} ],
+            "replicationEgressTraffic": [ {"t": "12345678", "Bandwidth": 9000}, {"t": "23435455", "Bandwidth": 9500} ],
+            "chunksRepoPendingReplicationTotalSize": 500000,
+            "chunksJournalPendingReplicationTotalSize": 400000,
+            "chunksPendingXorTotalSize": 300000,
+            "replicationRpoTimestamp": 12345678
+        }, {
+            "apiChange": "1",
+            "id": "rg-id2",
+            "name": "rg_name2",
+            "numZones": 2,
+            "replicationIngressTraffic": [ {"t": "12345678", "Bandwidth": 100} ],
+            "replicationEgressTraffic": [ {"t": "12345678", "Bandwidth": 200} ],
+            "chunksRepoPendingReplicationTotalSize": 0,
+            "chunksJournalPendingReplicationTotalSize": 0,
+            "chunksPendingXorTotalSize": 0,
+            "replicationRpoTimestamp": 22345678
+        }]
+    }
+}

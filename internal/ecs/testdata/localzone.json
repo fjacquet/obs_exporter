@@ -1,0 +1,52 @@
+{
+    "_links": {
+        "self": { "href": "/dashboard/zones/localzone" }
+    },
+    "apiChange": "1",
+    "name": "vdc1",
+    "id": "localzone",
+    "numNodes": "4",
+    "numGoodNodes": "4",
+    "numBadNodes": "0",
+    "numMaintenanceNodes": "0",
+    "numDisks": "32",
+    "numGoodDisks": "31",
+    "numBadDisks": "1",
+    "numMaintenanceDisks": "0",
+    "numReadyToReplaceDisks": "0",
+    "alertsNumUnackCritical": [ { "t": "1502827401", "Count": "1" } ],
+    "alertsNumUnackError": [ { "t": "1502827401", "Count": "0" } ],
+    "alertsNumUnackInfo": [ { "t": "1502827401", "Count": "3" } ],
+    "alertsNumUnackWarning": [ { "t": "1502827401", "Count": "2" } ],
+    "chunksRepoPendingReplicationTotalSize": "1750000",
+    "chunksJournalPendingReplicationTotalSize": "1250000",
+    "replicationIngressTrafficCurrent": "50000",
+    "replicationEgressTrafficCurrent": "35000",
+    "transactionReadLatency": [ {"t": "12345678", "Latency": 11}, {"t": "23435455", "Latency": 12} ],
+    "transactionWriteLatency": [ {"t": "12345678", "Latency": 21}, {"t": "23435455", "Latency": 22} ],
+    "transactionReadBandwidth": [ {"t": "12345678", "Bandwidth": 100}, {"t": "23435455", "Bandwidth": 110} ],
+    "transactionWriteBandwidth": [ {"t": "12345678", "Bandwidth": 200}, {"t": "23435455", "Bandwidth": 220} ],
+    "transactionReadTransactionsPerSec": [ {"t": "12345678", "TPS": 1000}, {"t": "23435455", "TPS": 1100} ],
+    "transactionWriteTransactionsPerSec": [ {"t": "12345678", "TPS": 2000}, {"t": "23435455", "TPS": 2200} ],
+    "transactionErrors": {
+        "all": [ {"t": "12345678", "Rate": 30} ],
+        "errorSuccessTotals": [ {
+            "successTotal": 2020,
+            "errorTotal": 6298
+        } ],
+        "types": [ {
+            "errorType": "404 (S3)",
+            "category": "User",
+            "errorCount": "6293",
+            "errorRate": [ {"t": "1463004000", "Rate": "75.75"} ]
+        }, {
+            "errorType": "412 (ATMOS)",
+            "category": "User",
+            "errorCount": "1",
+            "errorRate": [ {"t": "12345678", "Rate": 10} ]
+        } ]
+    },
+    "diskSpaceTotalCurrent": [ {"t": "12345678", "Bytes": 10000}, {"t": "23456789", "Bytes": 12000} ],
+    "diskSpaceFreeCurrent": [ {"t": "12345678", "Bytes": 8000}, {"t": "23456789", "Bytes": 7000} ],
+    "diskSpaceAllocatedCurrent": [ {"t": "12345678", "Bytes": 2000}, {"t": "23456789", "Bytes": 5000} ]
+}

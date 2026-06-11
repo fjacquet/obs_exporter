@@ -1,0 +1,27 @@
+site_name: obs_exporter
+site_description: Prometheus + OTLP exporter for Dell EMC ECS / ObjectScale object storage
+repo_url: https://github.com/fjacquet/obs_exporter
+theme:
+  name: material
+  features: [navigation.sections, navigation.top, content.code.copy]
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - Quick start: getting-started/quickstart.md
+  - Metrics reference: metrics.md
+  - Migrating from v1: migration-v2.md
+  - Architecture decisions:
+      - Overview: adr/index.md
+      - 0001 Supply-chain hardening: adr/0001-ci-supply-chain-hardening.md
+      - 0002 Snapshot model: adr/0002-prometheus-snapshot-model.md
+      - 0003 Hand-rolled client: adr/0003-hand-rolled-client-over-goobjectscale.md
+      - 0004 Token auth & retry: adr/0004-token-auth-retry-policy.md
+      - 0005 Hot reload swap: adr/0005-config-hot-reload-rebuild-and-swap.md
+      - 0006 Naming, units & labels: adr/0006-metric-naming-units-and-label-invariant.md
+      - 0007 OBS 4.1 API alignment: adr/0007-obs-4-1-api-alignment.md

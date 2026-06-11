@@ -1,0 +1,20 @@
+{
+    "node": [
+        {
+            "ip": "10.0.0.1",
+            "version": "4.1.0.0.12345",
+            "rackId": "rack01",
+            "nodename": "supr01-r01",
+            "mgmt_ip": "10.0.0.1",
+            "data_ip": "10.1.0.1"
+        },
+        {
+            "ip": "10.0.0.2",
+            "version": "4.1.0.0.12345",
+            "rackId": "rack01",
+            "nodename": "supr01-r02",
+            "mgmt_ip": "10.0.0.2",
+            "data_ip": "10.1.0.2"
+        }
+    ]
+}

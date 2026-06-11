@@ -1,0 +1,26 @@
+{
+    "namespace_billing_infos": [
+        {
+            "namespace": "s3",
+            "valid_namespace": "true",
+            "total_size": "107.0",
+            "total_size_unit": "KB",
+            "total_objects": 8,
+            "sample_time": "2026-06-10T08:25:00Z",
+            "total_mpu_size": "10.0",
+            "total_mpu_parts": 2,
+            "next_marker": ""
+        },
+        {
+            "namespace": "swift",
+            "valid_namespace": "true",
+            "total_size": "0.0",
+            "total_size_unit": "KB",
+            "total_objects": 0,
+            "sample_time": "2026-06-10T08:25:00Z",
+            "total_mpu_size": "0.0",
+            "total_mpu_parts": 0,
+            "next_marker": ""
+        }
+    ]
+}

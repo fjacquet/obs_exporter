@@ -1,0 +1,29 @@
+---
+server:
+  host: "0.0.0.0"
+  port: "9438"
+  uri: "/metrics"
+collection:
+  interval: "5m"
+  timeout: "60s"
+# Optional OTLP gRPC metric push (disabled while endpoint is empty).
+otlp:
+  endpoint: ""
+  insecure: false
+  interval: "10s"
+clusters:
+  - name: ecs-prod-01
+    host: ecs01.example.com
+    username: ecs-monitor
+    password: "${ECS01_PASSWORD}"
+    # mgmtPort: 4443
+    # insecureSkipVerify disables TLS certificate verification (man-in-the-middle
+    # risk). Leave it off in production; only enable for dev/test against a
+    # cluster with a self-signed certificate.
+    # insecureSkipVerify: true
+    # collectMetering: namespace quota + billing usage (default true). Disable on
+    # very large clusters if the billing query is too slow for the interval.
+    # collectMetering: false
+    # collectDT: opt-in legacy node-local DT/connection scraping over ports
+    # 9101/9021 (undocumented ECS internals, kept for v1 parity).
+    # collectDT: true

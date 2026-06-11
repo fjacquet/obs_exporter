@@ -1,0 +1,99 @@
+# GoReleaser — cross-compiled binaries, archives, checksums, CycloneDX SBOM, GitHub Release.
+# Validate locally with `goreleaser check` and dry-run with `make release-snapshot`.
+# Docs: https://goreleaser.com
+version: 2
+
+project_name: obs_exporter
+
+# Normalise the optional tap PAT so templates can truthy-check it even when it is
+# absent (local snapshots) or empty (CI without the secret) — both mean "skip the cask".
+env:
+  - HOMEBREW_TAP_GITHUB_TOKEN={{ if isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN" }}{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}{{ end }}
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: obs_exporter
+    main: .
+    binary: obs_exporter
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    # Mirrors the Makefile LDFLAGS: strip + inject main.version.
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    # Reproducible builds: stamp binaries with the commit time, not build time.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  # tar.gz archives bundling the licence, README, and a sample config.
+  - id: obs_exporter
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - config.yaml
+  # Raw, un-archived binaries for consumers who script direct downloads.
+  - id: obs_exporter_bin
+    formats: [binary]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# Module-wide CycloneDX SBOM via cyclonedx-gomod (must be on PATH — `make tools-sbom`).
+# GoReleaser runs sbom commands inside ./dist, so the module root is `../`.
+# `artifacts: any` runs the command once and emits a single module SBOM, matching
+# the content of `make sbom` (cyclonedx-gomod mod -licenses -json).
+sboms:
+  - id: cyclonedx-gomod
+    artifacts: any
+    documents:
+      - "{{ .ProjectName }}_{{ .Version }}.sbom.cdx.json"
+    cmd: cyclonedx-gomod
+    args: ["mod", "-licenses", "-json", "-output", "$document", "../"]
+
+# Homebrew cask (macOS only — casks are not supported on Linux). Published to a separate
+# tap repo, which requires a cross-repo PAT (HOMEBREW_TAP_GITHUB_TOKEN); the default
+# GITHUB_TOKEN cannot push to another repo. `skip_upload` keeps releases (and local
+# snapshots) working until that secret + the tap repo exist.
+# Install: brew install --cask fjacquet/tap/obs_exporter
+homebrew_casks:
+  - name: obs_exporter
+    # Two archives (tar.gz + raw binary) share each OS/arch; point the cask at the
+    # tar.gz archive so it has one unambiguous artifact per platform.
+    ids: [obs_exporter]
+    skip_upload: '{{ if .Env.HOMEBREW_TAP_GITHUB_TOKEN }}false{{ else }}true{{ end }}'
+    repository:
+      owner: fjacquet
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    binaries:
+      - obs_exporter
+    homepage: https://github.com/fjacquet/obs_exporter
+    description: Prometheus + OTLP exporter for Dell EMC ECS / ObjectScale
+    # The binary is unsigned; strip the quarantine bit so Gatekeeper doesn't block it.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/obs_exporter"]
+          end
+
+# Use GitHub's native auto-generated release notes.
+changelog:
+  use: github-native
+
+release:
+  github:
+    owner: fjacquet
+    name: obs_exporter
+  draft: false
+  prerelease: auto
