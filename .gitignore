@@ -1,12 +1,31 @@
+# Build artifacts
 bin/
 dist/
 vendor/
-log/
-*.log
-.DS_Store
-site/
 coverage.out
+coverage.html
 /obs_exporter
 /mockecs
+
+# Logs
+log/
+*.log
+
+# Docs build (mkdocs)
+site/
+
+# Local config & secrets — never commit
 .env
+*.local.yaml
+.claude.local.md
+.claude/settings.local.json
+
+# Editor / OS noise
 .vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local tooling state
+.rtk/
