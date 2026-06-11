@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 )
@@ -72,7 +73,7 @@ func (Metering) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, erro
 	var out []Sample
 	for _, name := range names {
 		var q namespaceQuotaResp
-		if err := c.Get(ctx, fmt.Sprintf("%s/namespace/%s/quota", pathNamespaces, name), &q); err != nil {
+		if err := c.Get(ctx, fmt.Sprintf("%s/namespace/%s/quota", pathNamespaces, url.PathEscape(name)), &q); err != nil {
 			// One namespace's quota failure shouldn't drop the whole domain.
 			continue
 		}

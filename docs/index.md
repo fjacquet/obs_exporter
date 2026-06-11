@@ -11,7 +11,7 @@ publishes an immutable snapshot. Both export paths read that snapshot — Promet
 scrapes never hit the ECS API directly, and backend load is independent of how
 many Prometheus servers scrape you.
 
-```
+```text
 collection loop (every `collection.interval`)
    └─ per cluster: cluster, replication, nodes, info, metering[, dt] collectors
         → immutable Snapshot → SnapshotStore
