@@ -67,6 +67,33 @@ clusters:
 	}
 }
 
+func TestLoadEnvInterpolationHostUsername(t *testing.T) {
+	t.Setenv("ECS1_HOST", "ecs01.prod.example.com")
+	t.Setenv("ECS1_USERNAME", "ecs-monitor")
+	t.Setenv("ECS1_PASSWORD", "s3cr3t")
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: "${ECS1_HOST}"
+    username: "${ECS1_USERNAME}"
+    password: "${ECS1_PASSWORD}"
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg.Clusters[0]
+	if c.Host != "ecs01.prod.example.com" {
+		t.Errorf("host = %q", c.Host)
+	}
+	if c.Username != "ecs-monitor" {
+		t.Errorf("username = %q", c.Username)
+	}
+	if c.Password != "s3cr3t" {
+		t.Errorf("password = %q", c.Password)
+	}
+}
+
 func TestLoadMissingEnvFails(t *testing.T) {
 	p := write(t, `
 clusters:
@@ -77,6 +104,32 @@ clusters:
 `)
 	if _, err := Load(p); err == nil {
 		t.Fatal("expected error for unset env var")
+	}
+}
+
+func TestLoadMissingEnvHostFails(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: "${DEFINITELY_NOT_SET_HOST_12345}"
+    username: monitor
+    password: secret
+`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for unset host env var")
+	}
+}
+
+func TestLoadMissingEnvUsernameFails(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: "${DEFINITELY_NOT_SET_USER_12345}"
+    password: secret
+`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for unset username env var")
 	}
 }
 

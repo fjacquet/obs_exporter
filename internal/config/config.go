@@ -103,6 +103,16 @@ func Load(path string) (*Config, error) {
 	}
 	for i := range cfg.Clusters {
 		c := &cfg.Clusters[i]
+		host, err := interpolate(c.Host)
+		if err != nil {
+			return nil, fmt.Errorf("cluster %s host: %w", c.Name, err)
+		}
+		c.Host = host
+		username, err := interpolate(c.Username)
+		if err != nil {
+			return nil, fmt.Errorf("cluster %s username: %w", c.Name, err)
+		}
+		c.Username = username
 		pw, err := interpolate(c.Password)
 		if err != nil {
 			return nil, fmt.Errorf("cluster %s password: %w", c.Name, err)

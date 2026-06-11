@@ -23,7 +23,7 @@ clusters:
     host: ecs01.example.com
     mgmtPort: 4443               # management API port
     username: ecs-monitor
-    password: "${ECS01_PASSWORD}"  # ${ENV_VAR} references are interpolated
+    password: "${ECS01_PASSWORD}"  # ${ENV_VAR} works in host, username, and password
     # passwordFile: /run/secrets/ecs01  # alternative to password
     insecureSkipVerify: false    # self-signed certs (dev/test only)
     collectMetering: true        # namespace quota + billing (default true)
@@ -34,11 +34,26 @@ clusters:
 
 ## Secrets
 
-Passwords support two mechanisms, checked in order:
+`${ENV_VAR}` references are interpolated in **host**, **username**, and **password**
+at config-load time. A referenced variable that is not set causes an immediate error
+(fail fast — a typo in a secret name shows up at startup, not as repeated auth
+failures).
 
-1. `${ENV_VAR}` references inside `password` — the variable **must** be set, or
-   config loading fails (a typo'd secret fails fast instead of looping auth errors).
+Passwords additionally support a file-based alternative:
+
+1. `${ENV_VAR}` inside `password` — variable must be set.
 2. `passwordFile` — read and trimmed when `password` resolves empty.
+
+### Single-cluster vs multi-cluster
+
+`${ENV_VAR}` references are a **single-cluster convenience**: put the env ref in
+`config.yaml` (e.g. `host: "${ECS01_HOSTNAME}"`), export the variable, and you
+avoid editing the file for each environment.
+
+`config.yaml` is always the source of truth and is always consumed. For
+**multi-cluster** setups use one `clusters` entry per cluster, either with literal
+values or with per-cluster env refs (e.g. `${ECS01_PASSWORD}`, `${ECS02_PASSWORD}`)
+— there is no implicit discovery of clusters from env vars.
 
 ## Hot reload
 
