@@ -1,5 +1,12 @@
 # obs_exporter
 
+[![CI](https://github.com/fjacquet/obs_exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/fjacquet/obs_exporter/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/fjacquet/obs_exporter?include_prereleases&sort=semver)](https://github.com/fjacquet/obs_exporter/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fjacquet/obs_exporter)](https://goreportcard.com/report/github.com/fjacquet/obs_exporter)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/fjacquet/obs_exporter)](go.mod)
+[![License](https://img.shields.io/github/license/fjacquet/obs_exporter)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://fjacquet.github.io/obs_exporter/)
+
 Prometheus + OTLP exporter for **Dell EMC ECS / ObjectScale** object-storage
 clusters, built against the ObjectScale **4.1.0.0** management REST API.
 
