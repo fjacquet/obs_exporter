@@ -49,6 +49,9 @@ func run(cfgPath string, once, debug, trace bool) error {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
+	// Load .env (if present) before interpolation so the `cp .env.example .env`
+	// quickstart works for bare-metal runs too; real env vars always win.
+	config.LoadDotEnv(cfgPath)
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return err
