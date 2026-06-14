@@ -89,3 +89,15 @@ Originally forked from
 [paychex/prometheus-emcecs-exporter](https://github.com/paychex/prometheus-emcecs-exporter)
 by [Mark DeNeve](https://github.com/xphyr); v2 is a ground-up rewrite. Licensed
 under the [Apache 2.0 license](LICENSE).
+
+## Node Exporter Full (Grafana 1860)
+
+This repo bundles the community [Node Exporter Full](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
+dashboard (`node-exporter-full.json`, auto-provisioned). It visualizes **host OS** metrics
+(CPU, memory, disk, network) exposed by [`prom/node-exporter`](https://hub.docker.com/r/prom/node-exporter) —
+**not** this exporter's own metrics.
+
+`node_exporter` is **not** part of this demo stack: it belongs on the hosts you actually want to
+monitor, not bolted onto the exporter's compose. To use this dashboard, run `prom/node-exporter`
+on those hosts and add a `node-exporter` scrape job to your Prometheus; the dashboard then
+visualizes them.
