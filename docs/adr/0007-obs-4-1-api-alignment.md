@@ -41,3 +41,8 @@ adds a bulk billing POST plus richer dashboard endpoints.
 - Default deployments need only the management port (4443) open.
 - The fixture suite mirrors the 4.1 reference examples, so payload-shape
   regressions are caught by tests.
+
+## Related
+
+- [Swagger 4.2 validation findings](0008-swagger-4.2-validation-findings.md) —
+  open live-verify items (billing body, `/vdc/nodes`, content-type).
