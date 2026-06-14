@@ -1,13 +1,9 @@
 {
   "uid": "obs-overview",
-  "title": "ObjectScale — Overview",
-  "tags": [
-    "objectscale",
-    "ecs",
-    "dell",
-    "object-storage"
-  ],
-  "timezone": "browser",
+  "title": "ObjectScale \u2014 Overview",
+  "editable": true,
+  "style": "dark",
+  "timezone": "",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
@@ -15,6 +11,14 @@
     "from": "now-6h",
     "to": "now"
   },
+  "tags": [
+    "objectscale",
+    "ecs",
+    "dell",
+    "object-storage",
+    "obs-nav",
+    "overview"
+  ],
   "templating": {
     "list": [
       {
@@ -36,21 +40,52 @@
       }
     ]
   },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "ObjectScale dashboards",
+      "tags": [
+        "obs-nav"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true,
+      "targetBlank": false,
+      "icon": "external link"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "type": "dashboard",
+        "name": "Annotations & Alerts",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        }
+      }
+    ]
+  },
   "panels": [
     {
-      "id": 1,
       "type": "row",
-      "title": "Cluster health",
+      "title": "Health \u2014 is anything on fire?",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
-      }
+      },
+      "panels": [],
+      "id": 100
     },
     {
-      "id": 2,
+      "id": 1,
       "type": "stat",
       "title": "Cluster up",
       "datasource": {
@@ -65,7 +100,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "custom": {},
+          "links": [
+            {
+              "title": "Open Nodes",
+              "url": "/d/obs-nodes?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -86,7 +128,7 @@
       ]
     },
     {
-      "id": 3,
+      "id": 2,
       "type": "stat",
       "title": "Good / bad nodes",
       "datasource": {
@@ -101,7 +143,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "custom": {},
+          "links": [
+            {
+              "title": "Open Nodes",
+              "url": "/d/obs-nodes?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -131,7 +180,7 @@
       ]
     },
     {
-      "id": 4,
+      "id": 3,
       "type": "stat",
       "title": "Good / bad disks",
       "datasource": {
@@ -146,7 +195,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "custom": {},
+          "links": [
+            {
+              "title": "Open Maintenance & DT",
+              "url": "/d/obs-maintenance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -176,7 +232,7 @@
       ]
     },
     {
-      "id": 5,
+      "id": 4,
       "type": "timeseries",
       "title": "Unacknowledged alerts by severity",
       "datasource": {
@@ -185,17 +241,35 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 10,
+        "w": 6,
         "x": 14,
         "y": 1
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "custom": {
+            "spanNulls": false
+          },
+          "links": [
+            {
+              "title": "Open Maintenance & DT",
+              "url": "/d/obs-maintenance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
-      "options": {},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -209,19 +283,93 @@
       ]
     },
     {
-      "id": 6,
+      "id": 5,
+      "type": "stat",
+      "title": "Max RPO lag",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(ecs_replication_group_rpo_lag_seconds{cluster=~\"$cluster\"})",
+          "legendFormat": "max RPO",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 900
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "title": "Open Replication",
+              "url": "/d/obs-replication?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
       "type": "row",
-      "title": "Capacity",
+      "title": "Capacity runway",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 7
-      }
+      },
+      "panels": [],
+      "id": 101
     },
     {
-      "id": 7,
+      "id": 6,
       "type": "gauge",
       "title": "Capacity used %",
       "datasource": {
@@ -239,7 +387,14 @@
           "custom": {},
           "unit": "percent",
           "max": 100,
-          "min": 0
+          "min": 0,
+          "links": [
+            {
+              "title": "Open Namespaces",
+              "url": "/d/obs-namespaces?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -257,7 +412,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 7,
       "type": "timeseries",
       "title": "Cluster disk space",
       "datasource": {
@@ -266,18 +421,29 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 9,
+        "w": 12,
         "x": 6,
         "y": 8
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
+          "custom": {
+            "spanNulls": false
+          },
           "unit": "bytes"
         },
         "overrides": []
       },
-      "options": {},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -309,6 +475,72 @@
       ]
     },
     {
+      "id": 8,
+      "type": "stat",
+      "title": "Projected time to full",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_disk_space_free_bytes{cluster=~\"$cluster\"} / clamp_min(-deriv(ecs_cluster_disk_space_free_bytes{cluster=~\"$cluster\"}[1h]), 1) / 86400",
+          "legendFormat": "days to full",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 7
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
       "id": 9,
       "type": "bargauge",
       "title": "Top namespaces by usage",
@@ -317,15 +549,22 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 15,
-        "y": 8
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 16
       },
       "fieldConfig": {
         "defaults": {
           "custom": {},
-          "unit": "bytes"
+          "unit": "bytes",
+          "links": [
+            {
+              "title": "Open Namespaces",
+              "url": "/d/obs-namespaces?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -351,19 +590,20 @@
       ]
     },
     {
-      "id": 10,
       "type": "row",
-      "title": "Performance",
+      "title": "Golden signals (RED)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
-      }
+        "y": 22
+      },
+      "panels": [],
+      "id": 102
     },
     {
-      "id": 11,
+      "id": 10,
       "type": "timeseries",
       "title": "Transaction latency",
       "datasource": {
@@ -374,16 +614,34 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 17
+        "y": 23
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
-          "unit": "ms"
+          "custom": {
+            "spanNulls": false
+          },
+          "unit": "ms",
+          "links": [
+            {
+              "title": "Open Performance",
+              "url": "/d/obs-performance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
-      "options": {},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -406,6 +664,67 @@
       ]
     },
     {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Transactions per second",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 23
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "spanNulls": false
+          },
+          "unit": "ops",
+          "links": [
+            {
+              "title": "Open Performance",
+              "url": "/d/obs-performance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_transactions_read_per_second{cluster=~\"$cluster\"}",
+          "legendFormat": "read {{cluster}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_transactions_write_per_second{cluster=~\"$cluster\"}",
+          "legendFormat": "write {{cluster}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
       "id": 12,
       "type": "timeseries",
       "title": "Transaction bandwidth",
@@ -416,17 +735,35 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 8,
-        "y": 17
+        "x": 16,
+        "y": 23
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
-          "unit": "MBs"
+          "custom": {
+            "spanNulls": false
+          },
+          "unit": "MBs",
+          "links": [
+            {
+              "title": "Open Performance",
+              "url": "/d/obs-performance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
-      "options": {},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -451,45 +788,86 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Transactions per second",
+      "title": "Transaction error ratio %",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 17
+        "w": 12,
+        "x": 0,
+        "y": 31
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "options": {},
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transactions_read_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "read {{cluster}}",
+          "expr": "100 * sum(rate(ecs_cluster_transaction_errors_total{cluster=~\"$cluster\"}[5m])) / clamp_min(sum(rate(ecs_cluster_transaction_errors_total{cluster=~\"$cluster\"}[5m])) + sum(rate(ecs_cluster_transaction_successes_total{cluster=~\"$cluster\"}[5m])), 1)",
+          "legendFormat": "error ratio %",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_transactions_write_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "write {{cluster}}",
-          "refId": "B"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Open Performance",
+              "url": "/d/obs-performance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     },
     {
       "id": 14,
@@ -502,16 +880,34 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 25
+        "x": 12,
+        "y": 31
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "custom": {
+            "spanNulls": false
+          },
+          "links": [
+            {
+              "title": "Open Performance",
+              "url": "/d/obs-performance?${__url_time_range}&var-cluster=${cluster}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
-      "options": {},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
       "targets": [
         {
           "datasource": {
@@ -520,936 +916,6 @@
           },
           "expr": "ecs_cluster_transaction_errors{cluster=~\"$cluster\"}",
           "legendFormat": "{{cluster}} {{code}} ({{protocol}})",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 15,
-      "type": "timeseries",
-      "title": "Error / success totals",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 25
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_transaction_errors_total{cluster=~\"$cluster\"}",
-          "legendFormat": "errors {{cluster}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_transaction_successes_total{cluster=~\"$cluster\"}",
-          "legendFormat": "successes {{cluster}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 16,
-      "type": "row",
-      "title": "Replication",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 33
-      }
-    },
-    {
-      "id": 17,
-      "type": "timeseries",
-      "title": "Replication traffic by group",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 34
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_ingress_traffic{cluster=~\"$cluster\"}",
-          "legendFormat": "in {{cluster}} {{rg}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_egress_traffic{cluster=~\"$cluster\"}",
-          "legendFormat": "out {{cluster}} {{rg}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 18,
-      "type": "timeseries",
-      "title": "Pending replication",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 34
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_chunks_repo_pending_replication_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "repo {{cluster}} {{rg}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_chunks_journal_pending_replication_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "journal {{cluster}} {{rg}}",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_chunks_pending_xor_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "xor {{cluster}} {{rg}}",
-          "refId": "C"
-        }
-      ]
-    },
-    {
-      "id": 19,
-      "type": "stat",
-      "title": "RPO lag",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 34
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_replication_group_rpo_lag_seconds{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{rg}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 20,
-      "type": "row",
-      "title": "Nodes",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 42
-      }
-    },
-    {
-      "id": 21,
-      "type": "timeseries",
-      "title": "Node CPU",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 43
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "percent",
-          "max": 100,
-          "min": 0
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_cpu_utilization_percent{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{node}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 22,
-      "type": "timeseries",
-      "title": "Node memory",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 43
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "percent",
-          "max": 100,
-          "min": 0
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_memory_utilization_percent{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{node}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 23,
-      "type": "timeseries",
-      "title": "Node NIC bandwidth",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 43
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_nic_received_bandwidth{cluster=~\"$cluster\"}",
-          "legendFormat": "rx {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_nic_transmitted_bandwidth{cluster=~\"$cluster\"}",
-          "legendFormat": "tx {{cluster}} {{node}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 24,
-      "type": "timeseries",
-      "title": "Node disk space free",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 51
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_disk_space_free_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{node}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 25,
-      "type": "stat",
-      "title": "Unhealthy nodes",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 51
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "count(ecs_node_healthy{cluster=~\"$cluster\"} == 0) or vector(0)",
-          "legendFormat": "unhealthy",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 26,
-      "type": "timeseries",
-      "title": "Node transaction latency",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 51
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transaction_read_latency_milliseconds{cluster=~\"$cluster\"}",
-          "legendFormat": "read {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transaction_write_latency_milliseconds{cluster=~\"$cluster\"}",
-          "legendFormat": "write {{cluster}} {{node}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 27,
-      "type": "row",
-      "title": "Namespaces",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 59
-      }
-    },
-    {
-      "id": 28,
-      "type": "timeseries",
-      "title": "Namespace usage",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 60
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_namespace_used_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{namespace}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 29,
-      "type": "timeseries",
-      "title": "Namespace objects",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 60
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_namespace_objects{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{namespace}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 30,
-      "type": "timeseries",
-      "title": "Quota headroom",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 60
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_namespace_quota_hard_bytes{cluster=~\"$cluster\"} - on(cluster, namespace) ecs_namespace_used_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{namespace}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 31,
-      "type": "timeseries",
-      "title": "Namespace MPU usage",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 68
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_namespace_mpu_used_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{namespace}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 32,
-      "type": "timeseries",
-      "title": "Namespace MPU parts",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 68
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_namespace_mpu_parts{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{namespace}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 33,
-      "type": "row",
-      "title": "Node transactions",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 76
-      },
-      "panels": []
-    },
-    {
-      "id": 34,
-      "type": "timeseries",
-      "title": "Node transactions/s",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 77
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transactions_read_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "read {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transactions_write_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "write {{cluster}} {{node}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 35,
-      "type": "timeseries",
-      "title": "Node transaction bandwidth",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 77
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "MBs"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transaction_read_bandwidth_mb_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "read {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_transaction_write_bandwidth_mb_per_second{cluster=~\"$cluster\"}",
-          "legendFormat": "write {{cluster}} {{node}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 36,
-      "type": "row",
-      "title": "Disk maintenance & replacement",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 85
-      },
-      "panels": []
-    },
-    {
-      "id": 37,
-      "type": "timeseries",
-      "title": "Cluster disks needing attention",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 86
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_maintenance_disks{cluster=~\"$cluster\"}",
-          "legendFormat": "maintenance {{cluster}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_ready_to_replace_disks{cluster=~\"$cluster\"}",
-          "legendFormat": "ready-to-replace {{cluster}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 38,
-      "type": "timeseries",
-      "title": "Node disks needing attention",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 86
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_maintenance_disks{cluster=~\"$cluster\"}",
-          "legendFormat": "maintenance {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_ready_to_replace_disks{cluster=~\"$cluster\"}",
-          "legendFormat": "ready-to-replace {{cluster}} {{node}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 39,
-      "type": "row",
-      "title": "Directory Tables (opt-in)",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 94
-      },
-      "panels": []
-    },
-    {
-      "id": 40,
-      "type": "stat",
-      "title": "DT scrape up",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 95
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_dt_up{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{node}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 41,
-      "type": "timeseries",
-      "title": "Directory table counts",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 95
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_dt_total{cluster=~\"$cluster\"}",
-          "legendFormat": "total {{cluster}} {{node}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_dt_unready{cluster=~\"$cluster\"}",
-          "legendFormat": "unready {{cluster}} {{node}}",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_dt_unknown{cluster=~\"$cluster\"}",
-          "legendFormat": "unknown {{cluster}} {{node}}",
-          "refId": "C"
-        }
-      ]
-    },
-    {
-      "id": 42,
-      "type": "timeseries",
-      "title": "Active connections",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 95
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
-      },
-      "options": {},
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_node_active_connections{cluster=~\"$cluster\"}",
-          "legendFormat": "{{cluster}} {{node}}",
           "refId": "A"
         }
       ]
