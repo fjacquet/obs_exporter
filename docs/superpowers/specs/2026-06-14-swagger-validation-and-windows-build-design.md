@@ -39,14 +39,20 @@ Grafana dashboard (`grafana/dashboards/obs-overview.json`) vs emitted metrics:
 
 - Zero broken panels — every metric the dashboard references is emitted.
 - Zero documented-but-nonexistent metrics in `docs/metrics.md`.
-- 28 emitted metrics are undocumented (F4); 32 emitted metrics are uncharted (mostly
-  meta or duplicates — a subset is worth charting, see WS3).
+- 32 emitted metrics are uncharted (mostly meta or duplicates — a subset is worth
+  charting, see WS3).
+- **F4 (docs drift) — RETRACTED.** An initial full-name `grep` diff reported 28
+  emitted metrics as undocumented. On verification this was a measurement artifact:
+  `docs/metrics.md` documents those metrics via collapsed shorthand
+  (`/ _good_disks / _bad_disks`, `_write_…`, `ecs_node_dt_total / _unready / _unknown`)
+  that does not match a full-name grep. The metric documentation is complete; there is
+  no drift. WS2 is therefore dropped.
 
 ## Scope
 
-Four independent workstreams. Decision (2026-06-14): F1/F2/F3 are documented as risks
-requiring live-cluster verification; **no blind code changes** to `metering.go`,
-`info.go`, or `dt.go`.
+Three independent workstreams (WS2 retracted — see F4 above). Decision (2026-06-14):
+F1/F2/F3 are documented as risks requiring live-cluster verification; **no blind code
+changes** to `metering.go`, `info.go`, or `dt.go`.
 
 ### WS1 — Document API risks (no code change)
 
@@ -70,43 +76,11 @@ Each item documents impact, swagger evidence, and a verify-then-fix disposition.
 
 Cross-link the new ADR from ADR-0007; add it to `docs/adr/index.md`.
 
-### WS2 — Documentation drift (F4)
+### WS2 — Documentation drift — RETRACTED
 
-Add the following 28 emitted-but-undocumented metrics to `docs/metrics.md`, respecting
-the naming/units rules (ADR-0006) and the existing table format. They are chiefly the
-`*_write_*` transaction counterparts and the disk/node-health breakdowns:
-
-- ecs_cluster_bad_disks
-- ecs_cluster_bad_nodes
-- ecs_cluster_disk_space_allocated_bytes
-- ecs_cluster_disk_space_free_bytes
-- ecs_cluster_good_disks
-- ecs_cluster_good_nodes
-- ecs_cluster_maintenance_disks
-- ecs_cluster_maintenance_nodes
-- ecs_cluster_ready_to_replace_disks
-- ecs_cluster_replication_egress_traffic
-- ecs_cluster_transaction_successes_total
-- ecs_cluster_transaction_write_bandwidth_mb_per_second
-- ecs_cluster_transaction_write_latency_milliseconds
-- ecs_cluster_transactions_write_per_second
-- ecs_node_bad_disks
-- ecs_node_disk_space_allocated_bytes
-- ecs_node_disk_space_free_bytes
-- ecs_node_dt_unknown
-- ecs_node_dt_unready
-- ecs_node_good_disks
-- ecs_node_maintenance_disks
-- ecs_node_nic_transmitted_bandwidth
-- ecs_node_nic_utilization_percent
-- ecs_node_ready_to_replace_disks
-- ecs_node_transaction_write_bandwidth_mb_per_second
-- ecs_node_transaction_write_latency_milliseconds
-- ecs_node_transactions_write_per_second
-- ecs_replication_group_egress_traffic
-
-Pure documentation; no code or metric changes. The exact unit/description for each is
-derived from the emitting collector and existing sibling entries.
+The initially-reported 28 undocumented metrics were a false positive of a full-name
+`grep` diff against `docs/metrics.md`, which documents those metrics via collapsed
+shorthand. Verification confirmed the metric documentation is complete. No work.
 
 ### WS3 — Dashboard panels
 
@@ -150,6 +124,7 @@ Decision (2026-06-14): family-wide change covering windows/amd64 + windows/arm64
 ## Verification
 
 - `make ci` green (fmt-check, vet, golangci-lint, go test -race, govulncheck, build).
+  (No Go source changes in this work, but the gate guards against regressions.)
 - `goreleaser check` passes; `make release-snapshot` produces Windows `.zip` archives
   and `.exe` binaries for both arches in `dist/`.
 - `uvx --with mkdocs-material --with pymdown-extensions mkdocs build --strict` passes
