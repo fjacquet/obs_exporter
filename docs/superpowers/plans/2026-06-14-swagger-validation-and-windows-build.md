@@ -368,8 +368,9 @@ auto-appends `.exe` to the Windows binary.
 - [ ] **Step 3: Validate the GoReleaser config**
 
 Run: `goreleaser check`
-Expected: `config is valid` (exit 0). If `goreleaser` is not on PATH, run
-`make tools` first or use the repo's pinned binary.
+Expected: `config is valid` (exit 0). `goreleaser` is called directly by the Makefile
+(`release: goreleaser release --clean`), so it must be on PATH; if missing, install it
+(`brew install goreleaser` or `go install github.com/goreleaser/goreleaser/v2@latest`).
 
 - [ ] **Step 4: Dry-run the release and confirm Windows artifacts**
 
