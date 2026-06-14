@@ -20,7 +20,7 @@ builds:
     binary: obs_exporter
     env:
       - CGO_ENABLED=0
-    goos: [linux, darwin]
+    goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     flags:
       - -trimpath
@@ -34,6 +34,9 @@ archives:
   # tar.gz archives bundling the licence, README, and a sample config.
   - id: obs_exporter
     formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE

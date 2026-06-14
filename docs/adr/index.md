@@ -9,3 +9,4 @@
 | [0005](0005-config-hot-reload-rebuild-and-swap.md) | Config hot reload via SIGHUP + file watch, rebuild-and-swap |
 | [0006](0006-metric-naming-units-and-label-invariant.md) | `ecs_` prefix, unit-explicit names, `cluster` identity label, label-key invariant |
 | [0007](0007-obs-4-1-api-alignment.md) | ObjectScale 4.1 API alignment: bulk billing, dashboard nodes, opt-in DT |
+| [0008](0008-swagger-4.2-validation-findings.md) | Swagger 4.2 validation findings: open live-verify items (billing body, `/vdc/nodes`, content-type) |

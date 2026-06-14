@@ -25,3 +25,4 @@ nav:
       - 0005 Hot reload swap: adr/0005-config-hot-reload-rebuild-and-swap.md
       - 0006 Naming, units & labels: adr/0006-metric-naming-units-and-label-invariant.md
       - 0007 OBS 4.1 API alignment: adr/0007-obs-4-1-api-alignment.md
+      - 0008 Swagger 4.2 validation findings: adr/0008-swagger-4.2-validation-findings.md
