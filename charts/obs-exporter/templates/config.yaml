@@ -1,0 +1,10 @@
+{{- if and (not .Values.existingSecret) .Values.config }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "obs-exporter.fullname" . }}-config
+  labels:
+    {{- include "obs-exporter.labels" . | nindent 4 }}
+stringData:
+  config.yaml: {{ tpl .Values.config . | quote }}
+{{- end }}

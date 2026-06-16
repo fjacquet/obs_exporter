@@ -1,0 +1,15 @@
+apiVersion: v2
+name: obs-exporter
+description: Chart for obs_exporter — Prometheus + OTLP exporter for Dell EMC ECS / ObjectScale object-storage clusters
+type: application
+
+# Baseline version for local installs from source. On a release, CI overrides
+# both `version` and `appVersion` from the git tag (.github/workflows/helm-charts.yml),
+# so the published OCI chart always matches the app release — no manual bump needed.
+version: "1.2.0"
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "1.2"
