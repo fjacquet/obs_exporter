@@ -1,54 +1,71 @@
-BIN := bin/obs_exporter
-DIST := dist
+BIN  := bin/obs_exporter
+DIST ?= dist
+COVER ?= coverage.out
 IMAGE ?= obs_exporter:dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Pinned tool versions (installed by `make tools`).
-GOLANGCI_LINT_VERSION   ?= v2.12.2
+GOLANGCI_VERSION    ?= v2.12.2
+GORELEASER_VERSION  ?= v2.16.0
 CYCLONEDX_GOMOD_VERSION ?= latest
 GOVULNCHECK_VERSION     ?= latest
 
-.PHONY: tools tools-sbom fmt fmt-check vet lint test test-race test-coverage vuln \
-        ci sure cli sbom release release-snapshot docker run-cli \
-        demo demo-ghcr demo-down clean clean-dist
+.PHONY: all clean install tools tools-sbom fmt fmt-check format vet lint \
+        test test-race test-coverage build vuln sbom security docs \
+        coverage-upload release release-snapshot ci sure \
+        cli docker run-cli demo demo-ghcr demo-down clean-dist
+
+.DEFAULT_GOAL := all
+
+all: clean lint test build
 
 # --- tooling ---
 
 # Install pinned dev/CI tooling into $(GOBIN)/$GOPATH/bin.
 tools:
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
 	go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 
 # Just the SBOM generator — used by the release pipeline (GoReleaser sboms hook).
 tools-sbom:
 	go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
 
-# --- quality gates (used by CI) ---
+# --- quality gates ---
 
 fmt:
 	gofmt -w .
 fmt-check:
 	@test -z "$$(gofmt -l . | tee /dev/stderr)"
+format:
+	golangci-lint fmt
 vet:
 	go vet ./...
 lint:
-	golangci-lint run ./...
+	golangci-lint run --timeout=5m
 test:
-	go test ./...
+	go test -race -coverprofile=$(COVER) -covermode=atomic ./...
 test-race:
 	go test -race -cover ./...
 test-coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -func=coverage.out | tail -1
+	go test -coverprofile=$(COVER) ./...
+	go tool cover -func=$(COVER) | tail -1
+build:
+	go build -v ./...
 vuln:
 	govulncheck ./...
 
 # Local convenience gate.
 sure: fmt-check vet test cli
-# Aggregate gate run by CI: fmt + vet + lint + race tests + vuln + build.
-ci: fmt-check vet lint test-race vuln cli
+# Aggregate gate run by CI: lint + test + build + vuln.
+ci: lint test build vuln
+
+# --- install ---
+
+install:
+	go mod download
 
 # --- artifacts ---
 
@@ -64,13 +81,20 @@ sbom:
 	cyclonedx-gomod mod -licenses -json -output $(DIST)/sbom.cdx.json
 	@echo "wrote $(DIST)/sbom.cdx.json"
 
+security:
+	uvx semgrep scan --config auto --error --skip-unknown-extensions
+
+docs:
+	uvx --with mkdocs-material --with pymdown-extensions mkdocs build --strict --site-dir site
+
+coverage-upload:
+	uvx --from codecov-cli codecov upload-process --file $(COVER) || true
+
 # Local/dev container image (the release image is built multi-arch in CI).
 docker:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE) .
 
 # Cross-compiled binaries + archives + SBOM + checksums + GitHub Release.
-# Driven by GoReleaser (.goreleaser.yaml). Real releases run from a `v*` tag in CI;
-# this target reproduces that pipeline locally — needs a tag and GITHUB_TOKEN.
 release: tools-sbom
 	goreleaser release --clean
 
@@ -80,7 +104,6 @@ release-snapshot: tools-sbom
 	@echo "release artifacts in $(DIST)/"
 
 # End-to-end demo stack (mockecs -> exporter -> Prometheus -> Grafana).
-# Grafana: http://localhost:3000 (admin/admin). Requires a running Docker daemon.
 demo:
 	docker compose up --build
 demo-ghcr:
@@ -92,4 +115,5 @@ demo-down:
 clean-dist:
 	rm -rf $(DIST)
 clean: clean-dist
-	rm -f $(BIN) coverage.out
+	rm -rf site $(COVER) *.sarif
+	rm -f $(BIN)
