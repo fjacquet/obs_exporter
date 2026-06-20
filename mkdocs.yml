@@ -1,6 +1,7 @@
 site_name: obs_exporter
 site_description: Prometheus + OTLP exporter for Dell EMC ECS / ObjectScale object storage
 repo_url: https://github.com/fjacquet/obs_exporter
+repo_name: fjacquet/obs_exporter
 theme:
   name: material
   features: [navigation.sections, navigation.top, content.code.copy]
@@ -28,3 +29,6 @@ nav:
       - 0008 Swagger 4.2 validation findings: adr/0008-swagger-4.2-validation-findings.md
       - 0009 Modular resource collectors: adr/0009-modular-resource-collectors.md
       - 0010 mockecs demo harness: adr/0010-mockecs-demo-harness.md
+
+extra:
+  version: v2.5.2
