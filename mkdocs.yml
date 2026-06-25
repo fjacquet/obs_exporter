@@ -4,6 +4,8 @@ repo_url: https://github.com/fjacquet/obs_exporter
 repo_name: fjacquet/obs_exporter
 theme:
   name: material
+  favicon: assets/favicon.png
+  logo: assets/logo.png
   features: [navigation.sections, navigation.top, content.code.copy]
 markdown_extensions:
   - admonition
