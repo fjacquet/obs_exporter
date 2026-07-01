@@ -44,6 +44,27 @@ Passwords additionally support a file-based alternative:
 1. `${ENV_VAR}` inside `password` — variable must be set.
 2. `passwordFile` — read and trimmed when `password` resolves empty.
 
+### Passwords with special characters
+
+Any character is safe end to end — the password is sent via HTTP Basic authentication
+(base64-encoded in the `Authorization` header), so nothing needs URL-encoding. The only
+place quoting matters is **parsing at load time**, and it differs by where you put the
+password:
+
+| Source | Rule |
+|---|---|
+| `.env`, single-quoted `'…'` | Fully literal — no `$` expansion, no `\` escapes, no `#` comment. Best default. Cannot contain a literal `'`. |
+| `.env`, double-quoted `"…"` | Expands `$VAR`/`${VAR}` and processes `\` escapes. `$`, `\`, `"` are special — write `\$`, `\\`, `\"`. |
+| `.env`, unquoted | `$VAR` expands; a ` #` (space-hash) starts a comment; a value **starting** with `'`/`"` is treated as quoted. |
+| `config.yaml` inline | Only the exact `${NAME}` token is interpolated (`os.LookupEnv`), so a literal password containing `${NAME}` is treated as an env ref. Prefer referencing an env var. |
+| `passwordFile` | Read **verbatim** (only surrounding whitespace trimmed) — no interpolation, no escaping. The bulletproof option. |
+
+For quotes inside the password specifically: use double quotes to include a `'`, single
+quotes to include a `"`. If the password has **both** `'` and `"` (or a `\`, or starts
+with a quote), use `passwordFile` — it needs no escaping at all. When referencing an env
+var from `config.yaml` (`password: "${OBS1_PASSWORD}"`) the value is inserted verbatim
+and never re-scanned, so the env var itself may contain `$`, `${…}`, or any character.
+
 ### .env loading
 
 The exporter binary loads a `.env` file natively at startup — from the working
