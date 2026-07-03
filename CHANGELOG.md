@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.5.5] - 2026-07-03
+
+### Added
+- Test coverage for the `obs_exporter_build_info` metric (build-info release).
+
+## [2.5.4] - 2026-07-03
+
+### Added
+- systemd deployment assets: service unit, environment file, and deployment guide.
+
+## [2.5.3] - 2026-07-01
+
+### Changed
+- MkDocs now uses the brand icon as its favicon and logo.
+- Documented handling of special characters in the monitoring password.
+
+## [2.5.2] - 2026-06-20
+
+### Changed
+- Migrated CI to the `fjacquet/ci` make-based reusable workflows.
+- Made the `security` workflow advisory to match the central default.
+
+## [2.5.1] - 2026-06-16
+
+### Added
+- Helm chart with a lockstep publishing workflow.
+
+## [2.5.0] - 2026-06-14
+
+### Added
+- Node Exporter Full (1860) companion Grafana dashboard.
+
+## [2.4.0] - 2026-06-14
+
+### Changed
+- Split the Grafana overview into a layered on-call dashboard set.
+
+## [2.3.1] - 2026-06-14
+
+### Added
+- ADR-0009 (modular collectors) and ADR-0010 (mockecs harness).
+
+## [2.3.0] - 2026-06-14
+
+### Added
+- Windows amd64/arm64 release builds with zip archives.
+- Grafana charts for namespace MPU, node transactions, disk attention, and DT.
+- OBS 4.2 management API Swagger spec plus ADR-0008 recording its validation findings.
+
+## [2.2.0] - 2026-06-12
+
+### Added
+- Native `.env` loading at startup (no-override semantics).
+
+## [2.1.0] - 2026-06-11
+
+### Added
+- `${ENV}` expansion in the `host` and `username` config fields.
+
+### Changed
+- Adopted the `OBS1_*` env prefix and parameterized the sample cluster entry.
+
 ## [2.0.0] - 2026-06-11
 
 Full rewrite — **breaking change** for every v1 user. See
