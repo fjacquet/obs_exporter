@@ -19,6 +19,8 @@ nav:
       - Quick start: getting-started/quickstart.md
   - Metrics reference: metrics.md
   - Migrating from v1: migration-v2.md
+  - Deployment:
+      - systemd: deployment/systemd.md
   - Architecture decisions:
       - Overview: adr/index.md
       - 0001 Supply-chain hardening: adr/0001-ci-supply-chain-hardening.md
