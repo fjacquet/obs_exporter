@@ -63,6 +63,32 @@ sboms:
     cmd: cyclonedx-gomod
     args: ["mod", "-licenses", "-json", "-output", "$document", "../"]
 
+# Multi-arch container image via buildx. sbom:true attaches SBOM + provenance
+# attestations natively. Restores GHCR publishing that was lost when the repo
+# migrated to goreleaser without a docker block.
+dockers_v2:
+  - id: obs_exporter
+    ids:
+      - obs_exporter
+    dockerfile: Dockerfile.goreleaser
+    images:
+      - "ghcr.io/fjacquet/obs_exporter"
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    extra_files:
+      - config.yaml
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: "https://github.com/fjacquet/obs_exporter"
+    sbom: true
+
 # Homebrew cask (macOS only — casks are not supported on Linux). Published to a separate
 # tap repo, which requires a cross-repo PAT (HOMEBREW_TAP_GITHUB_TOKEN); the default
 # GITHUB_TOKEN cannot push to another repo. `skip_upload` keeps releases (and local

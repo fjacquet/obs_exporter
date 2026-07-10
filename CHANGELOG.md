@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [2.5.6] - 2026-07-10
+
+### Security
+- Bumped Go to 1.26.5 to patch GO-2026-5856 (crypto/tls).
+
+### Fixed
+- Restored multi-arch GHCR container image publishing via GoReleaser `dockers_v2`.
+
 ## [2.5.5] - 2026-07-03
 
 ### Added
