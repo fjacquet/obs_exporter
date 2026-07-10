@@ -1,0 +1,20 @@
+# Used by GoReleaser (dockers_v2). The binary is cross-compiled by the build pipe;
+# buildx lays it out per-platform as ${TARGETPLATFORM}/obs_exporter in the context.
+# For local/dev builds from source, use the multi-stage ./Dockerfile instead.
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates && \
+    adduser -D -u 10001 obs && \
+    mkdir -p /var/log/obs_exporter && \
+    chown obs:obs /var/log/obs_exporter
+
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/obs_exporter /usr/bin/obs_exporter
+COPY config.yaml /etc/obs_exporter/config.yaml
+
+EXPOSE 9438
+
+USER obs
+
+ENTRYPOINT ["/usr/bin/obs_exporter"]
+CMD ["--config", "/etc/obs_exporter/config.yaml"]
