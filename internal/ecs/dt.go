@@ -44,9 +44,9 @@ type DT struct {
 // NewDT builds the DT collector for one cluster's ports/TLS settings.
 func NewDT(cl config.Cluster) *DT {
 	transport := http.DefaultTransport
-	if cl.InsecureSkipVerify {
+	if cl.InsecureSkipVerify.Bool() {
 		transport = &http.Transport{TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: cl.InsecureSkipVerify, // operator opt-in for self-signed ECS certs
+			InsecureSkipVerify: cl.InsecureSkipVerify.Bool(), // operator opt-in for self-signed ECS certs
 			MinVersion:         tls.VersionTLS12,
 		}}
 	}

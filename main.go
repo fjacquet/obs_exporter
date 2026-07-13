@@ -248,7 +248,7 @@ func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 	for _, cl := range cfg.Clusters {
 		client := ecsclient.NewClusterClient(ecsclient.Config{
 			Name: cl.Name, BaseURL: cl.BaseURL(), Username: cl.Username,
-			Password: cl.Password, InsecureSkipVerify: cl.InsecureSkipVerify,
+			Password: cl.Password, InsecureSkipVerify: cl.InsecureSkipVerify.Bool(),
 			Trace: trace,
 		})
 		targets = append(targets, ecs.Target{Client: client, Collectors: ecs.Registry(cl)})

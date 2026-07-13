@@ -23,8 +23,11 @@ clusters:
     # mgmtPort: 4443
     # insecureSkipVerify disables TLS certificate verification (man-in-the-middle
     # risk). Leave it off in production; only enable for dev/test against a
-    # cluster with a self-signed certificate.
+    # cluster with a self-signed certificate. Accepts a native boolean or a
+    # ${OBS1_SKIP_CERTIFICATE} env reference, resolved at startup like host/
+    # username/password. Defaults to false.
     # insecureSkipVerify: true
+    # insecureSkipVerify: ${OBS1_SKIP_CERTIFICATE}
     # collectMetering: namespace quota + billing usage (default true). Disable on
     # very large clusters if the billing query is too slow for the interval.
     # collectMetering: false
