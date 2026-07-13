@@ -219,14 +219,14 @@ clusters:
 }
 
 func TestLoadInsecureSkipVerifyEnvRefTrue(t *testing.T) {
-	t.Setenv("ECS1_SKIP_CERTIFICATE", "true")
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "true")
 	p := write(t, `
 clusters:
   - name: ecs1
     host: ecs1.example.com
     username: monitor
     password: x
-    insecureSkipVerify: "${ECS1_SKIP_CERTIFICATE}"
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
 `)
 	cfg, err := Load(p)
 	if err != nil {
@@ -238,14 +238,14 @@ clusters:
 }
 
 func TestLoadInsecureSkipVerifyEnvRefFalse(t *testing.T) {
-	t.Setenv("ECS1_SKIP_CERTIFICATE", "false")
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "false")
 	p := write(t, `
 clusters:
   - name: ecs1
     host: ecs1.example.com
     username: monitor
     password: x
-    insecureSkipVerify: "${ECS1_SKIP_CERTIFICATE}"
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
 `)
 	cfg, err := Load(p)
 	if err != nil {
@@ -271,14 +271,14 @@ clusters:
 }
 
 func TestLoadInsecureSkipVerifyNonBoolEnvFails(t *testing.T) {
-	t.Setenv("ECS1_SKIP_CERTIFICATE", "not-a-bool")
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "not-a-bool")
 	p := write(t, `
 clusters:
   - name: ecs1
     host: ecs1.example.com
     username: monitor
     password: x
-    insecureSkipVerify: "${ECS1_SKIP_CERTIFICATE}"
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
 `)
 	if _, err := Load(p); err == nil {
 		t.Fatal("expected error for non-boolean insecureSkipVerify env value")
