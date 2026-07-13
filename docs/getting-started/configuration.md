@@ -23,9 +23,9 @@ clusters:
     host: ecs01.example.com
     mgmtPort: 4443               # management API port
     username: ecs-monitor
-    password: "${OBS1_PASSWORD}"  # ${ENV_VAR} works in host, username, and password
+    password: "${OBS1_PASSWORD}"  # ${ENV_VAR} works in host, username, password, and insecureSkipVerify
     # passwordFile: /run/secrets/ecs01  # alternative to password
-    insecureSkipVerify: false    # self-signed certs (dev/test only)
+    insecureSkipVerify: false    # self-signed certs (dev/test only); also accepts ${OBS1_SKIP_CERTIFICATE}
     collectMetering: true        # namespace quota + billing (default true)
     collectDT: false             # opt-in legacy node-local DT scraping
     # objPort: 9021              # only used by collectDT
@@ -34,10 +34,14 @@ clusters:
 
 ## Secrets
 
-`${ENV_VAR}` references are interpolated in **host**, **username**, and **password**
-at config-load time. A referenced variable that is not set causes an immediate error
-(fail fast — a typo in a secret name shows up at startup, not as repeated auth
-failures).
+`${ENV_VAR}` references are interpolated in **host**, **username**, **password**, and
+**insecureSkipVerify** at config-load time. A referenced variable that is not set causes
+an immediate error (fail fast — a typo in a secret name shows up at startup, not as
+repeated auth failures).
+
+`insecureSkipVerify` accepts either a native YAML boolean (`true`/`false`) or an
+`${ENV_VAR}` reference (e.g. `${OBS1_SKIP_CERTIFICATE}`) that resolves to a boolean
+string (`true`/`false`); it defaults to `false` when omitted.
 
 Passwords additionally support a file-based alternative:
 

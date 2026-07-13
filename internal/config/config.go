@@ -13,15 +13,15 @@ import (
 
 // Cluster is one Dell ECS cluster (VDC) to monitor.
 type Cluster struct {
-	Name               string `yaml:"name"`
-	Host               string `yaml:"host"`
-	MgmtPort           int    `yaml:"mgmtPort"` // management API, defaults to 4443
-	ObjPort            int    `yaml:"objPort"`  // object/S3 API (DT ping), defaults to 9021
-	DTPort             int    `yaml:"dtPort"`   // node-local DT stats, defaults to 9101
-	Username           string `yaml:"username"`
-	Password           string `yaml:"password"`
-	PasswordFile       string `yaml:"passwordFile"`
-	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
+	Name               string  `yaml:"name"`
+	Host               string  `yaml:"host"`
+	MgmtPort           int     `yaml:"mgmtPort"` // management API, defaults to 4443
+	ObjPort            int     `yaml:"objPort"`  // object/S3 API (DT ping), defaults to 9021
+	DTPort             int     `yaml:"dtPort"`   // node-local DT stats, defaults to 9101
+	Username           string  `yaml:"username"`
+	Password           string  `yaml:"password"`
+	PasswordFile       string  `yaml:"passwordFile"`
+	InsecureSkipVerify EnvBool `yaml:"insecureSkipVerify"`
 	// CollectDT opts in to scraping the undocumented node-local DT stats
 	// (http://<node>:9101/stats/dt/DTInitStat and https://<node>:9021/?ping).
 	CollectDT bool `yaml:"collectDT"`
@@ -124,6 +124,9 @@ func Load(path string) (*Config, error) {
 				return nil, fmt.Errorf("cluster %s passwordFile: %w", c.Name, err)
 			}
 			c.Password = strings.TrimSpace(string(b))
+		}
+		if err := c.InsecureSkipVerify.Resolve(interpolate); err != nil {
+			return nil, fmt.Errorf("cluster %s insecureSkipVerify: %w", c.Name, err)
 		}
 		if c.MgmtPort == 0 {
 			c.MgmtPort = 4443

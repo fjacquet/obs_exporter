@@ -183,6 +183,108 @@ clusters:
 	}
 }
 
+func TestLoadInsecureSkipVerifyNativeBool(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    insecureSkipVerify: true
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Clusters[0].InsecureSkipVerify.Bool() {
+		t.Error("insecureSkipVerify should be true")
+	}
+}
+
+func TestLoadInsecureSkipVerifyDefaultFalse(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].InsecureSkipVerify.Bool() {
+		t.Error("insecureSkipVerify should default to false")
+	}
+}
+
+func TestLoadInsecureSkipVerifyEnvRefTrue(t *testing.T) {
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "true")
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Clusters[0].InsecureSkipVerify.Bool() {
+		t.Error("insecureSkipVerify should resolve to true from env")
+	}
+}
+
+func TestLoadInsecureSkipVerifyEnvRefFalse(t *testing.T) {
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "false")
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].InsecureSkipVerify.Bool() {
+		t.Error("insecureSkipVerify should resolve to false from env")
+	}
+}
+
+func TestLoadInsecureSkipVerifyMissingEnvFails(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    insecureSkipVerify: "${DEFINITELY_NOT_SET_SKIP_CERT_12345}"
+`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for unset insecureSkipVerify env var")
+	}
+}
+
+func TestLoadInsecureSkipVerifyNonBoolEnvFails(t *testing.T) {
+	t.Setenv("OBS1_SKIP_CERTIFICATE", "not-a-bool")
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE}"
+`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected error for non-boolean insecureSkipVerify env value")
+	}
+}
+
 func TestWatcherTrigger(t *testing.T) {
 	p := write(t, `
 clusters:

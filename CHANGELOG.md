@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- `insecureSkipVerify` now accepts a native boolean or a `${OBS1_SKIP_CERTIFICATE}`
+  env reference, resolved at startup, matching the `${OBS1_*}` pattern already used
+  for host/username/password.
+
 ## [2.5.6] - 2026-07-10
 
 ### Security
