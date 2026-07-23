@@ -25,13 +25,15 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 | `ecs_cluster_nodes` / `_good_nodes` / `_bad_nodes` / `_maintenance_nodes` | | node counts |
 | `ecs_cluster_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | | disk counts |
 | `ecs_cluster_alerts_unacknowledged` | `severity` (`critical`/`error`/`info`/`warning`) | unacknowledged alert counts |
-| `ecs_cluster_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` | | cluster capacity |
+| `ecs_cluster_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` / `_reserved_bytes` / `_offline_total_bytes` | | cluster capacity |
 | `ecs_cluster_transaction_read_latency_milliseconds` / `_write_…` | | transaction latency |
 | `ecs_cluster_transaction_read_bandwidth_mb_per_second` / `_write_…` | | transaction bandwidth (MB/s, as reported by the dashboard API) |
 | `ecs_cluster_transactions_read_per_second` / `_write_…` | | transactions per second |
 | `ecs_cluster_transaction_errors_total` / `_successes_total` | | cumulative error/success counts |
 | `ecs_cluster_transaction_errors` | `code`, `protocol`, `category` | error counts split by HTTP code and protocol (e.g. `404`/`S3`) |
 | `ecs_cluster_replication_ingress_traffic` / `_egress_traffic` | | cluster-level replication traffic (unit as reported by the dashboard API) |
+| `ecs_cluster_replication_rpo_lag_seconds` | | VDC-wide RPO lag (seconds); zone-level counterpart of the per-group metric |
+| `ecs_cluster_replication_rpo_timestamp_seconds` | | VDC-wide unix timestamp of the recovery point |
 
 ## Replication groups
 
@@ -52,6 +54,7 @@ All with the `node` label (the node's display name).
 | Metric | Description |
 |---|---|
 | `ecs_node_healthy` | `1` when `healthStatus` is `Good` |
+| `ecs_node_health_state` (extra label `state`) | `1` for the node's current `healthStatus`; `state` is one of `good` / `suspect` / `bad` / `notaccessible` / `maintenance` (the five values the API documents), keeping e.g. bad vs maintenance distinguishable |
 | `ecs_node_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | per-node disk counts |
 | `ecs_node_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` | per-node capacity |
 | `ecs_node_cpu_utilization_percent` | CPU usage |

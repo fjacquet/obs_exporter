@@ -18,6 +18,7 @@ func TestClusterCollect(t *testing.T) {
 	mustSample(t, samples, "ecs_cluster_disks", 32)
 	mustSample(t, samples, "ecs_cluster_good_disks", 31)
 	mustSample(t, samples, "ecs_cluster_bad_disks", 1)
+	mustSample(t, samples, "ecs_cluster_maintenance_disks", 0)
 	mustSample(t, samples, "ecs_cluster_ready_to_replace_disks", 0)
 
 	mustSample(t, samples, "ecs_cluster_alerts_unacknowledged", 1, Label{"severity", "critical"})
@@ -25,10 +26,15 @@ func TestClusterCollect(t *testing.T) {
 	mustSample(t, samples, "ecs_cluster_alerts_unacknowledged", 3, Label{"severity", "info"})
 	mustSample(t, samples, "ecs_cluster_alerts_unacknowledged", 2, Label{"severity", "warning"})
 
-	// "Current" value must be the newest point of each series.
+	// "Current" value must be the newest point of each series. Values are
+	// internally coherent per the ECS model total = allocated + free + reserved
+	// (offline is a separate dimension, not part of the online total):
+	// 12000 = 5000 + 5500 + 1500.
 	mustSample(t, samples, "ecs_cluster_disk_space_total_bytes", 12000)
-	mustSample(t, samples, "ecs_cluster_disk_space_free_bytes", 7000)
+	mustSample(t, samples, "ecs_cluster_disk_space_free_bytes", 5500)
 	mustSample(t, samples, "ecs_cluster_disk_space_allocated_bytes", 5000)
+	mustSample(t, samples, "ecs_cluster_disk_space_reserved_bytes", 1500)
+	mustSample(t, samples, "ecs_cluster_disk_space_offline_total_bytes", 300)
 
 	mustSample(t, samples, "ecs_cluster_transaction_read_latency_milliseconds", 12)
 	mustSample(t, samples, "ecs_cluster_transaction_write_latency_milliseconds", 22)
@@ -46,6 +52,9 @@ func TestClusterCollect(t *testing.T) {
 
 	mustSample(t, samples, "ecs_cluster_replication_ingress_traffic", 50000)
 	mustSample(t, samples, "ecs_cluster_replication_egress_traffic", 35000)
+
+	mustSample(t, samples, "ecs_cluster_replication_rpo_lag_seconds", 7200)
+	mustSample(t, samples, "ecs_cluster_replication_rpo_timestamp_seconds", 1502820000)
 }
 
 func TestSplitErrorType(t *testing.T) {
