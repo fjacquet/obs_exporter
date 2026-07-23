@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+- Node and replication-group collectors now read the HAL list under the
+  `_embedded._instances` key actually emitted by ECS/ObjectScale clusters
+  (confirmed live against 4.3). They previously used `_embedded.instances` as
+  shown in the Dell REST API reference, which no real cluster returns — so every
+  `ecs_node_*` and `ecs_replication_group_*` metric was silently absent while the
+  collectors still reported healthy. Some clusters may follow the documented
+  `instances` form; supporting both keys is under discussion.
+- Cluster-level `ecs_cluster_replication_ingress_traffic` / `_egress_traffic` are
+  now decoded as time-series arrays (`[{"t":…,"Bandwidth":…}]`), the shape real
+  clusters return (confirmed live against 4.3). They were typed as scalars and so
+  silently dropped, even though the field was present. The per-RG equivalents were
+  already correct.
+
+### Added
+- Cluster capacity gains `ecs_cluster_disk_space_reserved_bytes` and
+  `ecs_cluster_disk_space_offline_total_bytes` (from `diskSpaceReservedCurrent` /
+  `diskSpaceOfflineTotalCurrent` in the local-zone dashboard payload).
+- VDC-wide replication RPO: `ecs_cluster_replication_rpo_lag_seconds` and
+  `ecs_cluster_replication_rpo_timestamp_seconds`, complementing the existing
+  per-group `ecs_replication_group_rpo_*` metrics.
+- Per-node health state `ecs_node_health_state{state}` preserving the
+  good/bad/maintenance distinction alongside the boolean `ecs_node_healthy`.
+
+All new fields are sourced from the dashboard API and verified present and
+type-stable across the ObjectScale 4.1, 4.2, and 4.3 management API references.
+
 ## [2.6.0] - 2026-07-14
 
 ### Added

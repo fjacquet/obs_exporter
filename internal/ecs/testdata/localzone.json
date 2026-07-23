@@ -20,8 +20,10 @@
     "alertsNumUnackWarning": [ { "t": "1502827401", "Count": "2" } ],
     "chunksRepoPendingReplicationTotalSize": "1750000",
     "chunksJournalPendingReplicationTotalSize": "1250000",
-    "replicationIngressTrafficCurrent": "50000",
-    "replicationEgressTrafficCurrent": "35000",
+    "replicationIngressTrafficCurrent": [ {"t": "12345678", "Bandwidth": 48000}, {"t": "23456789", "Bandwidth": 50000} ],
+    "replicationEgressTrafficCurrent": [ {"t": "12345678", "Bandwidth": 33000}, {"t": "23456789", "Bandwidth": 35000} ],
+    "replicationRpoTimestamp": "1502820000",
+    "replicationRpoLag": "7200",
     "transactionReadLatency": [ {"t": "12345678", "Latency": 11}, {"t": "23435455", "Latency": 12} ],
     "transactionWriteLatency": [ {"t": "12345678", "Latency": 21}, {"t": "23435455", "Latency": 22} ],
     "transactionReadBandwidth": [ {"t": "12345678", "Bandwidth": 100}, {"t": "23435455", "Bandwidth": 110} ],
@@ -47,6 +49,8 @@
         } ]
     },
     "diskSpaceTotalCurrent": [ {"t": "12345678", "Bytes": 10000}, {"t": "23456789", "Bytes": 12000} ],
-    "diskSpaceFreeCurrent": [ {"t": "12345678", "Bytes": 8000}, {"t": "23456789", "Bytes": 7000} ],
-    "diskSpaceAllocatedCurrent": [ {"t": "12345678", "Bytes": 2000}, {"t": "23456789", "Bytes": 5000} ]
+    "diskSpaceFreeCurrent": [ {"t": "12345678", "Bytes": 7000}, {"t": "23456789", "Bytes": 5500} ],
+    "diskSpaceAllocatedCurrent": [ {"t": "12345678", "Bytes": 2000}, {"t": "23456789", "Bytes": 5000} ],
+    "diskSpaceReservedCurrent": [ {"t": "12345678", "Bytes": 1000}, {"t": "23456789", "Bytes": 1500} ],
+    "diskSpaceOfflineTotalCurrent": [ {"t": "12345678", "Bytes": 200}, {"t": "23456789", "Bytes": 300} ]
 }

@@ -46,8 +46,8 @@ func TestPromCollectorGather(t *testing.T) {
 	if got := families["ecs_cluster_alerts_unacknowledged"]; got != 4 {
 		t.Errorf("alerts series = %d, want 4 (one per severity)", got)
 	}
-	if got := families["ecs_node_healthy"]; got != 2 {
-		t.Errorf("node healthy series = %d, want 2", got)
+	if got := families["ecs_node_healthy"]; got != 5 {
+		t.Errorf("node healthy series = %d, want 5", got)
 	}
 }
 

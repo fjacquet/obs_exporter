@@ -11,6 +11,11 @@ const pathLocalZoneNodes = "/dashboard/zones/localzone/nodes"
 
 // localZoneNodesResp models GET /dashboard/zones/localzone/nodes (OBS 4.1): a
 // HAL-style list of per-node dashboard instances.
+//
+// The array key is "_instances" (underscore), which is what real ECS/ObjectScale
+// clusters emit and was confirmed live against a 4.3 cluster. The Dell REST API
+// reference (4.1 through 4.3) documents it without the underscore ("instances"),
+// but that form is never actually returned; using it silently yields zero nodes.
 type localZoneNodesResp struct {
 	Embedded struct {
 		Instances []struct {
@@ -41,7 +46,7 @@ type localZoneNodesResp struct {
 			TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
 			TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
 			TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
-		} `json:"instances"`
+		} `json:"_instances"`
 	} `json:"_embedded"`
 }
 
@@ -78,6 +83,21 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 			healthy = 1
 		}
 		out = append(out, Sample{Name: "ecs_node_healthy", Labels: nodeLabel, Value: healthy})
+
+		// Enum/state pattern: expose the raw health state as a label so bad and
+		// maintenance stay distinguishable (the boolean above collapses them).
+		// Only the current state is emitted; the snapshot model drops stale
+		// state series on the next cycle without manual bookkeeping.
+		if n.HealthStatus != "" {
+			out = append(out, Sample{
+				Name: "ecs_node_health_state",
+				Labels: []Label{
+					{Key: "node", Value: n.DisplayName},
+					{Key: "state", Value: strings.ToLower(n.HealthStatus)},
+				},
+				Value: 1,
+			})
+		}
 
 		num("ecs_node_disks", n.NumDisks)
 		num("ecs_node_good_disks", n.NumGoodDisks)

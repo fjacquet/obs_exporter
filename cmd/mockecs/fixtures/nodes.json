@@ -4,7 +4,7 @@
         "self": { "href": "/dashboard/zones/localzone/nodes" }
     },
     "_embedded": {
-        "instances": [{
+        "_instances": [{
             "apiChange": "1",
             "id": "node-id1",
             "displayName": "supr01-r01",
@@ -44,6 +44,26 @@
             "diskSpaceFree": [ {"t": "12345678", "Space": 50} ],
             "diskSpaceAllocated": [ {"t": "12345678", "Space": 450} ],
             "nodeCpuUtilization": [ {"t": "12345678", "Percent": 88} ]
+        }, {
+            "apiChange": "1",
+            "id": "node-id3",
+            "displayName": "supr01-r03",
+            "healthStatus": "Suspect"
+        }, {
+            "apiChange": "1",
+            "id": "node-id4",
+            "displayName": "supr01-r04",
+            "healthStatus": "NotAccessible"
+        }, {
+            "apiChange": "1",
+            "id": "node-id5",
+            "displayName": "supr01-r05",
+            "healthStatus": "Maintenance",
+            "numDisks": "40",
+            "numGoodDisks": "38",
+            "numBadDisks": "0",
+            "numMaintenanceDisks": "2",
+            "numReadyToReplaceDisks": "0"
         }]
     }
 }

@@ -30,9 +30,11 @@ type localZoneResp struct {
 	AlertsNumUnackInfo     Series `json:"alertsNumUnackInfo"`
 	AlertsNumUnackWarning  Series `json:"alertsNumUnackWarning"`
 
-	DiskSpaceTotalCurrent     Series `json:"diskSpaceTotalCurrent"`
-	DiskSpaceFreeCurrent      Series `json:"diskSpaceFreeCurrent"`
-	DiskSpaceAllocatedCurrent Series `json:"diskSpaceAllocatedCurrent"`
+	DiskSpaceTotalCurrent        Series `json:"diskSpaceTotalCurrent"`
+	DiskSpaceFreeCurrent         Series `json:"diskSpaceFreeCurrent"`
+	DiskSpaceAllocatedCurrent    Series `json:"diskSpaceAllocatedCurrent"`
+	DiskSpaceReservedCurrent     Series `json:"diskSpaceReservedCurrent"`
+	DiskSpaceOfflineTotalCurrent Series `json:"diskSpaceOfflineTotalCurrent"`
 
 	TransactionReadLatency             Series `json:"transactionReadLatency"`
 	TransactionWriteLatency            Series `json:"transactionWriteLatency"`
@@ -53,8 +55,15 @@ type localZoneResp struct {
 		} `json:"types"`
 	} `json:"transactionErrors"`
 
-	ReplicationIngressTrafficCurrent Num `json:"replicationIngressTrafficCurrent"`
-	ReplicationEgressTrafficCurrent  Num `json:"replicationEgressTrafficCurrent"`
+	// Real clusters return these as time-series arrays ([{"t":…,"Bandwidth":…}]),
+	// not scalars — confirmed live against 4.3. The per-RG equivalents in
+	// replication.go are already Series; the cluster-level ones were mistyped Num
+	// and silently dropped.
+	ReplicationIngressTrafficCurrent Series `json:"replicationIngressTrafficCurrent"`
+	ReplicationEgressTrafficCurrent  Series `json:"replicationEgressTrafficCurrent"`
+
+	ReplicationRpoLag       Num `json:"replicationRpoLag"`
+	ReplicationRpoTimestamp Num `json:"replicationRpoTimestamp"`
 }
 
 // Cluster collects VDC-wide health, capacity, and transaction stats from the
@@ -102,6 +111,8 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	series("ecs_cluster_disk_space_total_bytes", z.DiskSpaceTotalCurrent)
 	series("ecs_cluster_disk_space_free_bytes", z.DiskSpaceFreeCurrent)
 	series("ecs_cluster_disk_space_allocated_bytes", z.DiskSpaceAllocatedCurrent)
+	series("ecs_cluster_disk_space_reserved_bytes", z.DiskSpaceReservedCurrent)
+	series("ecs_cluster_disk_space_offline_total_bytes", z.DiskSpaceOfflineTotalCurrent)
 
 	series("ecs_cluster_transaction_read_latency_milliseconds", z.TransactionReadLatency)
 	series("ecs_cluster_transaction_write_latency_milliseconds", z.TransactionWriteLatency)
@@ -130,8 +141,11 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 		})
 	}
 
-	num("ecs_cluster_replication_ingress_traffic", z.ReplicationIngressTrafficCurrent)
-	num("ecs_cluster_replication_egress_traffic", z.ReplicationEgressTrafficCurrent)
+	series("ecs_cluster_replication_ingress_traffic", z.ReplicationIngressTrafficCurrent)
+	series("ecs_cluster_replication_egress_traffic", z.ReplicationEgressTrafficCurrent)
+
+	num("ecs_cluster_replication_rpo_lag_seconds", z.ReplicationRpoLag)
+	num("ecs_cluster_replication_rpo_timestamp_seconds", z.ReplicationRpoTimestamp)
 
 	return out, nil
 }
