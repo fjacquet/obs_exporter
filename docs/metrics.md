@@ -54,7 +54,7 @@ All with the `node` label (the node's display name).
 | Metric | Description |
 |---|---|
 | `ecs_node_healthy` | `1` when `healthStatus` is `Good` |
-| `ecs_node_health_state` (extra label `state`) | `1` for the node's current `healthStatus` (`good`/`bad`/`maintenance`/…); keeps bad vs maintenance distinguishable |
+| `ecs_node_health_state` (extra label `state`) | `1` for the node's current `healthStatus`; `state` is one of `good` / `suspect` / `bad` / `notaccessible` / `maintenance` (the five values the API documents), keeping e.g. bad vs maintenance distinguishable |
 | `ecs_node_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | per-node disk counts |
 | `ecs_node_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` | per-node capacity |
 | `ecs_node_cpu_utilization_percent` | CPU usage |

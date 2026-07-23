@@ -34,8 +34,12 @@ func TestPromCollectorGather(t *testing.T) {
 		"ecs_cluster_good_nodes",
 		"ecs_cluster_alerts_unacknowledged",
 		"ecs_cluster_transaction_errors",
+		"ecs_cluster_disk_space_reserved_bytes",
+		"ecs_cluster_disk_space_offline_total_bytes",
+		"ecs_cluster_replication_rpo_lag_seconds",
 		"ecs_replication_group_ingress_traffic",
 		"ecs_node_cpu_utilization_percent",
+		"ecs_node_health_state",
 		"ecs_namespace_used_bytes",
 		"ecs_cluster_info",
 	} {
