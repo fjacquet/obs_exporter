@@ -34,8 +34,12 @@ func TestPromCollectorGather(t *testing.T) {
 		"ecs_cluster_good_nodes",
 		"ecs_cluster_alerts_unacknowledged",
 		"ecs_cluster_transaction_errors",
+		"ecs_cluster_disk_space_reserved_bytes",
+		"ecs_cluster_disk_space_offline_total_bytes",
+		"ecs_cluster_replication_rpo_lag_seconds",
 		"ecs_replication_group_ingress_traffic",
 		"ecs_node_cpu_utilization_percent",
+		"ecs_node_health_state",
 		"ecs_namespace_used_bytes",
 		"ecs_cluster_info",
 	} {
@@ -46,8 +50,8 @@ func TestPromCollectorGather(t *testing.T) {
 	if got := families["ecs_cluster_alerts_unacknowledged"]; got != 4 {
 		t.Errorf("alerts series = %d, want 4 (one per severity)", got)
 	}
-	if got := families["ecs_node_healthy"]; got != 2 {
-		t.Errorf("node healthy series = %d, want 2", got)
+	if got := families["ecs_node_healthy"]; got != 5 {
+		t.Errorf("node healthy series = %d, want 5", got)
 	}
 }
 

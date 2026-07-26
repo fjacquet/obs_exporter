@@ -50,6 +50,13 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 	if got["ecs_cluster_good_nodes"] != 4 {
 		t.Errorf("ecs_cluster_good_nodes = %v, want 4", got["ecs_cluster_good_nodes"])
 	}
+	// New cluster capacity + RPO samples must also reach the OTLP export path.
+	if got["ecs_cluster_disk_space_reserved_bytes"] != 1500 {
+		t.Errorf("ecs_cluster_disk_space_reserved_bytes = %v, want 1500", got["ecs_cluster_disk_space_reserved_bytes"])
+	}
+	if got["ecs_cluster_replication_rpo_lag_seconds"] != 7200 {
+		t.Errorf("ecs_cluster_replication_rpo_lag_seconds = %v, want 7200", got["ecs_cluster_replication_rpo_lag_seconds"])
+	}
 	if !clusterAttr {
 		t.Error("cluster attribute missing from OTLP data points")
 	}

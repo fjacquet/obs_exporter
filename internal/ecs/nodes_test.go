@@ -13,6 +13,11 @@ func TestNodesCollect(t *testing.T) {
 
 	n1 := Label{"node", "supr01-r01"}
 	mustSample(t, samples, "ecs_node_healthy", 1, n1)
+	// Good node: health_state carries the lowercased status; no other state series.
+	mustSample(t, samples, "ecs_node_health_state", 1, n1, Label{"state", "good"})
+	if _, ok := findSample(samples, "ecs_node_health_state", n1, Label{"state", "bad"}); ok {
+		t.Error("node1 (Good) must not emit ecs_node_health_state{state=bad}")
+	}
 	mustSample(t, samples, "ecs_node_disks", 40, n1)
 	mustSample(t, samples, "ecs_node_good_disks", 40, n1)
 	mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
@@ -29,6 +34,7 @@ func TestNodesCollect(t *testing.T) {
 
 	n2 := Label{"node", "supr01-r02"}
 	mustSample(t, samples, "ecs_node_healthy", 0, n2)
+	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
 	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
 	mustSample(t, samples, "ecs_node_ready_to_replace_disks", 1, n2)
 	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 88, n2)
@@ -36,6 +42,23 @@ func TestNodesCollect(t *testing.T) {
 	if _, ok := findSample(samples, "ecs_node_nic_utilization_percent", n2); ok {
 		t.Error("nic utilization for node2 should be absent")
 	}
+
+	// All five documented healthStatus values (Good, Suspect, Bad, NotAccessible,
+	// Maintenance) must round-trip: healthy is 1 only for Good, and health_state
+	// carries every state — including the two (Suspect, NotAccessible) the v1
+	// Python exporter did not map.
+	n3 := Label{"node", "supr01-r03"} // Suspect
+	mustSample(t, samples, "ecs_node_healthy", 0, n3)
+	mustSample(t, samples, "ecs_node_health_state", 1, n3, Label{"state", "suspect"})
+
+	n4 := Label{"node", "supr01-r04"} // NotAccessible
+	mustSample(t, samples, "ecs_node_healthy", 0, n4)
+	mustSample(t, samples, "ecs_node_health_state", 1, n4, Label{"state", "notaccessible"})
+
+	n5 := Label{"node", "supr01-r05"} // Maintenance
+	mustSample(t, samples, "ecs_node_healthy", 0, n5)
+	mustSample(t, samples, "ecs_node_health_state", 1, n5, Label{"state", "maintenance"})
+	mustSample(t, samples, "ecs_node_maintenance_disks", 2, n5)
 }
 
 func TestInfoCollect(t *testing.T) {

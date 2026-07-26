@@ -9,7 +9,9 @@ import (
 const pathReplicationGroups = "/dashboard/zones/localzone/replicationgroups"
 
 // replicationGroupsResp models GET /dashboard/zones/localzone/replicationgroups
-// (OBS 4.1): a HAL-style list of per-replication-group instances.
+// (OBS 4.1): a HAL-style list of per-replication-group instances. The array key
+// is "_instances" (underscore) as emitted by real clusters, not the "instances"
+// shown in the Dell REST API reference — see localZoneNodesResp for details.
 type replicationGroupsResp struct {
 	Embedded struct {
 		Instances []struct {
@@ -22,7 +24,7 @@ type replicationGroupsResp struct {
 			ChunksPendingXorTotalSize                Num    `json:"chunksPendingXorTotalSize"`
 			ReplicationRpoTimestamp                  Num    `json:"replicationRpoTimestamp"`
 			ReplicationRpoLag                        Num    `json:"replicationRpoLag"`
-		} `json:"instances"`
+		} `json:"_instances"`
 	} `json:"_embedded"`
 }
 

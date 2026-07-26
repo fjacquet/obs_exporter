@@ -8,7 +8,9 @@
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://fjacquet.github.io/obs_exporter/)
 
 Prometheus + OTLP exporter for **Dell EMC ECS / ObjectScale** object-storage
-clusters, built against the ObjectScale **4.1.0.0** management REST API.
+clusters, built against the ObjectScale **4.1.0.0** management REST API (the
+dashboard endpoints and fields this exporter consumes are verified unchanged
+through **4.3**).
 
 A single exporter polls every configured cluster on an interval and serves the
 latest snapshot at `/metrics` — backend API load is independent of how many
