@@ -64,6 +64,14 @@ All with the `node` label (the node's display name).
 | `ecs_node_transaction_read_bandwidth_mb_per_second` / `_write_…` | per-node bandwidth |
 | `ecs_node_transactions_read_per_second` / `_write_…` | per-node TPS |
 
+!!! note "Availability varies by cluster and version"
+    `ecs_node_cpu_utilization_percent`, `ecs_node_memory_*`, `ecs_node_nic_*` and
+    the cluster-level `ecs_cluster_transaction*` metrics come from dashboard fields
+    the API reference documents but that some clusters do not populate — their
+    absence was confirmed at raw-API level on ObjectScale 4.3, where the keys are
+    simply not present in the response. Missing fields yield absent series, never
+    zeros, so these metrics may not appear at all on your cluster.
+
 ## Namespaces (metering, `collectMetering: true`)
 
 All with the `namespace` label.

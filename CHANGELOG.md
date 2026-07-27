@@ -4,7 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.7.1] - 2026-07-27
+
+### Fixed
+- The node and replication-group collectors now decode the HAL instance list
+  under **either** `_embedded._instances` (what real ECS/ObjectScale clusters
+  emit, confirmed from 3.8 through 4.3) or `_embedded.instances` (what the Dell
+  REST API reference examples show), resolving the open question left in 2.7.0.
+  Accepting only one spelling meant a cluster using the other emitted no
+  `ecs_node_*` or `ecs_replication_group_*` metrics while `ecs_collector_up` still
+  reported `1`. When neither key is present the collector now logs a warning, so
+  a future payload change leaves a trace instead of failing silently.
+
+## [2.7.0] - 2026-07-26
 
 ### Fixed
 - Node and replication-group collectors now read the HAL list under the
