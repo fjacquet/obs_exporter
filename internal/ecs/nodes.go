@@ -10,44 +10,41 @@ import (
 const pathLocalZoneNodes = "/dashboard/zones/localzone/nodes"
 
 // localZoneNodesResp models GET /dashboard/zones/localzone/nodes (OBS 4.1): a
-// HAL-style list of per-node dashboard instances.
-//
-// The array key is "_instances" (underscore), which is what real ECS/ObjectScale
-// clusters emit and was confirmed live against a 4.3 cluster. The Dell REST API
-// reference (4.1 through 4.3) documents it without the underscore ("instances"),
-// but that form is never actually returned; using it silently yields zero nodes.
+// HAL-style list of per-node dashboard instances. See halList for why both
+// spellings of the array key are accepted.
 type localZoneNodesResp struct {
-	Embedded struct {
-		Instances []struct {
-			DisplayName  string `json:"displayName"`
-			HealthStatus string `json:"healthStatus"`
+	Embedded halList[nodeInstance] `json:"_embedded"`
+}
 
-			NumDisks               Num `json:"numDisks"`
-			NumGoodDisks           Num `json:"numGoodDisks"`
-			NumBadDisks            Num `json:"numBadDisks"`
-			NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
-			NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
+// nodeInstance is one per-node entry of the local-zone dashboard payload.
+type nodeInstance struct {
+	DisplayName  string `json:"displayName"`
+	HealthStatus string `json:"healthStatus"`
 
-			DiskSpaceTotal     Series `json:"diskSpaceTotal"`
-			DiskSpaceFree      Series `json:"diskSpaceFree"`
-			DiskSpaceAllocated Series `json:"diskSpaceAllocated"`
+	NumDisks               Num `json:"numDisks"`
+	NumGoodDisks           Num `json:"numGoodDisks"`
+	NumBadDisks            Num `json:"numBadDisks"`
+	NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
+	NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
 
-			NodeCPUUtilization         Series `json:"nodeCpuUtilization"`
-			NodeMemoryUtilization      Series `json:"nodeMemoryUtilization"`
-			NodeMemoryUtilizationBytes Series `json:"nodeMemoryUtilizationBytes"`
+	DiskSpaceTotal     Series `json:"diskSpaceTotal"`
+	DiskSpaceFree      Series `json:"diskSpaceFree"`
+	DiskSpaceAllocated Series `json:"diskSpaceAllocated"`
 
-			NodeNicReceivedBandwidth    Series `json:"nodeNicReceivedBandwidth"`
-			NodeNicTransmittedBandwidth Series `json:"nodeNicTransmittedBandwidth"`
-			NodeNicUtilization          Series `json:"nodeNicUtilization"`
+	NodeCPUUtilization         Series `json:"nodeCpuUtilization"`
+	NodeMemoryUtilization      Series `json:"nodeMemoryUtilization"`
+	NodeMemoryUtilizationBytes Series `json:"nodeMemoryUtilizationBytes"`
 
-			TransactionReadLatency             Series `json:"transactionReadLatency"`
-			TransactionWriteLatency            Series `json:"transactionWriteLatency"`
-			TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
-			TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
-			TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
-			TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
-		} `json:"_instances"`
-	} `json:"_embedded"`
+	NodeNicReceivedBandwidth    Series `json:"nodeNicReceivedBandwidth"`
+	NodeNicTransmittedBandwidth Series `json:"nodeNicTransmittedBandwidth"`
+	NodeNicUtilization          Series `json:"nodeNicUtilization"`
+
+	TransactionReadLatency             Series `json:"transactionReadLatency"`
+	TransactionWriteLatency            Series `json:"transactionWriteLatency"`
+	TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
+	TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
+	TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
+	TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
 }
 
 // Nodes collects per-node health, capacity, utilization, and transaction stats
@@ -64,6 +61,7 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	if err := c.Get(ctx, pathLocalZoneNodes, &r); err != nil {
 		return nil, err
 	}
+	warnUnknownHalShape(pathLocalZoneNodes, r.Embedded.KeySeen)
 	var out []Sample
 	for _, n := range r.Embedded.Instances {
 		nodeLabel := []Label{{Key: "node", Value: n.DisplayName}}

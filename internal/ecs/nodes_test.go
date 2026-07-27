@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -59,6 +60,29 @@ func TestNodesCollect(t *testing.T) {
 	mustSample(t, samples, "ecs_node_healthy", 0, n5)
 	mustSample(t, samples, "ecs_node_health_state", 1, n5, Label{"state", "maintenance"})
 	mustSample(t, samples, "ecs_node_maintenance_disks", 2, n5)
+}
+
+func TestNodesCollectDocumentedInstancesKey(t *testing.T) {
+	mc := mockClient(t)
+	mc.Responses[pathLocalZoneNodes] = strings.ReplaceAll(
+		mc.Responses[pathLocalZoneNodes], `"_instances"`, `"instances"`)
+
+	samples, err := Nodes{}.Collect(context.Background(), mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n1 := Label{"node", "supr01-r01"}
+	mustSample(t, samples, "ecs_node_healthy", 1, n1)
+	mustSample(t, samples, "ecs_node_health_state", 1, n1, Label{"state", "good"})
+	mustSample(t, samples, "ecs_node_disks", 40, n1)
+	mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 43, n1)
+
+	n2 := Label{"node", "supr01-r02"}
+	mustSample(t, samples, "ecs_node_healthy", 0, n2)
+	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
+	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
 }
 
 func TestInfoCollect(t *testing.T) {
