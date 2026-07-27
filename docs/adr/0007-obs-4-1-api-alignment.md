@@ -20,7 +20,7 @@ adds a bulk billing POST plus richer dashboard endpoints.
   /object/billing/namespace/info?sizeunit=KB` (body `{"id": [...]}`) per cycle.
   Quota still requires per-namespace GETs.
 - **Documented node stats**: per-node metrics come from `GET
-  /dashboard/zones/localzone/nodes` (`_embedded.instances[]`) through the
+  /dashboard/zones/localzone/nodes` (`_embedded._instances[]`) through the
   management port — replacing v1's undocumented node-local scraping as the default
   node-metric source.
 - **Opt-in DT parity**: the v1 DT/connection metrics (node-local
@@ -32,6 +32,14 @@ adds a bulk billing POST plus richer dashboard endpoints.
   (including `"N/A"`), and the newest point by `t` is taken as "current". Scalars
   use a string-or-number `Num` type; unparseable values yield *absent* samples,
   never zeros.
+- **Tolerant HAL list decoding**: the nodes and replication-group endpoints return
+  their arrays under `_embedded._instances`, which is what real clusters emit (ECS
+  3.8 through ObjectScale 4.3, field-confirmed). The Dell reference examples show
+  `_embedded.instances` instead, and the bundled swagger cannot arbitrate — every
+  response body in it declares an empty schema (ADR-0008). Both spellings are
+  therefore accepted by a shared `halList[T]` decoder, which also records whether
+  either key was present so an unrecognised shape logs a warning instead of
+  silently yielding zero instances.
 - New 4.1 data exported: maintenance/ready-to-replace counts, per-RG
   `replicationRpoLag`, per-node CPU/memory/NIC.
 
@@ -39,8 +47,10 @@ adds a bulk billing POST plus richer dashboard endpoints.
 
 - Metering cost per cycle drops from O(namespaces) billing calls to one POST.
 - Default deployments need only the management port (4443) open.
-- The fixture suite mirrors the 4.1 reference examples, so payload-shape
-  regressions are caught by tests.
+- The fixture suite mirrored the 4.1 reference examples until v2.7.0, when it was
+  realigned to payloads captured from a live ObjectScale 4.3 cluster. Where the two
+  disagree — notably the HAL list key — the captured shape wins, because the
+  reference was never observed on hardware.
 
 ## Related
 

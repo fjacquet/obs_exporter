@@ -15,6 +15,10 @@ We validated the implementation against the bundled management-API swagger
   `properties: {}`), consistent with the payload weirdness recorded in ADR-0007.
   Response-field→metric mappings therefore remain fixture-derived and cannot be
   checked against the spec.
+  A concrete instance surfaced in v2.7.0: the nodes and replication-group HAL
+  arrays are keyed `_instances` on real clusters and `instances` in the reference
+  examples, and the swagger contains neither — its only `instances` token is the
+  unrelated path `/vdc/instances/storageservers`.
 
 All seven management endpoints the exporter calls exist in the swagger with matching
 methods and auth, **except** as noted below. The Grafana dashboard references only
@@ -71,3 +75,8 @@ it does.
 - No code changes are made now; the three items are tracked here until a live 4.1
   cluster is available for `Trace`-mode verification.
 - When verified, fix or close each item and update this ADR's status.
+- A live ObjectScale 4.3 cluster became reachable through the PR #18 contributor in
+  July 2026. F1 in particular should be settled there: if the swagger's wrapped
+  billing body is required, every namespace metering metric is silently absent on
+  every deployment, and no test can catch it because `cmd/mockecs` does not
+  validate request bodies.
