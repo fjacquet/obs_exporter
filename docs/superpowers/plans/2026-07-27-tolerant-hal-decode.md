@@ -26,7 +26,8 @@ Both discovered by reading the merged tree; the spec was written before these we
 
 1. **`docs/metrics.md` already lists all five health states.** Spec documentation item (a) — CodeRabbit r3639388941 — was already fixed inside PR #18 by commit `f474f1a`. `docs/metrics.md:57` already reads `good` / `suspect` / `bad` / `notaccessible` / `maintenance`. **That work is dropped from this plan.** Only the "may be absent" note remains.
 2. **`CHANGELOG.md` has no `## [2.7.0]` section.** The tag `v2.7.0` (2026-07-26) points at merge commit `369db05`, but the PR #18 entries still sit under `## [Unreleased]` (`CHANGELOG.md:7-34`). Task 5 promotes that block to a real `[2.7.0]` heading before adding `[2.7.1]`.
-3. **Deviation from the spec on one CHANGELOG point.** The spec says the "supporting both keys is under discussion" sentence "becomes resolved". That sentence is inside content already shipped as v2.7.0, so this plan leaves the released text verbatim and states the resolution in the new `[2.7.1]` entry instead. Rewriting a released changelog section hides what users of v2.7.0 actually got.
+3. **Controller ruling, 2026-07-27 — the warning is a shared helper, not an inlined block.** The plan first had Tasks 2 and 3 each inline the same three-line `if !r.Embedded.KeySeen { log… }` block. That is verbatim duplication of a logic block, which the review rubric treats as a defect. Ruling: `hal.go` owns a `warnUnknownHalShape(path string, keySeen bool)` helper and both collectors call it in one line. `hal.go` therefore imports logrus; `nodes.go` and `replication.go` do not. Tasks 1-3 below already reflect this.
+4. **Deviation from the spec on one CHANGELOG point.** The spec says the "supporting both keys is under discussion" sentence "becomes resolved". That sentence is inside content already shipped as v2.7.0, so this plan leaves the released text verbatim and states the resolution in the new `[2.7.1]` entry instead. Rewriting a released changelog section hides what users of v2.7.0 actually got.
 
 ---
 
@@ -38,7 +39,7 @@ Both discovered by reading the merged tree; the spec was written before these we
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `type halList[T any] struct { Instances []T; KeySeen bool }` with method `func (h *halList[T]) UnmarshalJSON(b []byte) error`. Tasks 2 and 3 embed this type and read both fields.
+- Produces: `type halList[T any] struct { Instances []T; KeySeen bool }` with method `func (h *halList[T]) UnmarshalJSON(b []byte) error`, plus `func warnUnknownHalShape(path string, keySeen bool)`. Tasks 2 and 3 embed the type and call the helper.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -126,7 +127,58 @@ func TestHalListRejectsMalformedList(t *testing.T) {
 		t.Fatal("want a decode error when _instances is not an array, got nil")
 	}
 }
+
+func TestWarnUnknownHalShape(t *testing.T) {
+	tests := []struct {
+		name     string
+		keySeen  bool
+		wantLogs int
+	}{
+		{name: "key seen stays silent", keySeen: true, wantLogs: 0},
+		{name: "key missing warns once", keySeen: false, wantLogs: 1},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+			defer hook.Reset()
+
+			warnUnknownHalShape("/dashboard/zones/localzone/nodes", tc.keySeen)
+
+			if got := len(hook.Entries); got != tc.wantLogs {
+				t.Fatalf("got %d log entries, want %d", got, tc.wantLogs)
+			}
+			if tc.wantLogs == 0 {
+				return
+			}
+			entry := hook.LastEntry()
+			if entry.Level != logrus.WarnLevel {
+				t.Errorf("level = %v, want warning", entry.Level)
+			}
+			if entry.Data["path"] != "/dashboard/zones/localzone/nodes" {
+				t.Errorf("path field = %v, want the endpoint path", entry.Data["path"])
+			}
+		})
+	}
+}
 ```
+
+The import block for this file is:
+
+```go
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
+)
+```
+
+`logrus/hooks/test` is a subpackage of the logrus module already required at
+`go.mod:10` (v1.9.4) — no dependency is added, but run `go mod tidy` if the
+build complains and confirm `go.mod` still lists logrus as a direct requirement
+and nothing else changed.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -141,7 +193,11 @@ Create `internal/ecs/hal.go`:
 ```go
 package ecs
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	log "github.com/sirupsen/logrus"
+)
 
 // halList decodes a HAL "_embedded" instance list.
 //
@@ -184,13 +240,29 @@ func (h *halList[T]) UnmarshalJSON(b []byte) error {
 	}
 	return nil
 }
+
+// warnUnknownHalShape logs when a HAL payload carried neither spelling of the
+// instance-array key, so an unrecognised shape leaves a trace instead of
+// silently yielding zero instances. An empty-but-present list is not a warning:
+// that is a legitimately empty cluster.
+//
+// This is deliberately a warning and not an error: a build that omits
+// "_embedded" entirely on an empty cluster would be indistinguishable from
+// shape drift, and a false ecs_collector_up=0 is worse than a missed alert.
+func warnUnknownHalShape(path string, keySeen bool) {
+	if keySeen {
+		return
+	}
+	log.WithField("path", path).
+		Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
+}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `go test ./internal/ecs/ -run TestHalList -v`
+Run: `go test ./internal/ecs/ -run 'TestHalList|TestWarnUnknownHalShape' -v`
 
-Expected: PASS — 5 subtests under `TestHalListUnmarshal` plus `TestHalListRejectsMalformedList`.
+Expected: PASS — 5 subtests under `TestHalListUnmarshal`, `TestHalListRejectsMalformedList`, and 2 subtests under `TestWarnUnknownHalShape`.
 
 - [ ] **Step 5: Commit**
 
@@ -312,25 +384,14 @@ type nodeInstance struct {
 }
 ```
 
-In the same file, extend the import block at lines 3-8 to pull in logrus:
+The import block is unchanged: the warning lives in the Task 1 helper, so this
+file does not import logrus.
+
+Inside `Collect`, insert the shape check immediately after the `c.Get` error
+check (currently `nodes.go:64-66`) and before `var out []Sample`:
 
 ```go
-import (
-	"context"
-	"strings"
-
-	"github.com/fjacquet/obs_exporter/internal/ecsclient"
-	log "github.com/sirupsen/logrus"
-)
-```
-
-Then, inside `Collect`, insert the shape check immediately after the `c.Get` error check (currently `nodes.go:64-66`) and before `var out []Sample`:
-
-```go
-	if !r.Embedded.KeySeen {
-		log.WithField("path", pathLocalZoneNodes).
-			Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
-	}
+	warnUnknownHalShape(pathLocalZoneNodes, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched — `r.Embedded.Instances` still resolves, now through the wrapper.
@@ -435,24 +496,13 @@ type replicationGroupInstance struct {
 }
 ```
 
-Extend the import block at lines 3-7 to pull in logrus:
-
-```go
-import (
-	"context"
-
-	"github.com/fjacquet/obs_exporter/internal/ecsclient"
-	log "github.com/sirupsen/logrus"
-)
-```
+The import block is unchanged: the warning lives in the Task 1 helper, so this
+file does not import logrus.
 
 Insert the shape check inside `Collect`, immediately after the `c.Get` error check (currently `replication.go:40-42`) and before `var out []Sample`:
 
 ```go
-	if !r.Embedded.KeySeen {
-		log.WithField("path", pathReplicationGroups).
-			Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
-	}
+	warnUnknownHalShape(pathReplicationGroups, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched.
