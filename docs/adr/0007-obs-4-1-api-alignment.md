@@ -47,10 +47,13 @@ adds a bulk billing POST plus richer dashboard endpoints.
 
 - Metering cost per cycle drops from O(namespaces) billing calls to one POST.
 - Default deployments need only the management port (4443) open.
-- The fixture suite mirrored the 4.1 reference examples until v2.7.0, when it was
-  realigned to payloads captured from a live ObjectScale 4.3 cluster. Where the two
-  disagree — notably the HAL list key — the captured shape wins, because the
-  reference was never observed on hardware.
+- The fixture suite is derived from the 4.1 reference examples. Since v2.7.0 it
+  carries targeted corrections where a live ObjectScale 4.3 cluster contradicted
+  the reference — the HAL list key, the cluster-level replication-traffic shape —
+  plus synthetic entries covering node health states the examples omit. Where the
+  reference and an observed payload disagree, the observed shape wins; the
+  fixtures are not captured payloads and should not be read as hardware ground
+  truth.
 
 ## Related
 

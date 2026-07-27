@@ -79,8 +79,10 @@ the Compose demo; demo-only, never published.
 
 ## Testing
 
-Fixtures in `internal/ecs/testdata/` mirror the OBS 4.1 reference examples
-(`cmd/mockecs/fixtures/` are copies — keep in sync). Collector tests run against
+Fixtures in `internal/ecs/testdata/` derive from the OBS 4.1 reference examples,
+with targeted corrections since v2.7.0 where a live ObjectScale 4.3 cluster
+contradicted the reference (`cmd/mockecs/fixtures/` are copies — keep in sync).
+Collector tests run against
 `ecsclient.Mock`; the client is tested against an httptest TLS server; export
 paths are asserted via **both** the Prometheus registry gather and the OTLP
 `ManualReader`.
