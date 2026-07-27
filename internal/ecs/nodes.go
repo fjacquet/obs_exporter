@@ -61,7 +61,7 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	if err := c.Get(ctx, pathLocalZoneNodes, &r); err != nil {
 		return nil, err
 	}
-	warnUnknownHalShape(pathLocalZoneNodes, r.Embedded.KeySeen)
+	warnUnknownHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.KeySeen)
 	var out []Sample
 	for _, n := range r.Embedded.Instances {
 		nodeLabel := []Label{{Key: "node", Value: n.DisplayName}}

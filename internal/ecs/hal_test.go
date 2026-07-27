@@ -98,7 +98,7 @@ func TestWarnUnknownHalShape(t *testing.T) {
 			hook := test.NewGlobal()
 			defer hook.Reset()
 
-			warnUnknownHalShape("/dashboard/zones/localzone/nodes", tc.keySeen)
+			warnUnknownHalShape("test-cluster", "/dashboard/zones/localzone/nodes", tc.keySeen)
 
 			if got := len(hook.Entries); got != tc.wantLogs {
 				t.Fatalf("got %d log entries, want %d", got, tc.wantLogs)
@@ -109,6 +109,9 @@ func TestWarnUnknownHalShape(t *testing.T) {
 			entry := hook.LastEntry()
 			if entry.Level != logrus.WarnLevel {
 				t.Errorf("level = %v, want warning", entry.Level)
+			}
+			if entry.Data["cluster"] != "test-cluster" {
+				t.Errorf("cluster field = %v, want the cluster name", entry.Data["cluster"])
 			}
 			if entry.Data["path"] != "/dashboard/zones/localzone/nodes" {
 				t.Errorf("path field = %v, want the endpoint path", entry.Data["path"])

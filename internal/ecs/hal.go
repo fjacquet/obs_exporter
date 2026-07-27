@@ -53,13 +53,17 @@ func (h *halList[T]) UnmarshalJSON(b []byte) error {
 // silently yielding zero instances. An empty-but-present list is not a warning:
 // that is a legitimately empty cluster.
 //
+// The cluster is included because this exporter polls many clusters per
+// cycle: a warning naming only the endpoint path would not tell an operator
+// which cluster drifted.
+//
 // This is deliberately a warning and not an error: a build that omits
 // "_embedded" entirely on an empty cluster would be indistinguishable from
 // shape drift, and a false ecs_collector_up=0 is worse than a missed alert.
-func warnUnknownHalShape(path string, keySeen bool) {
+func warnUnknownHalShape(cluster, path string, keySeen bool) {
 	if keySeen {
 		return
 	}
-	log.WithField("path", path).
+	log.WithFields(log.Fields{"cluster": cluster, "path": path}).
 		Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
 }

@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestReplicationCollect(t *testing.T) {
@@ -36,8 +39,12 @@ func TestReplicationCollect(t *testing.T) {
 // decoder must tolerate both, so the resulting samples are identical.
 func TestReplicationCollectDocumentedInstancesKey(t *testing.T) {
 	mc := mockClient(t)
-	mc.Responses[pathReplicationGroups] = strings.ReplaceAll(
-		mc.Responses[pathReplicationGroups], `"_instances"`, `"instances"`)
+	orig := mc.Responses[pathReplicationGroups]
+	rewritten := strings.ReplaceAll(orig, `"_instances"`, `"instances"`)
+	if rewritten == orig {
+		t.Fatal("fixture no longer contains the _instances key; this test would cover nothing")
+	}
+	mc.Responses[pathReplicationGroups] = rewritten
 
 	samples, err := Replication{}.Collect(context.Background(), mc)
 	if err != nil {
@@ -53,4 +60,37 @@ func TestReplicationCollectDocumentedInstancesKey(t *testing.T) {
 	rg2 := Label{"rg", "rg_name2"}
 	mustSample(t, samples, "ecs_replication_group_ingress_traffic", 100, rg2)
 	mustSample(t, samples, "ecs_replication_group_zones", 2, rg2)
+}
+
+// TestReplicationCollectUnknownShapeWarns pins the wiring between Collect and
+// warnUnknownHalShape: deleting the call site should fail this test even
+// though TestWarnUnknownHalShape covers the helper in isolation.
+func TestReplicationCollectUnknownShapeWarns(t *testing.T) {
+	hook := test.NewGlobal()
+	defer hook.Reset()
+
+	mc := mockClient(t)
+	mc.Responses[pathReplicationGroups] = `{"_embedded":{"_links":{}}}`
+
+	samples, err := Replication{}.Collect(context.Background(), mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 0 {
+		t.Fatalf("got %d samples, want 0", len(samples))
+	}
+
+	if got := len(hook.Entries); got != 1 {
+		t.Fatalf("got %d log entries, want 1", got)
+	}
+	entry := hook.LastEntry()
+	if entry.Level != logrus.WarnLevel {
+		t.Errorf("level = %v, want warning", entry.Level)
+	}
+	if entry.Data["cluster"] != mc.ClusterName {
+		t.Errorf("cluster field = %v, want %v", entry.Data["cluster"], mc.ClusterName)
+	}
+	if entry.Data["path"] != pathReplicationGroups {
+		t.Errorf("path field = %v, want %v", entry.Data["path"], pathReplicationGroups)
+	}
 }

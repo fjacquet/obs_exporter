@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestNodesCollect(t *testing.T) {
@@ -62,10 +65,21 @@ func TestNodesCollect(t *testing.T) {
 	mustSample(t, samples, "ecs_node_maintenance_disks", 2, n5)
 }
 
+// TestNodesCollectDocumentedInstancesKey serves the real fixture with the HAL
+// array key rewritten to the spelling the Dell reference documents. The
+// decoder must tolerate both, so the resulting samples are identical.
+//
+// The payload is derived from the fixture at test time on purpose: a second
+// fixture file could drift from the first, and cmd/mockecs/fixtures/ would
+// have to mirror it.
 func TestNodesCollectDocumentedInstancesKey(t *testing.T) {
 	mc := mockClient(t)
-	mc.Responses[pathLocalZoneNodes] = strings.ReplaceAll(
-		mc.Responses[pathLocalZoneNodes], `"_instances"`, `"instances"`)
+	orig := mc.Responses[pathLocalZoneNodes]
+	rewritten := strings.ReplaceAll(orig, `"_instances"`, `"instances"`)
+	if rewritten == orig {
+		t.Fatal("fixture no longer contains the _instances key; this test would cover nothing")
+	}
+	mc.Responses[pathLocalZoneNodes] = rewritten
 
 	samples, err := Nodes{}.Collect(context.Background(), mc)
 	if err != nil {
@@ -83,6 +97,39 @@ func TestNodesCollectDocumentedInstancesKey(t *testing.T) {
 	mustSample(t, samples, "ecs_node_healthy", 0, n2)
 	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
 	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
+}
+
+// TestNodesCollectUnknownShapeWarns pins the wiring between Collect and
+// warnUnknownHalShape: deleting the call site should fail this test even
+// though TestWarnUnknownHalShape covers the helper in isolation.
+func TestNodesCollectUnknownShapeWarns(t *testing.T) {
+	hook := test.NewGlobal()
+	defer hook.Reset()
+
+	mc := mockClient(t)
+	mc.Responses[pathLocalZoneNodes] = `{"_embedded":{"_links":{}}}`
+
+	samples, err := Nodes{}.Collect(context.Background(), mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) != 0 {
+		t.Fatalf("got %d samples, want 0", len(samples))
+	}
+
+	if got := len(hook.Entries); got != 1 {
+		t.Fatalf("got %d log entries, want 1", got)
+	}
+	entry := hook.LastEntry()
+	if entry.Level != logrus.WarnLevel {
+		t.Errorf("level = %v, want warning", entry.Level)
+	}
+	if entry.Data["cluster"] != mc.ClusterName {
+		t.Errorf("cluster field = %v, want %v", entry.Data["cluster"], mc.ClusterName)
+	}
+	if entry.Data["path"] != pathLocalZoneNodes {
+		t.Errorf("path field = %v, want %v", entry.Data["path"], pathLocalZoneNodes)
+	}
 }
 
 func TestInfoCollect(t *testing.T) {
