@@ -9,23 +9,23 @@ import (
 const pathReplicationGroups = "/dashboard/zones/localzone/replicationgroups"
 
 // replicationGroupsResp models GET /dashboard/zones/localzone/replicationgroups
-// (OBS 4.1): a HAL-style list of per-replication-group instances. The array key
-// is "_instances" (underscore) as emitted by real clusters, not the "instances"
-// shown in the Dell REST API reference — see localZoneNodesResp for details.
+// (OBS 4.1): a HAL-style list of per-replication-group instances. See halList
+// for why both spellings of the array key are accepted.
 type replicationGroupsResp struct {
-	Embedded struct {
-		Instances []struct {
-			Name                                     string `json:"name"`
-			NumZones                                 Num    `json:"numZones"`
-			ReplicationIngressTraffic                Series `json:"replicationIngressTraffic"`
-			ReplicationEgressTraffic                 Series `json:"replicationEgressTraffic"`
-			ChunksRepoPendingReplicationTotalSize    Num    `json:"chunksRepoPendingReplicationTotalSize"`
-			ChunksJournalPendingReplicationTotalSize Num    `json:"chunksJournalPendingReplicationTotalSize"`
-			ChunksPendingXorTotalSize                Num    `json:"chunksPendingXorTotalSize"`
-			ReplicationRpoTimestamp                  Num    `json:"replicationRpoTimestamp"`
-			ReplicationRpoLag                        Num    `json:"replicationRpoLag"`
-		} `json:"_instances"`
-	} `json:"_embedded"`
+	Embedded halList[replicationGroupInstance] `json:"_embedded"`
+}
+
+// replicationGroupInstance is one per-group entry of the dashboard payload.
+type replicationGroupInstance struct {
+	Name                                     string `json:"name"`
+	NumZones                                 Num    `json:"numZones"`
+	ReplicationIngressTraffic                Series `json:"replicationIngressTraffic"`
+	ReplicationEgressTraffic                 Series `json:"replicationEgressTraffic"`
+	ChunksRepoPendingReplicationTotalSize    Num    `json:"chunksRepoPendingReplicationTotalSize"`
+	ChunksJournalPendingReplicationTotalSize Num    `json:"chunksJournalPendingReplicationTotalSize"`
+	ChunksPendingXorTotalSize                Num    `json:"chunksPendingXorTotalSize"`
+	ReplicationRpoTimestamp                  Num    `json:"replicationRpoTimestamp"`
+	ReplicationRpoLag                        Num    `json:"replicationRpoLag"`
 }
 
 // Replication collects per-replication-group traffic, backlog, and RPO stats.
@@ -40,6 +40,7 @@ func (Replication) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, e
 	if err := c.Get(ctx, pathReplicationGroups, &r); err != nil {
 		return nil, err
 	}
+	warnUnknownHalShape(c.Name(), pathReplicationGroups, r.Embedded.KeySeen)
 	var out []Sample
 	for _, rg := range r.Embedded.Instances {
 		rgLabel := []Label{{Key: "rg", Value: rg.Name}}

@@ -29,3 +29,6 @@ Thumbs.db
 
 # Local tooling state
 .rtk/
+
+# superpowers subagent-driven-development scratch workspace
+.superpowers/

@@ -26,7 +26,9 @@ explicitly **not** a faithful ECS emulator and is **demo-only — never publishe
 (excluded from releases; see the binary list in GoReleaser/ADR-0001).
 
 `cmd/mockecs/fixtures/` are **copies** of the canonical `internal/ecs/testdata/`
-fixtures, which mirror the OBS 4.1 reference examples. The two sets are kept in
+fixtures, which derive from the OBS 4.1 reference examples with targeted
+corrections since v2.7.0 where a live ObjectScale 4.3 cluster contradicted the
+reference. The two sets are kept in
 sync deliberately: the test fixtures stay importable by `internal/ecs` tests
 without pulling a `cmd/` package into the test graph, while the embed directive
 needs the JSON physically under `cmd/mockecs/`. "Keep in sync when adding or
