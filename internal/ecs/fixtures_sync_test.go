@@ -15,38 +15,69 @@ import (
 // serves a payload missing the field a Grafana panel queries — an empty panel and
 // no failing test.
 //
-// The set is the intersection on purpose: localzone-live-4.3.json lives only in
-// testdata/ and must not be mirrored, so it is skipped rather than reported.
+// Both directories are enumerated, not just testdata/: a fixture added only on
+// the mockecs side would otherwise never be reported. One-sided files must be
+// named in allowedOneSided, so dropping a mirror is a test failure rather than a
+// silent skip.
 func TestFixturesMatchMockecs(t *testing.T) {
 	const (
 		testdata = "testdata"
 		mockecs  = "../../cmd/mockecs/fixtures"
 	)
 
-	entries, err := os.ReadDir(testdata)
-	if err != nil {
-		t.Fatalf("reading %s: %v", testdata, err)
+	// localzone-live-4.3.json is an unedited real-cluster capture read by one
+	// shape test; mirroring it into the demo server would serve a payload the
+	// demo never wants. See testdata/README.md.
+	allowedOneSided := map[string]string{
+		"localzone-live-4.3.json": "real-cluster capture, deliberately not served by mockecs",
 	}
 
+	jsonNames := func(dir string) map[string]bool {
+		t.Helper()
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatalf("reading %s: %v", dir, err)
+		}
+		out := map[string]bool{}
+		for _, e := range entries {
+			if !e.IsDir() && filepath.Ext(e.Name()) == ".json" {
+				out[e.Name()] = true
+			}
+		}
+		return out
+	}
+
+	left, right := jsonNames(testdata), jsonNames(mockecs)
+
 	compared := 0
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+	for name := range left {
+		if !right[name] {
+			if why, ok := allowedOneSided[name]; ok {
+				t.Logf("%s: present only in %s/ — %s", name, testdata, why)
+				continue
+			}
+			t.Errorf("%s exists in %s/ but not in %s/ — add the mirror or document it as one-sided",
+				name, testdata, mockecs)
 			continue
 		}
-		mirror := filepath.Join(mockecs, e.Name())
-		want, err := os.ReadFile(mirror)
+		got, err := os.ReadFile(filepath.Join(testdata, name))
 		if err != nil {
-			// Not mirrored: legitimate for fixtures only one side needs.
-			continue
+			t.Fatalf("reading %s: %v", name, err)
 		}
-		got, err := os.ReadFile(filepath.Join(testdata, e.Name()))
+		want, err := os.ReadFile(filepath.Join(mockecs, name))
 		if err != nil {
-			t.Fatalf("reading %s: %v", e.Name(), err)
+			t.Fatalf("reading mirror of %s: %v", name, err)
 		}
 		compared++
 		if !bytes.Equal(got, want) {
 			t.Errorf("%s differs between %s/ and %s/ — the two copies must stay byte-identical",
-				e.Name(), testdata, mockecs)
+				name, testdata, mockecs)
+		}
+	}
+	for name := range right {
+		if !left[name] && allowedOneSided[name] == "" {
+			t.Errorf("%s exists in %s/ but not in %s/ — the demo would serve a payload the suite never tests",
+				name, mockecs, testdata)
 		}
 	}
 

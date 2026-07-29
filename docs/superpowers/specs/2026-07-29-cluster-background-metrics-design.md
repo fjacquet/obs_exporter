@@ -1,7 +1,7 @@
 # Cluster background-process metrics — design
 
 Date: 2026-07-29
-Status: approved, not yet implemented
+Status: implemented in PR #20
 Branch base: `main` @ v2.7.1. PR #19 is merged and released, so the corrected
 `docs/metrics.md` and the v2.7.1 changelog entry this work builds on are already
 in `main`.
@@ -92,9 +92,9 @@ no documented unit, so they carry no unit suffix — matching the existing
 | Metric | Source |
 | --- | --- |
 | `ecs_cluster_gc_pending_bytes` | `gc{User,System}PendingCurrent` |
-| `ecs_cluster_gc_reclaimed_bytes` | `gc{User,System}ReclaimedCurrent` |
+| `ecs_cluster_gc_reclaimed_bytes_total` | `gc{User,System}ReclaimedCurrent` — a lifetime counter, hence `_total` |
 | `ecs_cluster_gc_unreclaimable_bytes` | `gc{User,System}UnreclaimableCurrent` |
-| `ecs_cluster_gc_detected_bytes` | `gc{User,System}TotalDetectedCurrent` |
+| `ecs_cluster_gc_detected_bytes_total` | `gc{User,System}TotalDetectedCurrent` |
 | `ecs_cluster_gc_enabled` | `gcUserDataIsEnabled` / `gcSystemMetadataIsEnabled` |
 
 The API names the two booleans asymmetrically (`UserData` / `SystemMetadata`) while

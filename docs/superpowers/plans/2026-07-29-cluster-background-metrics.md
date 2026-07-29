@@ -321,15 +321,15 @@ func TestGCFieldsSamples(t *testing.T) {
 
 	// "Current" is the newest point by t, not the first.
 	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 900, user)
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes", 8100, user)
+	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
 	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 640, user)
-	mustSample(t, got, "ecs_cluster_gc_detected_bytes", 9700, user)
+	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 9700, user)
 	mustSample(t, got, "ecs_cluster_gc_enabled", 1, user)
 
 	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 130, system)
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes", 2500, system)
+	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 2500, system)
 	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 70, system)
-	mustSample(t, got, "ecs_cluster_gc_detected_bytes", 2600, system)
+	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 2600, system)
 
 	// gcSystemMetadataIsEnabled was absent: the sample must be absent, not 0.
 	if _, ok := findSample(got, "ecs_cluster_gc_enabled", system); ok {
@@ -372,7 +372,7 @@ func TestGCFieldsSamplesUnparseableValue(t *testing.T) {
 		t.Error("an unparseable value must yield an absent sample, not zero")
 	}
 	// The rest of the family still emits.
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes", 8100, user)
+	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
 }
 ```
 
@@ -436,16 +436,16 @@ func (g gcFields) samples() []Sample {
 
 	user := Label{Key: "scope", Value: "user"}
 	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
-	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCUserReclaimed, user)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCUserReclaimed, user)
 	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
-	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCUserTotalDetected, user)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCUserTotalDetected, user)
 	flag("user", g.GCUserDataIsEnabled)
 
 	system := Label{Key: "scope", Value: "system"}
 	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
-	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCSystemReclaimed, system)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCSystemReclaimed, system)
 	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
-	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCSystemTotalDetected, system)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCSystemTotalDetected, system)
 	flag("system", g.GCSystemMetadataIsEnabled)
 
 	return out
@@ -504,9 +504,9 @@ existing `ecs_cluster_replication_rpo_timestamp_seconds` assertion (line 57):
 	gcUser := Label{"scope", "user"}
 	gcSystem := Label{"scope", "system"}
 	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes", 8100, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_detected_bytes", 9700, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
 	// The fixture omits gcSystemMetadataIsEnabled on purpose.
@@ -1239,9 +1239,9 @@ func TestLocalZoneLivePayloadShape(t *testing.T) {
 	// or the Prometheus collector drops it at scrape time (ADR-0006).
 	wantKeys := map[string][]string{
 		"ecs_cluster_gc_pending_bytes":                      {"scope"},
-		"ecs_cluster_gc_reclaimed_bytes":                    {"scope"},
+		"ecs_cluster_gc_reclaimed_bytes_total":                    {"scope"},
 		"ecs_cluster_gc_unreclaimable_bytes":                {"scope"},
-		"ecs_cluster_gc_detected_bytes":                     {"scope"},
+		"ecs_cluster_gc_detected_bytes_total":                     {"scope"},
 		"ecs_cluster_gc_enabled":                            {"scope"},
 		"ecs_cluster_disk_space_allocated_component_bytes":  {"purpose"},
 	}
@@ -1400,9 +1400,9 @@ additional API call.
 | Metric | Labels | Description |
 |---|---|---|
 | `ecs_cluster_gc_pending_bytes` | `scope` (`user`/`system`) | space detected as reclaimable but not yet reclaimed |
-| `ecs_cluster_gc_reclaimed_bytes` | `scope` | space reclaimed so far |
+| `ecs_cluster_gc_reclaimed_bytes_total` | `scope` | space reclaimed so far |
 | `ecs_cluster_gc_unreclaimable_bytes` | `scope` | space detected but not reclaimable |
-| `ecs_cluster_gc_detected_bytes` | `scope` | total space detected by GC |
+| `ecs_cluster_gc_detected_bytes_total` | `scope` | total space detected by GC |
 | `ecs_cluster_gc_enabled` | `scope` | `1` when that GC scope is enabled, `0` when explicitly disabled |
 | `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery |
 | `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API) |
@@ -1510,7 +1510,7 @@ The remaining five panels, in order, with `gridPos` laid out two per row
 | id | Title | Type | Unit | Expressions (legend) |
 |---|---|---|---|---|
 | 2 | GC backlog by scope | `timeseries` | `bytes` | `ecs_cluster_gc_pending_bytes{cluster=~"$cluster"}` (`pending {{scope}}`), `ecs_cluster_gc_unreclaimable_bytes{cluster=~"$cluster"}` (`unreclaimable {{scope}}`) |
-| 3 | GC reclaimed vs detected | `timeseries` | `bytes` | `ecs_cluster_gc_detected_bytes{cluster=~"$cluster"}` (`detected {{scope}}`), `ecs_cluster_gc_reclaimed_bytes{cluster=~"$cluster"}` (`reclaimed {{scope}}`) |
+| 3 | GC reclaimed vs detected | `timeseries` | `bytes` | `ecs_cluster_gc_detected_bytes_total{cluster=~"$cluster"}` (`detected {{scope}}`), `ecs_cluster_gc_reclaimed_bytes_total{cluster=~"$cluster"}` (`reclaimed {{scope}}`) |
 | 4 | Erasure-coded share | `stat` | `percent` | `ecs_cluster_ec_coded_ratio_percent{cluster=~"$cluster"}` (`{{cluster}}`) |
 | 5 | Erasure-coding backlog | `timeseries` | `bytes` | `ecs_cluster_ec_applicable_bytes{cluster=~"$cluster"} - ecs_cluster_ec_coded_bytes{cluster=~"$cluster"}` (`uncoded {{cluster}}`) |
 | 6 | Allocated space by purpose | `timeseries` | `bytes` | `ecs_cluster_disk_space_allocated_component_bytes{cluster=~"$cluster"}` (`{{purpose}} {{cluster}}`) |
@@ -1609,7 +1609,6 @@ tag, because they carry the same misspelling as the code.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-https://claude.ai/code/session_01P9vAnqpQXacSLWcgudSwcb
 EOF
 )"
 ```

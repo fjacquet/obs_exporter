@@ -400,8 +400,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Recovery progress",
-      "description": "Throughput and the cluster's own completion estimate. Units are as the dashboard API reports them — Dell documents none. Already a rate: never wrap in rate().",
+      "title": "Recovery throughput",
+      "description": "Throughput as the dashboard API reports it — Dell documents no unit. Already a rate: never wrap in rate().",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -437,32 +437,23 @@
             "uid": "prometheus"
           },
           "expr": "ecs_cluster_recovery_rate{cluster=~\"$cluster\"}",
-          "legendFormat": "rate {{cluster}}",
+          "legendFormat": "{{cluster}}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "ecs_cluster_recovery_complete_time_estimate{cluster=~\"$cluster\"}",
-          "legendFormat": "estimate {{cluster}}",
-          "refId": "B"
         }
       ]
     },
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Erasure-coding progress",
-      "description": "Throughput and completion estimate for the backlog plotted above. Units are as the dashboard API reports them — Dell documents none. Already a rate: never wrap in rate().",
+      "title": "Recovery time remaining",
+      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses — Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 32
       },
@@ -490,18 +481,99 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_ec_rate{cluster=~\"$cluster\"}",
-          "legendFormat": "rate {{cluster}}",
+          "expr": "ecs_cluster_recovery_complete_time_estimate{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}}",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Erasure-coding throughput",
+      "description": "Throughput as the dashboard API reports it — Dell documents no unit. Already a rate: never wrap in rate().",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
         },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_ec_rate{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Erasure-coding time remaining",
+      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses — Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "expr": "ecs_cluster_ec_complete_time_estimate{cluster=~\"$cluster\"}",
-          "legendFormat": "estimate {{cluster}}",
-          "refId": "B"
+          "legendFormat": "{{cluster}}",
+          "refId": "A"
         }
       ]
     }
