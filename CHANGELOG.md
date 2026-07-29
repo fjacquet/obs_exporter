@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Time-series metrics no longer publish a stale reading as a live value. When the
+  newest point of a dashboard series was unreadable (`"N/A"`, `null`), the parser
+  fell back to the most recent point that *did* parse and exported that instead —
+  and once it reaches Prometheus, nothing distinguishes a stale reading from a
+  current one. The newest point is now chosen first and only then read, so an
+  unreadable current reading yields an absent sample. This is the absent-never-zero
+  rule of ADR-0007 applied to the time axis, and affects every `Series` metric.
+
 ## [2.8.0] - 2026-07-29
 
 ### Added
