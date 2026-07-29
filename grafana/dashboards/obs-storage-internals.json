@@ -336,6 +336,174 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "GC enabled by scope",
+      "description": "1 when that GC scope is running. A backlog climbing while this reads 0 is the diagnosis, not a mystery.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "off",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "on",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_gc_enabled{cluster=~\"$cluster\"}",
+          "legendFormat": "{{scope}} {{cluster}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Recovery progress",
+      "description": "Throughput and the cluster's own completion estimate. Units are as the dashboard API reports them — Dell documents none. Already a rate: never wrap in rate().",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_recovery_rate{cluster=~\"$cluster\"}",
+          "legendFormat": "rate {{cluster}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_recovery_complete_time_estimate{cluster=~\"$cluster\"}",
+          "legendFormat": "estimate {{cluster}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Erasure-coding progress",
+      "description": "Throughput and completion estimate for the backlog plotted above. Units are as the dashboard API reports them — Dell documents none. Already a rate: never wrap in rate().",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_ec_rate{cluster=~\"$cluster\"}",
+          "legendFormat": "rate {{cluster}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_ec_complete_time_estimate{cluster=~\"$cluster\"}",
+          "legendFormat": "estimate {{cluster}}",
+          "refId": "B"
+        }
+      ]
     }
   ]
 }

@@ -36,16 +36,60 @@ func TestLocalZoneLivePayloadShape(t *testing.T) {
 		{"erasure coding", z.erasureCodingFields.samples()},
 		{"allocation components", z.allocationComponentFields.samples()},
 	}
-	wantCounts := map[string]int{
-		"gc":                    10,
-		"recovery":              3,
-		"erasure coding":        5,
-		"allocation components": 5,
+	// The exact multiset of metric names per family, not just how many. A count
+	// alone would pass if two adjacent appendSeries calls named the same metric —
+	// a plausible copy-paste between near-identical lines, which would emit one
+	// name twice and drop another while keeping the total intact.
+	wantNames := map[string][]string{
+		"gc": {
+			"ecs_cluster_gc_pending_bytes", "ecs_cluster_gc_pending_bytes",
+			"ecs_cluster_gc_reclaimed_bytes_total", "ecs_cluster_gc_reclaimed_bytes_total",
+			"ecs_cluster_gc_unreclaimable_bytes", "ecs_cluster_gc_unreclaimable_bytes",
+			"ecs_cluster_gc_detected_bytes_total", "ecs_cluster_gc_detected_bytes_total",
+			"ecs_cluster_gc_enabled", "ecs_cluster_gc_enabled",
+		},
+		"recovery": {
+			"ecs_cluster_recovery_bad_chunks_bytes",
+			"ecs_cluster_recovery_rate",
+			"ecs_cluster_recovery_complete_time_estimate",
+		},
+		"erasure coding": {
+			"ecs_cluster_ec_applicable_bytes",
+			"ecs_cluster_ec_coded_bytes",
+			"ecs_cluster_ec_coded_ratio_percent",
+			"ecs_cluster_ec_rate",
+			"ecs_cluster_ec_complete_time_estimate",
+		},
+		"allocation components": {
+			"ecs_cluster_disk_space_allocated_component_bytes",
+			"ecs_cluster_disk_space_allocated_component_bytes",
+			"ecs_cluster_disk_space_allocated_component_bytes",
+			"ecs_cluster_disk_space_allocated_component_bytes",
+			"ecs_cluster_disk_space_allocated_component_bytes",
+		},
 	}
 	for _, f := range families {
-		want := wantCounts[f.name]
-		if len(f.samples) != want {
-			t.Errorf("%s family produced %d samples from the live payload, want exactly %d: a JSON tag is probably misspelled", f.name, len(f.samples), want)
+		want := map[string]int{}
+		for _, n := range wantNames[f.name] {
+			want[n]++
+		}
+		got := map[string]int{}
+		for _, s := range f.samples {
+			got[s.Name]++
+		}
+		if len(f.samples) != len(wantNames[f.name]) {
+			t.Errorf("%s family produced %d samples from the live payload, want exactly %d: a JSON tag is probably misspelled",
+				f.name, len(f.samples), len(wantNames[f.name]))
+		}
+		for name, n := range want {
+			if got[name] != n {
+				t.Errorf("%s family emitted %s %d times, want %d", f.name, name, got[name], n)
+			}
+		}
+		for name := range got {
+			if _, ok := want[name]; !ok {
+				t.Errorf("%s family emitted unexpected metric %s", f.name, name)
+			}
 		}
 	}
 
