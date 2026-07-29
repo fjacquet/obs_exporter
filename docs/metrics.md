@@ -35,6 +35,44 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 | `ecs_cluster_replication_rpo_lag_seconds` | | VDC-wide RPO lag (seconds); zone-level counterpart of the per-group metric |
 | `ecs_cluster_replication_rpo_timestamp_seconds` | | VDC-wide unix timestamp of the recovery point |
 
+## Cluster background processes
+
+From the same local-zone dashboard response as the cluster metrics above — no
+additional API call.
+
+| Metric | Labels | Description |
+|---|---|---|
+| `ecs_cluster_gc_pending_bytes` | `scope` (`user`/`system`) | space detected as reclaimable but not yet reclaimed |
+| `ecs_cluster_gc_reclaimed_bytes` | `scope` | space reclaimed so far |
+| `ecs_cluster_gc_unreclaimable_bytes` | `scope` | space detected but not reclaimable |
+| `ecs_cluster_gc_detected_bytes` | `scope` | total space detected by GC |
+| `ecs_cluster_gc_enabled` | `scope` | `1` when that GC scope is enabled, `0` when explicitly disabled |
+| `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery |
+| `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API) |
+| `ecs_cluster_recovery_complete_time_estimate` | | estimated time to finish recovery (unit as reported by the dashboard API) |
+| `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding |
+| `ecs_cluster_ec_coded_bytes` | | sealed data already erasure-coded |
+| `ecs_cluster_ec_coded_ratio_percent` | | coded share of applicable data |
+| `ecs_cluster_ec_rate` | | erasure-coding throughput (unit as reported by the dashboard API) |
+| `ecs_cluster_ec_complete_time_estimate` | | estimated time to finish coding (unit as reported by the dashboard API) |
+| `ecs_cluster_disk_space_allocated_component_bytes` | `purpose` | allocated space broken down by what holds it |
+
+`purpose` is one of `user_data`, `system_metadata`, `geo_cache`, `geo_copy`,
+`local_protection`.
+
+!!! warning "The allocation breakdown is not exhaustive"
+    `ecs_cluster_disk_space_allocated_component_bytes` does **not** sum to
+    `ecs_cluster_disk_space_allocated_bytes`. On a real ObjectScale 4.3 cluster the
+    five components accounted for 87.2% of the allocated total. Do not compute
+    percentages of the total from these components, and do not treat the remainder
+    as a category — it is simply unreported.
+
+!!! note "There is no `scope=\"combined\"`"
+    The API also reports combined GC figures, which equal `user + system` exactly
+    (verified to the byte on a live cluster). Exporting them would make
+    `sum(ecs_cluster_gc_pending_bytes)` double-count, so they are omitted:
+    `sum without(scope) (ecs_cluster_gc_pending_bytes)` reproduces them.
+
 ## Replication groups
 
 | Metric | Labels | Description |

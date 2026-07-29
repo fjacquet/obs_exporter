@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Cluster background-process metrics, all from the local-zone dashboard response
+  the exporter already fetches once per cycle (no additional API call):
+  - garbage collection — `ecs_cluster_gc_pending_bytes`, `_reclaimed_bytes`,
+    `_unreclaimable_bytes`, `_detected_bytes` and `ecs_cluster_gc_enabled`,
+    labelled `scope="user"|"system"`. Combined figures are not exported: they
+    equal `user + system` exactly, so `sum without(scope)` reproduces them
+    without double-counting.
+  - chunk recovery — `ecs_cluster_recovery_bad_chunks_bytes` (corrupted data
+    awaiting recovery), `ecs_cluster_recovery_rate`,
+    `ecs_cluster_recovery_complete_time_estimate`.
+  - erasure coding — `ecs_cluster_ec_applicable_bytes`, `_coded_bytes`,
+    `_coded_ratio_percent`, `ecs_cluster_ec_rate`,
+    `ecs_cluster_ec_complete_time_estimate`.
+  - allocated-space breakdown —
+    `ecs_cluster_disk_space_allocated_component_bytes{purpose}`. Note this does
+    **not** sum to `ecs_cluster_disk_space_allocated_bytes`; the breakdown is not
+    exhaustive.
+- Grafana dashboard "ObjectScale — Storage internals" covering the four families.
+
 ## [2.7.1] - 2026-07-29
 
 ### Fixed
