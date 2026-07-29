@@ -53,13 +53,19 @@ type Num struct {
 	Set bool
 }
 
+// isAbsentToken reports whether a trimmed token is one of the values ECS uses to
+// mean "no reading", rather than a number it failed to format. This is the single
+// place that set is defined: every tolerant decode path in this file consults it,
+// so adding a sentinel here covers scalars and series alike.
+func isAbsentToken(s string) bool {
+	return s == "" || s == "null" || strings.EqualFold(s, "n/a")
+}
+
 // cleanScalar unwraps a raw JSON scalar the ECS API may have quoted, and reports
-// whether anything decodable is left. The sentinels it rejects ("", null, "N/A")
-// live here once so the tolerant scalar types cannot drift apart on which values
-// count as absent.
+// whether anything decodable is left.
 func cleanScalar(raw []byte) (string, bool) {
 	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
-	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+	if isAbsentToken(s) {
 		return "", false
 	}
 	return s, true
@@ -109,7 +115,7 @@ func anyToFloat(v any) (float64, bool) {
 		return x, true
 	case string:
 		s := strings.TrimSpace(x)
-		if s == "" || strings.EqualFold(s, "n/a") {
+		if isAbsentToken(s) {
 			return 0, false
 		}
 		f, err := strconv.ParseFloat(s, 64)

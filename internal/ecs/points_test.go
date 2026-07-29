@@ -92,3 +92,21 @@ func TestBoolUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+// A JSON null inside a series point means "no reading", exactly as it does for a
+// scalar. Before isAbsentToken existed, anyToFloat rejected "" and "N/A" but not
+// "null", so the two decode paths disagreed on what counts as absent.
+func TestSeriesTreatsNullAsAbsent(t *testing.T) {
+	for _, tc := range []struct{ name, token string }{
+		{"null", "null"},
+		{"empty", ""},
+		{"not available", "N/A"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Series{{"t": "1", "Capacity": tc.token}}
+			if v, ok := s.Latest(); ok {
+				t.Errorf("Latest() = %v, true; want absent for %q", v, tc.token)
+			}
+		})
+	}
+}
