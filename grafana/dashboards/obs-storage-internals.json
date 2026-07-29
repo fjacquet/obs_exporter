@@ -194,7 +194,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_gc_detected_bytes{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_gc_detected_bytes_total{cluster=~\"$cluster\"}",
           "legendFormat": "detected {{scope}}",
           "refId": "A"
         },
@@ -203,7 +203,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_gc_reclaimed_bytes{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_gc_reclaimed_bytes_total{cluster=~\"$cluster\"}",
           "legendFormat": "reclaimed {{scope}}",
           "refId": "B"
         }

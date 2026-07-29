@@ -2,8 +2,10 @@
 
 Every domain metric carries the `cluster` identity label (one exporter process can
 serve many clusters). All metrics are exported as gauges holding the latest
-snapshot value; per-second values (TPS, bandwidth) are already rates — aggregate
-them with `sum`/`avg`, **never `rate()`**.
+snapshot value; per-second values (TPS, bandwidth, and the metrics named
+`…_rate` — `ecs_cluster_ec_rate`, `ecs_cluster_recovery_rate`) are already rates
+— aggregate them with `sum`/`avg`, **never `rate()`**. Metrics suffixed `_total`
+are the cumulative counters, and those are the ones `rate()` is for.
 
 Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 (replication), `…/nodes` (node), `/vdc/nodes` (info), `/object/namespaces` +
@@ -43,17 +45,17 @@ additional API call.
 | Metric | Labels | Description |
 |---|---|---|
 | `ecs_cluster_gc_pending_bytes` | `scope` (`user`/`system`) | space detected as reclaimable but not yet reclaimed |
-| `ecs_cluster_gc_reclaimed_bytes` | `scope` | space reclaimed so far |
+| `ecs_cluster_gc_reclaimed_bytes_total` | `scope` | space reclaimed since the cluster was built — a lifetime counter, not a backlog |
 | `ecs_cluster_gc_unreclaimable_bytes` | `scope` | space detected but not reclaimable |
-| `ecs_cluster_gc_detected_bytes` | `scope` | total space detected by GC |
-| `ecs_cluster_gc_enabled` | `scope` | `1` when that GC scope is enabled, `0` when explicitly disabled |
-| `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery |
-| `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API) |
+| `ecs_cluster_gc_detected_bytes_total` | `scope` | space detected by GC over the cluster's lifetime; equals pending + unreclaimable + reclaimed |
+| `ecs_cluster_gc_enabled` | `scope` | `1` when that GC scope is enabled, `0` when explicitly disabled. The flag is assumed to scope the same subsystem as the byte series above — inferred from the API's field naming (`gcUserDataIsEnabled` / `gcSystemMetadataIsEnabled`), not documented by Dell |
+| `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery. The cluster may report a long-stale computation here: on a real 4.3 cluster this field's timestamp was 55 days older than every other field in the same response |
+| `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
 | `ecs_cluster_recovery_complete_time_estimate` | | estimated time to finish recovery (unit as reported by the dashboard API) |
 | `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding |
 | `ecs_cluster_ec_coded_bytes` | | sealed data already erasure-coded |
 | `ecs_cluster_ec_coded_ratio_percent` | | coded share of applicable data |
-| `ecs_cluster_ec_rate` | | erasure-coding throughput (unit as reported by the dashboard API) |
+| `ecs_cluster_ec_rate` | | erasure-coding throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
 | `ecs_cluster_ec_complete_time_estimate` | | estimated time to finish coding (unit as reported by the dashboard API) |
 | `ecs_cluster_disk_space_allocated_component_bytes` | `purpose` | allocated space broken down by what holds it |
 
@@ -67,7 +69,7 @@ additional API call.
     percentages of the total from these components, and do not treat the remainder
     as a category — it is simply unreported.
 
-!!! note "There is no `scope=\"combined\"`"
+!!! note "There is no combined scope"
     The API also reports combined GC figures, which equal `user + system` exactly
     (verified to the byte on a live cluster). Exporting them would make
     `sum(ecs_cluster_gc_pending_bytes)` double-count, so they are omitted:

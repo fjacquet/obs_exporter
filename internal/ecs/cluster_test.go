@@ -59,9 +59,9 @@ func TestClusterCollect(t *testing.T) {
 	gcUser := Label{"scope", "user"}
 	gcSystem := Label{"scope", "system"}
 	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes", 8100, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_detected_bytes", 9700, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
 	// The fixture omits gcSystemMetadataIsEnabled on purpose.

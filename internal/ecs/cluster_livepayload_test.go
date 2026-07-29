@@ -53,9 +53,9 @@ func TestLocalZoneLivePayloadShape(t *testing.T) {
 	// or the Prometheus collector drops it at scrape time (ADR-0006).
 	wantKeys := map[string][]string{
 		"ecs_cluster_gc_pending_bytes":                     {"scope"},
-		"ecs_cluster_gc_reclaimed_bytes":                   {"scope"},
+		"ecs_cluster_gc_reclaimed_bytes_total":                   {"scope"},
 		"ecs_cluster_gc_unreclaimable_bytes":               {"scope"},
-		"ecs_cluster_gc_detected_bytes":                    {"scope"},
+		"ecs_cluster_gc_detected_bytes_total":                    {"scope"},
 		"ecs_cluster_gc_enabled":                           {"scope"},
 		"ecs_cluster_disk_space_allocated_component_bytes": {"purpose"},
 	}

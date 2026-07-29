@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Cluster background-process metrics, all from the local-zone dashboard response
   the exporter already fetches once per cycle (no additional API call):
-  - garbage collection — `ecs_cluster_gc_pending_bytes`, `_reclaimed_bytes`,
-    `_unreclaimable_bytes`, `_detected_bytes` and `ecs_cluster_gc_enabled`,
-    labelled `scope="user"|"system"`. Combined figures are not exported: they
-    equal `user + system` exactly, so `sum without(scope)` reproduces them
-    without double-counting.
+  - garbage collection — `ecs_cluster_gc_pending_bytes`,
+    `_unreclaimable_bytes`, `_reclaimed_bytes_total`, `_detected_bytes_total`
+    and `ecs_cluster_gc_enabled`, labelled `scope="user"|"system"`. Reclaimed
+    and detected carry `_total` because they are lifetime counters: on a real
+    4.3 cluster detected equalled pending + unreclaimable + reclaimed exactly,
+    on both scopes. Combined figures are not exported: they equal
+    `user + system` exactly, so `sum without(scope)` reproduces them without
+    double-counting.
   - chunk recovery — `ecs_cluster_recovery_bad_chunks_bytes` (corrupted data
     awaiting recovery), `ecs_cluster_recovery_rate`,
     `ecs_cluster_recovery_complete_time_estimate`.
