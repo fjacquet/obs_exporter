@@ -68,6 +68,13 @@ func TestClusterCollect(t *testing.T) {
 	if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
 		t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")
 	}
+
+	mustSample(t, samples, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
+	mustSample(t, samples, "ecs_cluster_recovery_complete_time_estimate", 45.5)
+	// The fixture sets recoveryRateCurrent to "N/A" on purpose.
+	if _, ok := findSample(samples, "ecs_cluster_recovery_rate"); ok {
+		t.Error("recovery_rate should be absent: the fixture value is unparseable")
+	}
 }
 
 func TestSplitErrorType(t *testing.T) {

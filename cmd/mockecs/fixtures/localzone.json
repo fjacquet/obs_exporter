@@ -61,5 +61,8 @@
     "gcSystemPendingCurrent": [{"t": "23456789", "Capacity": "130"}],
     "gcSystemReclaimedCurrent": [{"t": "23456789", "Capacity": "2500"}],
     "gcSystemUnreclaimableCurrent": [{"t": "23456789", "Capacity": "70"}],
-    "gcSystemTotalDetectedCurrent": [{"t": "23456789", "Capacity": "2600"}]
+    "gcSystemTotalDetectedCurrent": [{"t": "23456789", "Capacity": "2600"}],
+    "recoveryBadChunksTotalSizeCurrent": [{"t": "23456789", "Space": "10992"}],
+    "recoveryRateCurrent": [{"t": "23456789", "Rate": "N/A"}],
+    "recoveryCompleteTimeEstimate": "45.5"
 }

@@ -66,6 +66,7 @@ type localZoneResp struct {
 	ReplicationRpoTimestamp Num `json:"replicationRpoTimestamp"`
 
 	gcFields
+	recoveryFields
 }
 
 // Cluster collects VDC-wide health, capacity, and transaction stats from the
@@ -150,6 +151,7 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	num("ecs_cluster_replication_rpo_timestamp_seconds", z.ReplicationRpoTimestamp)
 
 	out = append(out, z.gcFields.samples()...)
+	out = append(out, z.recoveryFields.samples()...)
 
 	return out, nil
 }
