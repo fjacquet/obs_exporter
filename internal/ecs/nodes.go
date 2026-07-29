@@ -65,17 +65,6 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	var out []Sample
 	for _, n := range r.Embedded.Instances {
 		nodeLabel := []Label{{Key: "node", Value: n.DisplayName}}
-		num := func(name string, v Num) {
-			if v.Set {
-				out = append(out, Sample{Name: name, Labels: nodeLabel, Value: v.Val})
-			}
-		}
-		series := func(name string, s Series) {
-			if v, ok := s.Latest(); ok {
-				out = append(out, Sample{Name: name, Labels: nodeLabel, Value: v})
-			}
-		}
-
 		healthy := 0.0
 		if strings.EqualFold(n.HealthStatus, "good") {
 			healthy = 1
@@ -97,30 +86,30 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 			})
 		}
 
-		num("ecs_node_disks", n.NumDisks)
-		num("ecs_node_good_disks", n.NumGoodDisks)
-		num("ecs_node_bad_disks", n.NumBadDisks)
-		num("ecs_node_maintenance_disks", n.NumMaintenanceDisks)
-		num("ecs_node_ready_to_replace_disks", n.NumReadyToReplaceDisks)
+		out = appendNum(out, "ecs_node_disks", n.NumDisks, nodeLabel...)
+		out = appendNum(out, "ecs_node_good_disks", n.NumGoodDisks, nodeLabel...)
+		out = appendNum(out, "ecs_node_bad_disks", n.NumBadDisks, nodeLabel...)
+		out = appendNum(out, "ecs_node_maintenance_disks", n.NumMaintenanceDisks, nodeLabel...)
+		out = appendNum(out, "ecs_node_ready_to_replace_disks", n.NumReadyToReplaceDisks, nodeLabel...)
 
-		series("ecs_node_disk_space_total_bytes", n.DiskSpaceTotal)
-		series("ecs_node_disk_space_free_bytes", n.DiskSpaceFree)
-		series("ecs_node_disk_space_allocated_bytes", n.DiskSpaceAllocated)
+		out = appendSeries(out, "ecs_node_disk_space_total_bytes", n.DiskSpaceTotal, nodeLabel...)
+		out = appendSeries(out, "ecs_node_disk_space_free_bytes", n.DiskSpaceFree, nodeLabel...)
+		out = appendSeries(out, "ecs_node_disk_space_allocated_bytes", n.DiskSpaceAllocated, nodeLabel...)
 
-		series("ecs_node_cpu_utilization_percent", n.NodeCPUUtilization)
-		series("ecs_node_memory_utilization_percent", n.NodeMemoryUtilization)
-		series("ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes)
+		out = appendSeries(out, "ecs_node_cpu_utilization_percent", n.NodeCPUUtilization, nodeLabel...)
+		out = appendSeries(out, "ecs_node_memory_utilization_percent", n.NodeMemoryUtilization, nodeLabel...)
+		out = appendSeries(out, "ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes, nodeLabel...)
 
-		series("ecs_node_nic_received_bandwidth", n.NodeNicReceivedBandwidth)
-		series("ecs_node_nic_transmitted_bandwidth", n.NodeNicTransmittedBandwidth)
-		series("ecs_node_nic_utilization_percent", n.NodeNicUtilization)
+		out = appendSeries(out, "ecs_node_nic_received_bandwidth", n.NodeNicReceivedBandwidth, nodeLabel...)
+		out = appendSeries(out, "ecs_node_nic_transmitted_bandwidth", n.NodeNicTransmittedBandwidth, nodeLabel...)
+		out = appendSeries(out, "ecs_node_nic_utilization_percent", n.NodeNicUtilization, nodeLabel...)
 
-		series("ecs_node_transaction_read_latency_milliseconds", n.TransactionReadLatency)
-		series("ecs_node_transaction_write_latency_milliseconds", n.TransactionWriteLatency)
-		series("ecs_node_transaction_read_bandwidth_mb_per_second", n.TransactionReadBandwidth)
-		series("ecs_node_transaction_write_bandwidth_mb_per_second", n.TransactionWriteBandwidth)
-		series("ecs_node_transactions_read_per_second", n.TransactionReadTransactionsPerSec)
-		series("ecs_node_transactions_write_per_second", n.TransactionWriteTransactionsPerSec)
+		out = appendSeries(out, "ecs_node_transaction_read_latency_milliseconds", n.TransactionReadLatency, nodeLabel...)
+		out = appendSeries(out, "ecs_node_transaction_write_latency_milliseconds", n.TransactionWriteLatency, nodeLabel...)
+		out = appendSeries(out, "ecs_node_transaction_read_bandwidth_mb_per_second", n.TransactionReadBandwidth, nodeLabel...)
+		out = appendSeries(out, "ecs_node_transaction_write_bandwidth_mb_per_second", n.TransactionWriteBandwidth, nodeLabel...)
+		out = appendSeries(out, "ecs_node_transactions_read_per_second", n.TransactionReadTransactionsPerSec, nodeLabel...)
+		out = appendSeries(out, "ecs_node_transactions_write_per_second", n.TransactionWriteTransactionsPerSec, nodeLabel...)
 	}
 	return out, nil
 }

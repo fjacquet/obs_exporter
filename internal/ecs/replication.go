@@ -44,23 +44,14 @@ func (Replication) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, e
 	var out []Sample
 	for _, rg := range r.Embedded.Instances {
 		rgLabel := []Label{{Key: "rg", Value: rg.Name}}
-		num := func(name string, n Num) {
-			if n.Set {
-				out = append(out, Sample{Name: name, Labels: rgLabel, Value: n.Val})
-			}
-		}
-		if v, ok := rg.ReplicationIngressTraffic.Latest(); ok {
-			out = append(out, Sample{Name: "ecs_replication_group_ingress_traffic", Labels: rgLabel, Value: v})
-		}
-		if v, ok := rg.ReplicationEgressTraffic.Latest(); ok {
-			out = append(out, Sample{Name: "ecs_replication_group_egress_traffic", Labels: rgLabel, Value: v})
-		}
-		num("ecs_replication_group_chunks_repo_pending_replication_bytes", rg.ChunksRepoPendingReplicationTotalSize)
-		num("ecs_replication_group_chunks_journal_pending_replication_bytes", rg.ChunksJournalPendingReplicationTotalSize)
-		num("ecs_replication_group_chunks_pending_xor_bytes", rg.ChunksPendingXorTotalSize)
-		num("ecs_replication_group_rpo_timestamp_seconds", rg.ReplicationRpoTimestamp)
-		num("ecs_replication_group_rpo_lag_seconds", rg.ReplicationRpoLag)
-		num("ecs_replication_group_zones", rg.NumZones)
+		out = appendSeries(out, "ecs_replication_group_ingress_traffic", rg.ReplicationIngressTraffic, rgLabel...)
+		out = appendSeries(out, "ecs_replication_group_egress_traffic", rg.ReplicationEgressTraffic, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_chunks_repo_pending_replication_bytes", rg.ChunksRepoPendingReplicationTotalSize, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_chunks_journal_pending_replication_bytes", rg.ChunksJournalPendingReplicationTotalSize, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_chunks_pending_xor_bytes", rg.ChunksPendingXorTotalSize, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_rpo_timestamp_seconds", rg.ReplicationRpoTimestamp, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_rpo_lag_seconds", rg.ReplicationRpoLag, rgLabel...)
+		out = appendNum(out, "ecs_replication_group_zones", rg.NumZones, rgLabel...)
 	}
 	return out, nil
 }
