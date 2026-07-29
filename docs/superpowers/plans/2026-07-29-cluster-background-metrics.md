@@ -29,15 +29,25 @@
 
 ---
 
-### Task 1: `Bool` tolerant boolean primitive
+### Task 1: `Bool` primitive and sample-append helpers
 
 **Files:**
 - Modify: `internal/ecs/points.go` (append after `Num.UnmarshalJSON`, which ends at line 68)
+- Modify: `internal/ecs/sample.go` (append after `WithCluster`, which ends at line 36)
 - Test: `internal/ecs/points_test.go`
+- Create: `internal/ecs/sample_test.go`
 
 **Interfaces:**
-- Consumes: nothing.
-- Produces: `type Bool struct { Val bool; Set bool }` with `func (b *Bool) UnmarshalJSON(raw []byte) error`. Task 2 uses it for the two GC enable flags.
+- Consumes: `Series`, `Num`, `Sample`, `Label` — all in package `ecs`.
+- Produces:
+  - `type Bool struct { Val bool; Set bool }` with `func (b *Bool) UnmarshalJSON(raw []byte) error`. Task 2 uses it for the two GC enable flags.
+  - `func appendSeries(out []Sample, name string, s Series, labels ...Label) []Sample`
+  - `func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample`
+
+  Tasks 2-5 build every sample through the two append helpers. They exist because
+  without them each family file would carry a byte-identical five-line emit
+  closure, and that duplication is where the absent-never-zero rule would
+  eventually drift apart between families.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -125,15 +135,139 @@ Run: `go test ./internal/ecs/ -run 'TestBoolUnmarshal|TestNum' -v`
 
 Expected: PASS — 9 `TestBoolUnmarshal` subtests, plus the pre-existing `Num` tests still green.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Write the failing test for the append helpers**
+
+Create `internal/ecs/sample_test.go`:
+
+```go
+package ecs
+
+import "testing"
+
+func TestAppendSeries(t *testing.T) {
+	var out []Sample
+
+	// A parseable series appends one sample carrying the newest point.
+	out = appendSeries(out, "ecs_thing_bytes", Series{
+		{"t": "100", "Capacity": "5"},
+		{"t": "200", "Capacity": "9"},
+	})
+	if len(out) != 1 {
+		t.Fatalf("got %d samples, want 1", len(out))
+	}
+	if out[0].Name != "ecs_thing_bytes" || out[0].Value != 9 {
+		t.Errorf("got %s = %v, want ecs_thing_bytes = 9", out[0].Name, out[0].Value)
+	}
+	if len(out[0].Labels) != 0 {
+		t.Errorf("got %d labels, want none when no labels are passed", len(out[0].Labels))
+	}
+
+	// Labels are carried through in the order given.
+	out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "3"}},
+		Label{"scope", "user"})
+	if len(out) != 2 {
+		t.Fatalf("got %d samples, want 2", len(out))
+	}
+	if got := out[1].LabelValue("scope"); got != "user" {
+		t.Errorf("scope label = %q, want %q", got, "user")
+	}
+
+	// An empty series appends nothing — absent, never zero.
+	before := len(out)
+	out = appendSeries(out, "ecs_thing_bytes", Series{})
+	if len(out) != before {
+		t.Errorf("an empty series appended %d samples, want 0", len(out)-before)
+	}
+
+	// An unparseable value appends nothing either.
+	out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "N/A"}})
+	if len(out) != before {
+		t.Errorf("an unparseable series appended %d samples, want 0", len(out)-before)
+	}
+}
+
+func TestAppendNum(t *testing.T) {
+	var out []Sample
+
+	out = appendNum(out, "ecs_thing_seconds", Num{Val: 45.5, Set: true})
+	if len(out) != 1 {
+		t.Fatalf("got %d samples, want 1", len(out))
+	}
+	if out[0].Value != 45.5 {
+		t.Errorf("value = %v, want 45.5", out[0].Value)
+	}
+
+	out = appendNum(out, "ecs_thing_seconds", Num{Val: 0, Set: true}, Label{"purpose", "x"})
+	if len(out) != 2 {
+		t.Fatalf("got %d samples, want 2", len(out))
+	}
+	// A parsed zero is real data and must be emitted.
+	if out[1].Value != 0 || out[1].LabelValue("purpose") != "x" {
+		t.Errorf("got %v/%q, want 0 with purpose=x", out[1].Value, out[1].LabelValue("purpose"))
+	}
+
+	// An unset Num appends nothing — absent, never zero.
+	before := len(out)
+	out = appendNum(out, "ecs_thing_seconds", Num{})
+	if len(out) != before {
+		t.Errorf("an unset Num appended %d samples, want 0", len(out)-before)
+	}
+}
+```
+
+- [ ] **Step 6: Run the helper tests to verify they fail**
+
+Run: `go test ./internal/ecs/ -run 'TestAppendSeries|TestAppendNum' -v`
+
+Expected: FAIL — compile error `undefined: appendSeries`.
+
+- [ ] **Step 7: Write the append helpers**
+
+Append to `internal/ecs/sample.go`, after `WithCluster` (which ends at line 36):
+
+```go
+// appendSeries appends the newest point of s to out. A series with no parseable
+// value appends nothing: unparseable and missing values yield absent samples,
+// never zeros (ADR-0007). Passing no labels yields a sample with none.
+func appendSeries(out []Sample, name string, s Series, labels ...Label) []Sample {
+	v, ok := s.Latest()
+	if !ok {
+		return out
+	}
+	return append(out, Sample{Name: name, Labels: labels, Value: v})
+}
+
+// appendNum appends n to out when it parsed. An unset Num appends nothing —
+// absent, never zero (ADR-0007). A Num that parsed as 0 is real data and is
+// emitted.
+func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample {
+	if !n.Set {
+		return out
+	}
+	return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
+}
+```
+
+- [ ] **Step 8: Run the helper tests to verify they pass**
+
+Run: `go test ./internal/ecs/ -run 'TestAppendSeries|TestAppendNum' -v`
+
+Expected: PASS.
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add internal/ecs/points.go internal/ecs/points_test.go
-git commit -m "feat(ecs): tolerant Bool primitive for quoted-string flags
+git add internal/ecs/points.go internal/ecs/points_test.go \
+        internal/ecs/sample.go internal/ecs/sample_test.go
+git commit -m "feat(ecs): Bool primitive and sample-append helpers
 
 The dashboard encodes gcUserDataIsEnabled and friends as \"true\"/\"false\",
-which Num deliberately refuses. Unset rather than false when unparseable, so an
-unreported flag stays absent."
+which Num deliberately refuses; unset rather than false when unparseable, so an
+unreported flag stays absent.
+
+appendSeries/appendNum give the four upcoming metric families one shared emit
+path instead of a byte-identical closure each, so the absent-never-zero rule
+cannot drift apart between them."
 ```
 
 ---
@@ -283,17 +417,8 @@ type gcFields struct {
 func (g gcFields) samples() []Sample {
 	var out []Sample
 
-	series := func(name, scope string, s Series) {
-		if v, ok := s.Latest(); ok {
-			out = append(out, Sample{
-				Name:   name,
-				Labels: []Label{{Key: "scope", Value: scope}},
-				Value:  v,
-			})
-		}
-	}
-	// A reported flag is emitted even when false — that is real information.
-	// Only an unreported flag is absent.
+	// A reported flag is emitted even when false — "GC is off" is exactly what an
+	// operator needs to see. Only an unreported flag is absent.
 	flag := func(scope string, b Bool) {
 		if !b.Set {
 			return
@@ -309,16 +434,18 @@ func (g gcFields) samples() []Sample {
 		})
 	}
 
-	series("ecs_cluster_gc_pending_bytes", "user", g.GCUserPending)
-	series("ecs_cluster_gc_reclaimed_bytes", "user", g.GCUserReclaimed)
-	series("ecs_cluster_gc_unreclaimable_bytes", "user", g.GCUserUnreclaimable)
-	series("ecs_cluster_gc_detected_bytes", "user", g.GCUserTotalDetected)
+	user := Label{Key: "scope", Value: "user"}
+	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCUserReclaimed, user)
+	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCUserTotalDetected, user)
 	flag("user", g.GCUserDataIsEnabled)
 
-	series("ecs_cluster_gc_pending_bytes", "system", g.GCSystemPending)
-	series("ecs_cluster_gc_reclaimed_bytes", "system", g.GCSystemReclaimed)
-	series("ecs_cluster_gc_unreclaimable_bytes", "system", g.GCSystemUnreclaimable)
-	series("ecs_cluster_gc_detected_bytes", "system", g.GCSystemTotalDetected)
+	system := Label{Key: "scope", Value: "system"}
+	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCSystemReclaimed, system)
+	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCSystemTotalDetected, system)
 	flag("system", g.GCSystemMetadataIsEnabled)
 
 	return out
@@ -511,22 +638,9 @@ type recoveryFields struct {
 // unparseable values yield absent samples, never zeros.
 func (r recoveryFields) samples() []Sample {
 	var out []Sample
-
-	series := func(name string, s Series) {
-		if v, ok := s.Latest(); ok {
-			out = append(out, Sample{Name: name, Value: v})
-		}
-	}
-
-	series("ecs_cluster_recovery_bad_chunks_bytes", r.RecoveryBadChunksTotalSize)
-	series("ecs_cluster_recovery_rate", r.RecoveryRate)
-	if r.RecoveryCompleteTimeEstimate.Set {
-		out = append(out, Sample{
-			Name:  "ecs_cluster_recovery_complete_time_estimate",
-			Value: r.RecoveryCompleteTimeEstimate.Val,
-		})
-	}
-
+	out = appendSeries(out, "ecs_cluster_recovery_bad_chunks_bytes", r.RecoveryBadChunksTotalSize)
+	out = appendSeries(out, "ecs_cluster_recovery_rate", r.RecoveryRate)
+	out = appendNum(out, "ecs_cluster_recovery_complete_time_estimate", r.RecoveryCompleteTimeEstimate)
 	return out
 }
 ```
@@ -703,24 +817,11 @@ type erasureCodingFields struct {
 // unparseable values yield absent samples, never zeros.
 func (e erasureCodingFields) samples() []Sample {
 	var out []Sample
-
-	series := func(name string, s Series) {
-		if v, ok := s.Latest(); ok {
-			out = append(out, Sample{Name: name, Value: v})
-		}
-	}
-
-	series("ecs_cluster_ec_applicable_bytes", e.ChunksEcApplicableTotalSealSize)
-	series("ecs_cluster_ec_coded_bytes", e.ChunksEcCodedTotalSealSize)
-	series("ecs_cluster_ec_coded_ratio_percent", e.ChunksEcCodedRatio)
-	series("ecs_cluster_ec_rate", e.ChunksEcRate)
-	if e.ChunksEcCompleteTimeEstimate.Set {
-		out = append(out, Sample{
-			Name:  "ecs_cluster_ec_complete_time_estimate",
-			Value: e.ChunksEcCompleteTimeEstimate.Val,
-		})
-	}
-
+	out = appendSeries(out, "ecs_cluster_ec_applicable_bytes", e.ChunksEcApplicableTotalSealSize)
+	out = appendSeries(out, "ecs_cluster_ec_coded_bytes", e.ChunksEcCodedTotalSealSize)
+	out = appendSeries(out, "ecs_cluster_ec_coded_ratio_percent", e.ChunksEcCodedRatio)
+	out = appendSeries(out, "ecs_cluster_ec_rate", e.ChunksEcRate)
+	out = appendNum(out, "ecs_cluster_ec_complete_time_estimate", e.ChunksEcCompleteTimeEstimate)
 	return out
 }
 ```
@@ -917,24 +1018,21 @@ type allocationComponentFields struct {
 // samples maps the allocation breakdown to cluster-agnostic samples. Missing or
 // unparseable components yield absent samples, never zeros.
 func (a allocationComponentFields) samples() []Sample {
+	const name = "ecs_cluster_disk_space_allocated_component_bytes"
+
 	var out []Sample
-
-	component := func(purpose string, s Series) {
-		if v, ok := s.Latest(); ok {
-			out = append(out, Sample{
-				Name:   "ecs_cluster_disk_space_allocated_component_bytes",
-				Labels: []Label{{Key: "purpose", Value: purpose}},
-				Value:  v,
-			})
-		}
+	for _, c := range []struct {
+		purpose string
+		series  Series
+	}{
+		{"user_data", a.UserData},
+		{"system_metadata", a.SystemMetadata},
+		{"geo_cache", a.GeoCache},
+		{"geo_copy", a.GeoCopy},
+		{"local_protection", a.LocalProtection},
+	} {
+		out = appendSeries(out, name, c.series, Label{Key: "purpose", Value: c.purpose})
 	}
-
-	component("user_data", a.UserData)
-	component("system_metadata", a.SystemMetadata)
-	component("geo_cache", a.GeoCache)
-	component("geo_copy", a.GeoCopy)
-	component("local_protection", a.LocalProtection)
-
 	return out
 }
 ```
