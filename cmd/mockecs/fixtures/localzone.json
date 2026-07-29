@@ -64,5 +64,10 @@
     "gcSystemTotalDetectedCurrent": [{"t": "23456789", "Capacity": "2600"}],
     "recoveryBadChunksTotalSizeCurrent": [{"t": "23456789", "Space": "10992"}],
     "recoveryRateCurrent": [{"t": "23456789", "Rate": "N/A"}],
-    "recoveryCompleteTimeEstimate": "45.5"
+    "recoveryCompleteTimeEstimate": "45.5",
+    "chunksEcApplicableTotalSealSizeCurrent": [{"t": "23456789", "Space": "59000"}],
+    "chunksEcCodedTotalSealSizeCurrent": [{"t": "23456789", "Space": "58000"}],
+    "chunksEcCodedRatioCurrent": [{"t": "12345678", "Percent": "97.5"}, {"t": "23456789", "Percent": "98.3"}],
+    "chunksEcRateCurrent": [{"t": "23456789", "Rate": "12.5"}],
+    "chunksEcCompleteTimeEstimate": "3.25"
 }

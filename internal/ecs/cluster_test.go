@@ -75,6 +75,12 @@ func TestClusterCollect(t *testing.T) {
 	if _, ok := findSample(samples, "ecs_cluster_recovery_rate"); ok {
 		t.Error("recovery_rate should be absent: the fixture value is unparseable")
 	}
+
+	mustSample(t, samples, "ecs_cluster_ec_applicable_bytes", 59000)
+	mustSample(t, samples, "ecs_cluster_ec_coded_bytes", 58000)
+	mustSample(t, samples, "ecs_cluster_ec_coded_ratio_percent", 98.3)
+	mustSample(t, samples, "ecs_cluster_ec_rate", 12.5)
+	mustSample(t, samples, "ecs_cluster_ec_complete_time_estimate", 3.25)
 }
 
 func TestSplitErrorType(t *testing.T) {
