@@ -1,6 +1,6 @@
 {
   "uid": "obs-overview",
-  "title": "ObjectScale \u2014 Overview",
+  "title": "ObjectScale — Overview",
   "editable": true,
   "style": "dark",
   "timezone": "",
@@ -73,7 +73,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Health \u2014 is anything on fire?",
+      "title": "Health — is anything on fire?",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -356,6 +356,52 @@
       }
     },
     {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Corrupted data awaiting recovery",
+      "description": "Bytes of bad chunks not yet recovered. Should trend to zero; a rising floor is a durability concern, not a capacity one.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_recovery_bad_chunks_bytes{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "type": "row",
       "title": "Capacity runway",
       "collapsed": false,
@@ -363,7 +409,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 13
       },
       "panels": [],
       "id": 101
@@ -380,7 +426,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 8
+        "y": 14
       },
       "fieldConfig": {
         "defaults": {
@@ -423,7 +469,7 @@
         "h": 8,
         "w": 12,
         "x": 6,
-        "y": 8
+        "y": 14
       },
       "fieldConfig": {
         "defaults": {
@@ -486,7 +532,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 8
+        "y": 14
       },
       "targets": [
         {
@@ -550,9 +596,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 24,
+        "w": 14,
         "x": 0,
-        "y": 16
+        "y": 22
       },
       "fieldConfig": {
         "defaults": {
@@ -590,6 +636,52 @@
       ]
     },
     {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Allocated space by purpose",
+      "description": "What the allocated space actually holds. These components do NOT sum to the allocated total — the breakdown is not exhaustive, so do not read percentages of the total from it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "spanNulls": false,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_cluster_disk_space_allocated_component_bytes{cluster=~\"$cluster\"}",
+          "legendFormat": "{{purpose}} {{cluster}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "type": "row",
       "title": "Golden signals (RED)",
       "collapsed": false,
@@ -597,7 +689,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 28
       },
       "panels": [],
       "id": 102
@@ -614,7 +706,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 23
+        "y": 29
       },
       "fieldConfig": {
         "defaults": {
@@ -675,7 +767,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 23
+        "y": 29
       },
       "fieldConfig": {
         "defaults": {
@@ -736,7 +828,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 23
+        "y": 29
       },
       "fieldConfig": {
         "defaults": {
@@ -797,7 +889,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 37
       },
       "targets": [
         {
@@ -881,7 +973,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 37
       },
       "fieldConfig": {
         "defaults": {

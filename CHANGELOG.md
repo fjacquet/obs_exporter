@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
     **not** sum to `ecs_cluster_disk_space_allocated_bytes`; the breakdown is not
     exhaustive.
 - Grafana dashboard "ObjectScale — Storage internals" covering the four families.
+- The overview dashboard gains the two panels that belong on a landing page:
+  corrupted data awaiting recovery, under *Health*, and allocated space by
+  purpose, under *Capacity runway* — which until now showed total and free
+  without saying what the allocated space actually holds. The purpose panel is
+  deliberately unstacked: the components do not sum to the total.
 
 ## [2.7.1] - 2026-07-29
 
