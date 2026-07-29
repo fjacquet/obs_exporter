@@ -42,6 +42,11 @@ func TestPromCollectorGather(t *testing.T) {
 		"ecs_node_health_state",
 		"ecs_namespace_used_bytes",
 		"ecs_cluster_info",
+		"ecs_cluster_gc_pending_bytes",
+		"ecs_cluster_gc_enabled",
+		"ecs_cluster_recovery_bad_chunks_bytes",
+		"ecs_cluster_ec_coded_ratio_percent",
+		"ecs_cluster_disk_space_allocated_component_bytes",
 	} {
 		if families[want] == 0 {
 			t.Errorf("metric family %s missing from gather", want)
@@ -52,6 +57,18 @@ func TestPromCollectorGather(t *testing.T) {
 	}
 	if got := families["ecs_node_healthy"]; got != 5 {
 		t.Errorf("node healthy series = %d, want 5", got)
+	}
+	// scope=user and scope=system both report pending bytes.
+	if got := families["ecs_cluster_gc_pending_bytes"]; got != 2 {
+		t.Errorf("gc pending series = %d, want 2 (one per scope)", got)
+	}
+	// The fixture omits gcSystemMetadataIsEnabled, so only scope=user is enabled.
+	if got := families["ecs_cluster_gc_enabled"]; got != 1 {
+		t.Errorf("gc enabled series = %d, want 1 (the fixture omits the system flag)", got)
+	}
+	// The fixture omits the two geo components.
+	if got := families["ecs_cluster_disk_space_allocated_component_bytes"]; got != 3 {
+		t.Errorf("allocation component series = %d, want 3 (the fixture omits the geo purposes)", got)
 	}
 }
 

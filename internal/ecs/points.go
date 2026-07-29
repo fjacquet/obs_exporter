@@ -53,10 +53,28 @@ type Num struct {
 	Set bool
 }
 
+// isAbsentToken reports whether a trimmed token is one of the values ECS uses to
+// mean "no reading", rather than a number it failed to format. This is the single
+// place that set is defined: every tolerant decode path in this file consults it,
+// so adding a sentinel here covers scalars and series alike.
+func isAbsentToken(s string) bool {
+	return s == "" || s == "null" || strings.EqualFold(s, "n/a")
+}
+
+// cleanScalar unwraps a raw JSON scalar the ECS API may have quoted, and reports
+// whether anything decodable is left.
+func cleanScalar(raw []byte) (string, bool) {
+	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
+	if isAbsentToken(s) {
+		return "", false
+	}
+	return s, true
+}
+
 // UnmarshalJSON implements tolerant number decoding.
 func (n *Num) UnmarshalJSON(b []byte) error {
-	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(b)), `"`))
-	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+	s, ok := cleanScalar(b)
+	if !ok {
 		return nil
 	}
 	v, err := strconv.ParseFloat(s, 64)
@@ -67,6 +85,29 @@ func (n *Num) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Bool is a flag the ECS API encodes as a quoted string ("true"/"false"), which
+// Num deliberately refuses. Unparseable values (including "N/A", "", null) leave
+// Set false rather than failing the whole decode, so a flag the cluster does not
+// report yields an absent sample rather than a misleading false.
+type Bool struct {
+	Val bool
+	Set bool
+}
+
+// UnmarshalJSON implements tolerant boolean decoding.
+func (b *Bool) UnmarshalJSON(raw []byte) error {
+	s, ok := cleanScalar(raw)
+	if !ok {
+		return nil
+	}
+	v, err := strconv.ParseBool(s)
+	if err != nil {
+		return nil
+	}
+	b.Val, b.Set = v, true
+	return nil
+}
+
 // anyToFloat converts a raw-decoded JSON value (float64 or string) to a float.
 func anyToFloat(v any) (float64, bool) {
 	switch x := v.(type) {
@@ -74,7 +115,7 @@ func anyToFloat(v any) (float64, bool) {
 		return x, true
 	case string:
 		s := strings.TrimSpace(x)
-		if s == "" || strings.EqualFold(s, "n/a") {
+		if isAbsentToken(s) {
 			return 0, false
 		}
 		f, err := strconv.ParseFloat(s, 64)

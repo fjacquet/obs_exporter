@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-07-29
+
+### Added
+- Cluster background-process metrics, all from the local-zone dashboard response
+  the exporter already fetches once per cycle (no additional API call):
+  - garbage collection — `ecs_cluster_gc_pending_bytes`,
+    `_unreclaimable_bytes`, `_reclaimed_bytes_total`, `_detected_bytes_total`
+    and `ecs_cluster_gc_enabled`, labelled `scope="user"|"system"`. Reclaimed
+    and detected carry `_total` because they are lifetime counters: on a real
+    4.3 cluster detected equalled pending + unreclaimable + reclaimed exactly,
+    on both scopes. Combined figures are not exported: they equal
+    `user + system` exactly, so `sum without(scope)` reproduces them without
+    double-counting.
+  - chunk recovery — `ecs_cluster_recovery_bad_chunks_bytes` (corrupted data
+    awaiting recovery), `ecs_cluster_recovery_rate`,
+    `ecs_cluster_recovery_complete_time_estimate`.
+  - erasure coding — `ecs_cluster_ec_applicable_bytes`, `_coded_bytes`,
+    `_coded_ratio_percent`, `ecs_cluster_ec_rate`,
+    `ecs_cluster_ec_complete_time_estimate`.
+  - allocated-space breakdown —
+    `ecs_cluster_disk_space_allocated_component_bytes{purpose}`. Note this does
+    **not** sum to `ecs_cluster_disk_space_allocated_bytes`; the breakdown is not
+    exhaustive.
+- Grafana dashboard "ObjectScale — Storage internals" covering the four families.
+- The overview dashboard gains the two panels that belong on a landing page:
+  corrupted data awaiting recovery, under *Health*, and allocated space by
+  purpose, under *Capacity runway* — which until now showed total and free
+  without saying what the allocated space actually holds. The purpose panel is
+  deliberately unstacked: the components do not sum to the total.
+
 ## [2.7.1] - 2026-07-29
 
 ### Fixed

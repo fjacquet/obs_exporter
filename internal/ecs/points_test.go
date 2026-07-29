@@ -58,3 +58,55 @@ func TestNumUnmarshal(t *testing.T) {
 		t.Errorf("D = %+v", v.D)
 	}
 }
+
+func TestBoolUnmarshal(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload string
+		wantVal bool
+		wantSet bool
+	}{
+		{name: "quoted true, as the dashboard sends it", payload: `"true"`, wantVal: true, wantSet: true},
+		{name: "quoted false", payload: `"false"`, wantVal: false, wantSet: true},
+		{name: "native JSON true", payload: `true`, wantVal: true, wantSet: true},
+		{name: "native JSON false", payload: `false`, wantVal: false, wantSet: true},
+		{name: "mixed case", payload: `"True"`, wantVal: true, wantSet: true},
+		{name: "N/A leaves it unset", payload: `"N/A"`, wantSet: false},
+		{name: "empty string leaves it unset", payload: `""`, wantSet: false},
+		{name: "null leaves it unset", payload: `null`, wantSet: false},
+		{name: "unrecognised word leaves it unset", payload: `"maybe"`, wantSet: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var got Bool
+			if err := json.Unmarshal([]byte(tc.payload), &got); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if got.Set != tc.wantSet {
+				t.Fatalf("Set = %v, want %v", got.Set, tc.wantSet)
+			}
+			if got.Set && got.Val != tc.wantVal {
+				t.Errorf("Val = %v, want %v", got.Val, tc.wantVal)
+			}
+		})
+	}
+}
+
+// A JSON null inside a series point means "no reading", exactly as it does for a
+// scalar. Before isAbsentToken existed, anyToFloat rejected "" and "N/A" but not
+// "null", so the two decode paths disagreed on what counts as absent.
+func TestSeriesTreatsNullAsAbsent(t *testing.T) {
+	for _, tc := range []struct{ name, token string }{
+		{"null", "null"},
+		{"empty", ""},
+		{"not available", "N/A"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Series{{"t": "1", "Capacity": tc.token}}
+			if v, ok := s.Latest(); ok {
+				t.Errorf("Latest() = %v, true; want absent for %q", v, tc.token)
+			}
+		})
+	}
+}

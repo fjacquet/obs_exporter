@@ -42,7 +42,8 @@ suitable as a container health check.
 The repo ships an end-to-end Compose stack: a fake ECS management API (`mockecs`)
 → the exporter → Prometheus → Grafana with a provisioned dashboard set: an
 on-call **Overview** plus focused drill-downs (Performance, Nodes, Namespaces,
-Replication, Maintenance & Directory Tables), linked via the dashboards dropdown.
+Replication, Storage internals, Maintenance & Directory Tables), linked via the
+dashboards dropdown.
 
 ```bash
 make demo          # builds everything from source

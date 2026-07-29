@@ -55,6 +55,41 @@ func TestClusterCollect(t *testing.T) {
 
 	mustSample(t, samples, "ecs_cluster_replication_rpo_lag_seconds", 7200)
 	mustSample(t, samples, "ecs_cluster_replication_rpo_timestamp_seconds", 1502820000)
+
+	gcUser := Label{"scope", "user"}
+	gcSystem := Label{"scope", "system"}
+	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
+	// The fixture omits gcSystemMetadataIsEnabled on purpose.
+	if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
+		t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")
+	}
+
+	mustSample(t, samples, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
+	mustSample(t, samples, "ecs_cluster_recovery_complete_time_estimate", 45.5)
+	// The fixture sets recoveryRateCurrent to "N/A" on purpose.
+	if _, ok := findSample(samples, "ecs_cluster_recovery_rate"); ok {
+		t.Error("recovery_rate should be absent: the fixture value is unparseable")
+	}
+
+	mustSample(t, samples, "ecs_cluster_ec_applicable_bytes", 59000)
+	mustSample(t, samples, "ecs_cluster_ec_coded_bytes", 58000)
+	mustSample(t, samples, "ecs_cluster_ec_coded_ratio_percent", 98.3)
+	mustSample(t, samples, "ecs_cluster_ec_rate", 12.5)
+	mustSample(t, samples, "ecs_cluster_ec_complete_time_estimate", 3.25)
+
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
+	// The fixture omits the geo components on purpose: the breakdown is not
+	// exhaustive, and 3100+1200+600 = 4900 against an allocated total of 5000.
+	if _, ok := findSample(samples, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", "geo_cache"}); ok {
+		t.Error("purpose=geo_cache should be absent: the fixture omits it")
+	}
 }
 
 func TestSplitErrorType(t *testing.T) {
