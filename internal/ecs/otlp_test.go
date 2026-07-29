@@ -57,6 +57,16 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 	if got["ecs_cluster_replication_rpo_lag_seconds"] != 7200 {
 		t.Errorf("ecs_cluster_replication_rpo_lag_seconds = %v, want 7200", got["ecs_cluster_replication_rpo_lag_seconds"])
 	}
+	if got["ecs_cluster_recovery_bad_chunks_bytes"] != 10992 {
+		t.Errorf("ecs_cluster_recovery_bad_chunks_bytes = %v, want 10992", got["ecs_cluster_recovery_bad_chunks_bytes"])
+	}
+	if got["ecs_cluster_ec_coded_ratio_percent"] != 98.3 {
+		t.Errorf("ecs_cluster_ec_coded_ratio_percent = %v, want 98.3", got["ecs_cluster_ec_coded_ratio_percent"])
+	}
+	// The gc/allocation families are labelled (scope, purpose) with multiple
+	// series each; got is keyed by metric name alone, so a labelled series
+	// would collide here. Those families are covered by the Prometheus gather
+	// test instead, which counts series per family.
 	if !clusterAttr {
 		t.Error("cluster attribute missing from OTLP data points")
 	}
