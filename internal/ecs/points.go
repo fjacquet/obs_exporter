@@ -67,6 +67,29 @@ func (n *Num) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Bool is a flag the ECS API encodes as a quoted string ("true"/"false"), which
+// Num deliberately refuses. Unparseable values (including "N/A", "", null) leave
+// Set false rather than failing the whole decode, so a flag the cluster does not
+// report yields an absent sample rather than a misleading false.
+type Bool struct {
+	Val bool
+	Set bool
+}
+
+// UnmarshalJSON implements tolerant boolean decoding.
+func (b *Bool) UnmarshalJSON(raw []byte) error {
+	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
+	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+		return nil
+	}
+	v, err := strconv.ParseBool(s)
+	if err != nil {
+		return nil
+	}
+	b.Val, b.Set = v, true
+	return nil
+}
+
 // anyToFloat converts a raw-decoded JSON value (float64 or string) to a float.
 func anyToFloat(v any) (float64, bool) {
 	switch x := v.(type) {

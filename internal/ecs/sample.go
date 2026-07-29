@@ -34,3 +34,24 @@ func (s Sample) WithCluster(name string) Sample {
 	labels = append(labels, s.Labels...)
 	return Sample{Name: s.Name, Labels: labels, Value: s.Value}
 }
+
+// appendSeries appends the newest point of s to out. A series with no parseable
+// value appends nothing: unparseable and missing values yield absent samples,
+// never zeros (ADR-0007). Passing no labels yields a sample with none.
+func appendSeries(out []Sample, name string, s Series, labels ...Label) []Sample {
+	v, ok := s.Latest()
+	if !ok {
+		return out
+	}
+	return append(out, Sample{Name: name, Labels: labels, Value: v})
+}
+
+// appendNum appends n to out when it parsed. An unset Num appends nothing —
+// absent, never zero (ADR-0007). A Num that parsed as 0 is real data and is
+// emitted.
+func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample {
+	if !n.Set {
+		return out
+	}
+	return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
+}
