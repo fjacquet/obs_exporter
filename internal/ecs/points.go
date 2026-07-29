@@ -53,10 +53,22 @@ type Num struct {
 	Set bool
 }
 
+// cleanScalar unwraps a raw JSON scalar the ECS API may have quoted, and reports
+// whether anything decodable is left. The sentinels it rejects ("", null, "N/A")
+// live here once so the tolerant scalar types cannot drift apart on which values
+// count as absent.
+func cleanScalar(raw []byte) (string, bool) {
+	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
+	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+		return "", false
+	}
+	return s, true
+}
+
 // UnmarshalJSON implements tolerant number decoding.
 func (n *Num) UnmarshalJSON(b []byte) error {
-	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(b)), `"`))
-	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+	s, ok := cleanScalar(b)
+	if !ok {
 		return nil
 	}
 	v, err := strconv.ParseFloat(s, 64)
@@ -78,8 +90,8 @@ type Bool struct {
 
 // UnmarshalJSON implements tolerant boolean decoding.
 func (b *Bool) UnmarshalJSON(raw []byte) error {
-	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
-	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+	s, ok := cleanScalar(raw)
+	if !ok {
 		return nil
 	}
 	v, err := strconv.ParseBool(s)

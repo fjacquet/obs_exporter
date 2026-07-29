@@ -28,36 +28,19 @@ type gcFields struct {
 func (g gcFields) samples() []Sample {
 	var out []Sample
 
-	// A reported flag is emitted even when false — "GC is off" is exactly what an
-	// operator needs to see. Only an unreported flag is absent.
-	flag := func(scope string, b Bool) {
-		if !b.Set {
-			return
-		}
-		v := 0.0
-		if b.Val {
-			v = 1
-		}
-		out = append(out, Sample{
-			Name:   "ecs_cluster_gc_enabled",
-			Labels: []Label{{Key: "scope", Value: scope}},
-			Value:  v,
-		})
-	}
-
 	user := Label{Key: "scope", Value: "user"}
 	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
 	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCUserReclaimed, user)
 	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
 	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCUserTotalDetected, user)
-	flag("user", g.GCUserDataIsEnabled)
+	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCUserDataIsEnabled, user)
 
 	system := Label{Key: "scope", Value: "system"}
 	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
 	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes", g.GCSystemReclaimed, system)
 	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
 	out = appendSeries(out, "ecs_cluster_gc_detected_bytes", g.GCSystemTotalDetected, system)
-	flag("system", g.GCSystemMetadataIsEnabled)
+	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCSystemMetadataIsEnabled, system)
 
 	return out
 }

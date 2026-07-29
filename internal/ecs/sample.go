@@ -55,3 +55,18 @@ func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample {
 	}
 	return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
 }
+
+// appendBool appends b to out as 1 or 0 when the cluster reported it. An unset
+// Bool appends nothing — absent, never zero (ADR-0007). A reported false is
+// emitted as 0 rather than dropped: "this is switched off" is real information,
+// and only silence about the flag is absence.
+func appendBool(out []Sample, name string, b Bool, labels ...Label) []Sample {
+	if !b.Set {
+		return out
+	}
+	v := 0.0
+	if b.Val {
+		v = 1
+	}
+	return append(out, Sample{Name: name, Labels: labels, Value: v})
+}

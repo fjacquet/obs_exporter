@@ -23,17 +23,10 @@ func (a allocationComponentFields) samples() []Sample {
 	const name = "ecs_cluster_disk_space_allocated_component_bytes"
 
 	var out []Sample
-	for _, c := range []struct {
-		purpose string
-		series  Series
-	}{
-		{"user_data", a.UserData},
-		{"system_metadata", a.SystemMetadata},
-		{"geo_cache", a.GeoCache},
-		{"geo_copy", a.GeoCopy},
-		{"local_protection", a.LocalProtection},
-	} {
-		out = appendSeries(out, name, c.series, Label{Key: "purpose", Value: c.purpose})
-	}
+	out = appendSeries(out, name, a.UserData, Label{Key: "purpose", Value: "user_data"})
+	out = appendSeries(out, name, a.SystemMetadata, Label{Key: "purpose", Value: "system_metadata"})
+	out = appendSeries(out, name, a.GeoCache, Label{Key: "purpose", Value: "geo_cache"})
+	out = appendSeries(out, name, a.GeoCopy, Label{Key: "purpose", Value: "geo_copy"})
+	out = appendSeries(out, name, a.LocalProtection, Label{Key: "purpose", Value: "local_protection"})
 	return out
 }
