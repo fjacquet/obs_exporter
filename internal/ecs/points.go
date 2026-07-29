@@ -18,31 +18,47 @@ import (
 // Series is a raw-decoded dashboard time series.
 type Series []map[string]any
 
-// Latest returns the value of the most recent point (max "t"), if any.
+// Latest returns the value of the most recent point (max "t"), if it is readable.
+//
+// The newest point is chosen first, and only then is its value parsed: an
+// unreadable newest reading yields absence, never the value of an older point.
+// This is the absent-never-zero rule of ADR-0007 applied to the time axis — a
+// value we cannot read *now* must not be silently replaced by one from before,
+// because the exporter publishes these as live gauges and a stale reading is
+// indistinguishable from a current one once it reaches Prometheus.
 func (s Series) Latest() (float64, bool) {
+	newest := -1
 	bestT := 0.0
-	bestV := 0.0
-	found := false
-	for _, p := range s {
+	for i, p := range s {
 		t := 0.0
-		v := 0.0
-		vOK := false
 		for k, raw := range p {
-			if strings.TrimSpace(k) == "t" {
-				if f, ok := anyToFloat(raw); ok {
-					t = f
-				}
+			if strings.TrimSpace(k) != "t" {
 				continue
 			}
-			if f, ok := anyToFloat(raw); ok && !vOK {
-				v, vOK = f, true
+			if f, ok := anyToFloat(raw); ok {
+				t = f
 			}
+			break
 		}
-		if vOK && (!found || t >= bestT) {
-			bestT, bestV, found = t, v, true
+		// Ties keep the later element, matching the previous behaviour.
+		if newest < 0 || t >= bestT {
+			newest, bestT = i, t
 		}
 	}
-	return bestV, found
+	if newest < 0 {
+		return 0, false
+	}
+	// A point's value is its single non-"t" key. The loop tolerates more than one
+	// only so key order cannot decide the outcome.
+	for k, raw := range s[newest] {
+		if strings.TrimSpace(k) == "t" {
+			continue
+		}
+		if f, ok := anyToFloat(raw); ok {
+			return f, true
+		}
+	}
+	return 0, false
 }
 
 // Num is a scalar that the ECS API may encode as a JSON number or a quoted string

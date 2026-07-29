@@ -32,6 +32,12 @@ adds a bulk billing POST plus richer dashboard endpoints.
   (including `"N/A"`), and the newest point by `t` is taken as "current". Scalars
   use a string-or-number `Num` type; unparseable values yield *absent* samples,
   never zeros.
+  "Current" means the newest point, not the newest point that happens to parse:
+  `Latest` picks the maximum `t` first and only then reads its value, so an
+  unreadable newest reading yields absence rather than the value of an older
+  point. This is the same rule on the time axis — the exporter publishes these as
+  live gauges, and once a stale reading reaches Prometheus nothing distinguishes
+  it from a current one.
 - **Tolerant HAL list decoding**: the nodes and replication-group endpoints return
   their arrays under `_embedded._instances`, which is what real clusters emit (ECS
   3.8 through ObjectScale 4.3, field-confirmed). The Dell reference examples show
