@@ -26,7 +26,7 @@ Both discovered by reading the merged tree; the spec was written before these we
 
 1. **`docs/metrics.md` already lists all five health states.** Spec documentation item (a) — CodeRabbit r3639388941 — was already fixed inside PR #18 by commit `f474f1a`. `docs/metrics.md:57` already reads `good` / `suspect` / `bad` / `notaccessible` / `maintenance`. **That work is dropped from this plan.** Only the "may be absent" note remains.
 2. **`CHANGELOG.md` has no `## [2.7.0]` section.** The tag `v2.7.0` (2026-07-26) points at merge commit `369db05`, but the PR #18 entries still sit under `## [Unreleased]` (`CHANGELOG.md:7-34`). Task 5 promotes that block to a real `[2.7.0]` heading before adding `[2.7.1]`.
-3. **Controller ruling, 2026-07-27 — the warning is a shared helper, not an inlined block.** The plan first had Tasks 2 and 3 each inline the same three-line `if !r.Embedded.KeySeen { log… }` block. That is verbatim duplication of a logic block, which the review rubric treats as a defect. Ruling: `hal.go` owns a `warnUnknownHalShape(path string, keySeen bool)` helper and both collectors call it in one line. `hal.go` therefore imports logrus; `nodes.go` and `replication.go` do not. Tasks 1-3 below already reflect this.
+3. **Controller ruling, 2026-07-27 — the warning is a shared helper, not an inlined block.** The plan first had Tasks 2 and 3 each inline the same three-line `if !r.Embedded.KeySeen { log… }` block. That is verbatim duplication of a logic block, which the review rubric treats as a defect. Ruling: `hal.go` owns a `warnUnknownHalShape(cluster, path string, keySeen bool)` helper and both collectors call it in one line. `hal.go` therefore imports logrus; `nodes.go` and `replication.go` do not. Tasks 1-3 below already reflect this.
 4. **Deviation from the spec on one CHANGELOG point.** The spec says the "supporting both keys is under discussion" sentence "becomes resolved". That sentence is inside content already shipped as v2.7.0, so this plan leaves the released text verbatim and states the resolution in the new `[2.7.1]` entry instead. Rewriting a released changelog section hides what users of v2.7.0 actually got.
 
 ---
@@ -39,7 +39,7 @@ Both discovered by reading the merged tree; the spec was written before these we
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `type halList[T any] struct { Instances []T; KeySeen bool }` with method `func (h *halList[T]) UnmarshalJSON(b []byte) error`, plus `func warnUnknownHalShape(path string, keySeen bool)`. Tasks 2 and 3 embed the type and call the helper.
+- Produces: `type halList[T any] struct { Instances []T; KeySeen bool }` with method `func (h *halList[T]) UnmarshalJSON(b []byte) error`, plus `func warnUnknownHalShape(cluster, path string, keySeen bool)`. Tasks 2 and 3 embed the type and call the helper.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -143,7 +143,7 @@ func TestWarnUnknownHalShape(t *testing.T) {
 			hook := test.NewGlobal()
 			defer hook.Reset()
 
-			warnUnknownHalShape("/dashboard/zones/localzone/nodes", tc.keySeen)
+			warnUnknownHalShape("test-cluster", "/dashboard/zones/localzone/nodes", tc.keySeen)
 
 			if got := len(hook.Entries); got != tc.wantLogs {
 				t.Fatalf("got %d log entries, want %d", got, tc.wantLogs)
@@ -157,6 +157,9 @@ func TestWarnUnknownHalShape(t *testing.T) {
 			}
 			if entry.Data["path"] != "/dashboard/zones/localzone/nodes" {
 				t.Errorf("path field = %v, want the endpoint path", entry.Data["path"])
+			}
+			if entry.Data["cluster"] != "test-cluster" {
+				t.Errorf("cluster field = %v, want the cluster name", entry.Data["cluster"])
 			}
 		})
 	}
@@ -249,11 +252,14 @@ func (h *halList[T]) UnmarshalJSON(b []byte) error {
 // This is deliberately a warning and not an error: a build that omits
 // "_embedded" entirely on an empty cluster would be indistinguishable from
 // shape drift, and a false ecs_collector_up=0 is worse than a missed alert.
-func warnUnknownHalShape(path string, keySeen bool) {
+//
+// The cluster is included because the exporter polls many clusters per cycle; a
+// warning naming only the endpoint cannot tell an operator which one drifted.
+func warnUnknownHalShape(cluster, path string, keySeen bool) {
 	if keySeen {
 		return
 	}
-	log.WithField("path", path).
+	log.WithFields(log.Fields{"cluster": cluster, "path": path}).
 		Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
 }
 ```
@@ -391,7 +397,7 @@ Inside `Collect`, insert the shape check immediately after the `c.Get` error
 check (currently `nodes.go:64-66`) and before `var out []Sample`:
 
 ```go
-	warnUnknownHalShape(pathLocalZoneNodes, r.Embedded.KeySeen)
+	warnUnknownHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched — `r.Embedded.Instances` still resolves, now through the wrapper.
@@ -502,7 +508,7 @@ file does not import logrus.
 Insert the shape check inside `Collect`, immediately after the `c.Get` error check (currently `replication.go:40-42`) and before `var out []Sample`:
 
 ```go
-	warnUnknownHalShape(pathReplicationGroups, r.Embedded.KeySeen)
+	warnUnknownHalShape(c.Name(), pathReplicationGroups, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched.
@@ -676,7 +682,7 @@ Also promotes the stale [Unreleased] heading to [2.7.0], which was tagged on
 ### Task 6: Draft the reply to the PR #18 contributor
 
 **Files:**
-- Create: `/private/tmp/claude-501/-Users-fjacquet-Projects-obs-exporter/380f2331-021c-47f6-bcd2-1fa24dbaf7e6/scratchpad/pr18-reply.md`
+- Create: `<scratchpad>/pr18-reply.md` (the session scratchpad directory; the file is deliberately outside the repository)
 
 Written to the scratchpad, not the repo: it is a GitHub comment, not project content. The maintainer posts it.
 

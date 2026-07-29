@@ -1,7 +1,7 @@
 # Tolerant HAL list decoding — design
 
 Date: 2026-07-27
-Status: approved, not yet implemented
+Status: implemented in v2.7.1 (PR #19)
 Target release: v2.7.1
 
 ## Context

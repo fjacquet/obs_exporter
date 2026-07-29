@@ -17,7 +17,9 @@ import (
 // Both keys are therefore accepted. Picking only one is not a cosmetic choice:
 // a key mismatch decodes zero instances and returns no error, so the collector
 // emits no samples while ecs_collector_up still reports 1 — the worst failure
-// mode this exporter has, and the bug fixed in v2.7.0.
+// mode this exporter has. v2.7.0 hit it by reading only "instances", then fixed
+// that by switching to "_instances", which left clusters emitting the documented
+// form exposed to the same failure. v2.7.1 accepts both and closes the class.
 type halList[T any] struct {
 	// Instances holds the decoded array, empty when the payload carried none.
 	Instances []T
