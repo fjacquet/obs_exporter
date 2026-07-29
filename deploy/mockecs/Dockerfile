@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build context is the repo root: docker build -f deploy/mockecs/Dockerfile .
-FROM golang:1.26.4 AS build
+FROM golang:1.26.5 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
