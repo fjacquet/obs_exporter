@@ -55,6 +55,19 @@ func TestClusterCollect(t *testing.T) {
 
 	mustSample(t, samples, "ecs_cluster_replication_rpo_lag_seconds", 7200)
 	mustSample(t, samples, "ecs_cluster_replication_rpo_timestamp_seconds", 1502820000)
+
+	gcUser := Label{"scope", "user"}
+	gcSystem := Label{"scope", "system"}
+	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes", 8100, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_detected_bytes", 9700, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
+	// The fixture omits gcSystemMetadataIsEnabled on purpose.
+	if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
+		t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")
+	}
 }
 
 func TestSplitErrorType(t *testing.T) {
