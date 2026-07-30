@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func gather(t *testing.T, store *SnapshotStore) map[string]int {
@@ -100,5 +101,33 @@ func TestPromCollectorEmptyStore(t *testing.T) {
 	store := NewSnapshotStore()
 	if got := len(gather(t, store)); got != 0 {
 		t.Errorf("expected empty gather, got %d families", got)
+	}
+}
+
+func TestPromCollectorEmitsCounterType(t *testing.T) {
+	store := NewSnapshotStore()
+	store.Store(&Snapshot{Clusters: []*ClusterSnapshot{{
+		Cluster: "c1",
+		Samples: []Sample{
+			{Name: "ecs_node_requests_total", Labels: []Label{{"node", "n1"}}, Value: 5, Type: Counter},
+			{Name: "ecs_node_cpu_utilization_percent", Labels: []Label{{"node", "n1"}}, Value: 12},
+		},
+	}}})
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(NewPromCollector(store))
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	types := map[string]dto.MetricType{}
+	for _, mf := range mfs {
+		types[mf.GetName()] = mf.GetType()
+	}
+	if types["ecs_node_requests_total"] != dto.MetricType_COUNTER {
+		t.Errorf("requests_total type = %v, want COUNTER", types["ecs_node_requests_total"])
+	}
+	if types["ecs_node_cpu_utilization_percent"] != dto.MetricType_GAUGE {
+		t.Errorf("cpu_utilization type = %v, want GAUGE", types["ecs_node_cpu_utilization_percent"])
 	}
 }

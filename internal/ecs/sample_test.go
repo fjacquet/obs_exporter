@@ -116,3 +116,19 @@ func TestAppendHelpersDetachLabelSlices(t *testing.T) {
 		})
 	}
 }
+
+func TestWithClusterPreservesType(t *testing.T) {
+	// The collection loop stamps the cluster label on every sample. A counter
+	// that loses its type there would silently export as a gauge.
+	s := Sample{Name: "ecs_node_requests_total", Value: 1, Type: Counter}
+	if got := s.WithCluster("c1").Type; got != Counter {
+		t.Errorf("Type after WithCluster = %v, want Counter", got)
+	}
+}
+
+func TestSampleTypeZeroValueIsGauge(t *testing.T) {
+	// Every existing collector builds Samples without a Type; they must stay gauges.
+	if (Sample{}).Type != Gauge {
+		t.Error("the zero SampleType must be Gauge")
+	}
+}

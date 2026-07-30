@@ -42,7 +42,11 @@ func (p *PromCollector) Collect(ch chan<- prometheus.Metric) {
 				schema[s.Name] = keys
 			}
 			desc := prometheus.NewDesc(s.Name, "ECS metric "+s.Name, keys, nil)
-			m, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, s.Value, vals...)
+			valueType := prometheus.GaugeValue
+			if s.Type == Counter {
+				valueType = prometheus.CounterValue
+			}
+			m, err := prometheus.NewConstMetric(desc, valueType, s.Value, vals...)
 			if err != nil {
 				continue // skip inconsistent label sets rather than panic
 			}
