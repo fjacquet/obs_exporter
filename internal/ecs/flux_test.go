@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -111,9 +112,13 @@ type fluxClient struct {
 	ecsclient.Client
 	bodies map[string]string
 	t      *testing.T
+	fail   bool
 }
 
 func (f *fluxClient) Post(_ context.Context, path string, body, out any) error {
+	if f.fail {
+		return errors.New("401 Unauthorized")
+	}
 	if path != fluxPath {
 		return fmt.Errorf("unexpected POST to %s", path)
 	}
@@ -206,4 +211,43 @@ func TestFluxQueryScriptShape(t *testing.T) {
 	if strings.Contains(script, "r.host ==") {
 		t.Errorf("script filters by host:\n%s", script)
 	}
+}
+
+func TestFluxCollectFailsOnEndpointError(t *testing.T) {
+	// An unreachable or unauthorized endpoint degrades this collector alone:
+	// returning an error is what drives ecs_collector_up{collector="flux"}=0.
+	c := mockClient(t)
+	c.Errs = map[string]error{fluxPath: errors.New("401 Unauthorized")}
+	if _, err := (Flux{}).Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, fail: true}); err == nil {
+		t.Error("Collect must return an error when the Flux endpoint rejects the query")
+	}
+}
+
+func TestFluxCollectSurvivesRenamedMeasurement(t *testing.T) {
+	// Measurement names are undocumented and unversioned: net/utilization is
+	// listed in 3.8 and gone in 4.3. One missing measurement must not take the
+	// other seven with it.
+	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 31.5, Label{"node", "supr01-r01"})
+	for _, absent := range []string{"ecs_cluster_dt_total", "ecs_node_requests_total"} {
+		if _, ok := findSample(samples, absent); ok {
+			t.Errorf("%s emitted from an empty measurement", absent)
+		}
+	}
+}
+
+func TestFluxCountsUnmappedHosts(t *testing.T) {
+	// flux_net.json carries one row for a host absent from the inventory. Without
+	// this counter, a cluster whose tag space we guessed wrong reports a healthy
+	// collector producing no data.
+	samples := collectFlux(t, map[string]string{"net": "flux_net.json"})
+	mustSample(t, samples, "ecs_collector_unmapped_nodes", 1, Label{"collector", "flux"})
+	if _, ok := findSample(samples, "ecs_node_network_bytes_total", Label{"node", "not-in-this-cluster.example.com"}); ok {
+		t.Error("an unmappable host produced a series that cannot join the others")
+	}
+}
+
+func TestFluxCollectEmitsZeroUnmappedOnSuccess(t *testing.T) {
+	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
+	mustSample(t, samples, "ecs_collector_unmapped_nodes", 0, Label{"collector", "flux"})
 }
