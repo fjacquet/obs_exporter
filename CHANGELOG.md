@@ -8,22 +8,29 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [3.2.0] - 2026-07-30
 
+Non-breaking: no metric is removed or renamed, and no existing series changes
+type. A 3.1.0 was drafted while this work was split across two phases; both
+phases shipped in one merge, so they are released together here and 3.1.0 was
+never cut.
+
 ### Added
 
 - Opt-in `collectFlux` collector querying the cluster's Flux monitoring store
   for per-node CPU, memory and network metrics, per-node request counters, and
   cluster-wide DT and transaction metrics the management API does not serve.
-  Off by default; requires `SYSTEM_MONITOR` or `SYSTEM_ADMIN`.
+  Off by default; requires `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. It reuses the
+  management port and session, so it needs no additional network access.
+- `ecs_node_maintenance_mode`, from the object-port ping's `MAINTENANCE_MODE`
+  item. A node reporting `UNKNOWN` yields an absent sample, never 0.
 - `ecs_collector_unmapped_nodes{collector="flux"}` reports Flux rows whose host
-  tag matched no node in the inventory.
-
-### Changed
-
-- When `collectFlux` is enabled it becomes the sole source of
-  `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent` and
-  `ecs_node_memory_used_bytes`. Every other Flux metric is additive.
-
-## [3.1.0] - 2026-07-30
+  tag matched no node in the inventory. Published every cycle including as 0, so
+  a flat zero means the mapping is working rather than that the metric is absent.
+- Grafana panels for every new metric, and an "Exporter health" row on the
+  overview carrying `ecs_collector_up` and `ecs_collector_unmapped_nodes` —
+  neither of which had ever been shown, so a degraded collector was invisible.
+- `collectFlux` documented on the operator paths: the annotated config example,
+  the per-cluster flag table, the installation prerequisites, the README feature
+  list, and the chart's commented values.
 
 ### Fixed
 
@@ -32,13 +39,30 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `ecs_node_active_connections` previously read whichever item came first. Its
   name and meaning are unchanged — the 4.3 REST reference defines `LOAD_FACTOR`
   as the node's active Jetty connection count.
+- Two samples sharing a metric name **and** label values no longer fail the whole
+  Prometheus `Gather`. The registry errors on a duplicate and `promhttp`'s
+  default error handling turns that into HTTP 500 for the entire `/metrics`
+  endpoint, across every cluster; the duplicate is now dropped so one bad series
+  costs one series.
+- `ecs_up` can reach 0 again on a cluster with `collectFlux` enabled. The
+  unmapped-nodes housekeeping sample was counted as a domain sample, so a cycle
+  in which every collector returned no data still reported the cluster up.
 
-### Added
+### Changed
 
-- `ecs_node_maintenance_mode`, from the ping's `MAINTENANCE_MODE` item. A node
-  reporting `UNKNOWN` yields an absent sample, never 0.
+- When `collectFlux` is enabled it becomes the sole source of
+  `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent` and
+  `ecs_node_memory_used_bytes`. Every other Flux metric is additive.
 - Internal: samples carry a gauge/counter type, honoured by both the Prometheus
-  and OTLP export paths. No existing series changes type.
+  and OTLP export paths. Cumulative Flux counters export as counters; no
+  pre-existing series changes type.
+
+### Known limitations
+
+- The Flux collector's bucket and measurement mapping, its response envelope, and
+  the `host`-tag node identity are derived from the ObjectScale 4.3 admin guide
+  and have not been confirmed against a running cluster. `cmd/mockecs` does not
+  yet serve the Flux endpoint. See ADR-0011's Consequences.
 
 ## [3.0.0] - 2026-07-30
 
