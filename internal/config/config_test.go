@@ -47,6 +47,9 @@ clusters:
 	if c.CollectDT {
 		t.Error("DT collection should default to disabled")
 	}
+	if c.CollectFlux {
+		t.Error("Flux collection should default to disabled")
+	}
 }
 
 func TestLoadEnvInterpolation(t *testing.T) {

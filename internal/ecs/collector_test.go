@@ -117,3 +117,64 @@ func TestLabelKeyConsistency(t *testing.T) {
 		}
 	}
 }
+
+func TestRegistryArbitratesPerfNamesWithFlux(t *testing.T) {
+	// The three names below exist in both sources. Exactly one collector may own
+	// each per cycle, and the decision is made here, before any request goes out.
+	off := Registry(config.Cluster{})
+	on := Registry(config.Cluster{CollectFlux: true})
+
+	var offNodes, onNodes Nodes
+	for _, rc := range off {
+		if n, ok := rc.(Nodes); ok {
+			offNodes = n
+		}
+	}
+	for _, rc := range on {
+		if n, ok := rc.(Nodes); ok {
+			onNodes = n
+		}
+	}
+	if offNodes.FluxOwnsPerf {
+		t.Error("Nodes must keep the perf names when Flux is off")
+	}
+	if !onNodes.FluxOwnsPerf {
+		t.Error("Nodes must yield the perf names when Flux is on")
+	}
+
+	var hasFlux bool
+	for _, rc := range on {
+		if rc.Name() == "flux" {
+			hasFlux = true
+		}
+	}
+	if !hasFlux {
+		t.Error("collectFlux must register the flux collector")
+	}
+	for _, rc := range off {
+		if rc.Name() == "flux" {
+			t.Error("flux must not be registered when the flag is unset")
+		}
+	}
+}
+
+func TestNodesYieldsArbitratedNames(t *testing.T) {
+	samples, err := Nodes{FluxOwnsPerf: true}.Collect(t.Context(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"ecs_node_cpu_utilization_percent",
+		"ecs_node_memory_utilization_percent",
+		"ecs_node_memory_used_bytes",
+	} {
+		if _, ok := findSample(samples, name); ok {
+			t.Errorf("%s emitted by Nodes while Flux owns it", name)
+		}
+	}
+	// Names Flux cannot fill — its net measurement carries a per-interface
+	// dimension, so it must use a different name — stay with the dashboard.
+	if _, ok := findSample(samples, "ecs_node_nic_bandwidth"); !ok {
+		t.Error("nic_bandwidth must stay on the dashboard path")
+	}
+}
