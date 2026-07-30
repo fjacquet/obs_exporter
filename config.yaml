@@ -42,3 +42,7 @@ clusters:
     # network-segmented cluster port 9101 is not reachable from outside the
     # cluster — see docs/metrics.md.
     # collectDT: true
+    # Query the cluster's Flux monitoring store for per-node performance and
+    # cluster DT counters the management API does not serve. Requires the
+    # account to hold SYSTEM_MONITOR or SYSTEM_ADMIN. Off by default.
+    # collectFlux: true

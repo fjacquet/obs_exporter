@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-30
+
+### Added
+
+- Opt-in `collectFlux` collector querying the cluster's Flux monitoring store
+  for per-node CPU, memory and network metrics, per-node request counters, and
+  cluster-wide DT and transaction metrics the management API does not serve.
+  Off by default; requires `SYSTEM_MONITOR` or `SYSTEM_ADMIN`.
+- `ecs_collector_unmapped_nodes{collector="flux"}` reports Flux rows whose host
+  tag matched no node in the inventory.
+
+### Changed
+
+- When `collectFlux` is enabled it becomes the sole source of
+  `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent` and
+  `ecs_node_memory_used_bytes`. Every other Flux metric is additive.
+
 ## [3.1.0] - 2026-07-30
 
 ### Fixed
