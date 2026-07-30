@@ -9,10 +9,9 @@ Implements: [ADR-0011](../../adr/0011-flux-collector-for-unreachable-metrics.md)
 ADR-0011 accepted an opt-in Flux collector as the route to metric families the
 management API does not serve, and left six questions to the implementation PR.
 All six are now answered — by the live-4.3 reporter, and independently validated
-against the ObjectScale 4.3 admin guide and release notes.
+against the ObjectScale 4.3 admin guide, release notes, and REST API reference.
 
-The reporter also found a defect while reviewing the DT collector:
-`ecs_node_active_connections` has never carried a connection count. The object
+The reporter also found a defect while reviewing the DT collector. The object
 port's ping payload is
 
 ```xml
@@ -23,10 +22,25 @@ port's ping payload is
 ```
 
 and `internal/ecs/dt.go` decodes it as `xml:"PingItem>Value"` into a scalar. Go's
-XML decoder keeps the *first* match, so the metric reports LOAD_FACTOR — a load
-balancer weight, effectively always 1 — under a name promising connection counts.
-The doc comment asserting otherwise is wrong. Neither value in the payload is a
-supervision metric; both are signals for a load balancer fronting the node.
+XML decoder keeps the *first* match, so `ecs_node_active_connections` reports the
+`Value` of whichever `PingItem` happens to appear first.
+
+The metric's **name** is correct. The 4.3 REST reference documents `GET ?ping` as
+returning a load factor, and states plainly: *"The Load Factor value is the number
+of active Jetty connections on that node."* An early reading of this defect held
+that the metric was meaningless and had to be removed; the reference contradicts
+that, and the reporter's observed value of `1` reads as a genuinely idle node
+rather than a constant.
+
+The **decode** is the defect. The reference documents `PingItem` as `0-*`
+elements with no guaranteed ordering, and the `&item=load-factor` query parameter
+changes which items are present at all. A positional decode therefore reports the
+first item's `Value` whatever that item is — correct today by luck of ordering,
+silently wrong the moment ordering changes or LOAD_FACTOR is absent. Matching by
+`Name` removes the coincidence.
+
+Because the name survives, this correction is **not breaking**: no series is
+removed or renamed, and the existing Grafana panel keeps working.
 
 ### Answers to ADR-0011's open questions
 
@@ -37,7 +51,7 @@ supervision metric; both are signals for a load balancer fronting the node.
 | 3 | Version skew | Warning plus absent series, never a hard collector failure. | reporter; the 4.3 guide confirms `net` has no `utilization` field. Its presence in 3.8 is the reporter's recollection, unverified either way — which is itself the argument for tolerating absence rather than asserting a schema |
 | 4 | Response parsing | Structured JSON (`Series`/`Datatypes`/`Columns`/`Values`) via `accept:application/json`. Annotated CSV is offered but not used. | admin guide worked example |
 | 5 | Whether DT moves to Flux | Partly. Flux DT is cluster-scoped; per-node DT stays on `collectDT`. | admin guide tag listings |
-| 6 | The "DT Query Services" REST section | Not an API surface. `dtquery` is a *process* in the system-process table that "provides REST APIs to get Directory Table details" — internal, not a documented 4443 endpoint. Moot regardless: in 4.x the REST/dashboard layer sources from Flux underneath, so it could not be an independent source. | admin guide, Table 26 |
+| 6 | The "DT Query Services" REST section | Does not exist as an API surface. In the 4.3 REST reference it is a navigation category whose sole child is *Data Migration* — an orphaned heading from Dell's doc generator, with no methods beneath it. No service in the reference exposes DT counters. `dtquery` is a *process* in the admin guide's system-process table that "provides REST APIs to get Directory Table details" — internal to the cluster, not published on 4443. | 4.3 REST reference navigation tree; admin guide Table 26 |
 
 ### What the 4.3 admin guide confirms
 
@@ -66,20 +80,41 @@ default one-hour window**, and prescribes reducing the window to five minutes.
 The store punishes wide ranges, so the guide's own `range(start: -30m)` examples
 are not a safe default for a collector that runs every cycle.
 
+### What the 4.3 REST reference settles
+
+The full 4.3 REST API reference closes the two remaining "is there another way?"
+questions, both negatively:
+
+- **No DT endpoint exists on 4443.** The reference's service list contains no DT
+  or directory-table service, and the "DT Query Services" heading is an empty
+  navigation category (see Q6 above). Flux is not merely the best source for DT
+  counters; it is the only one.
+- **Nothing on 4443 competes with Flux for the perf fields.** `MonitoringService`
+  — the one service whose name suggests it might — exposes `getAuditEvents` and
+  nothing else. `DashboardApiRouter` is the dashboard path the exporter already
+  uses, and the fields in question are absent from its payloads on 4.3.
+
+It also documents the ping payload the DT collector scrapes: `PingList` contains
+`0-*` `PingItem` elements with `Name`, `Status`, `Text` and `Value`, all typed
+String; `MAINTENANCE_MODE` reports `ON`, `OFF`, or `UNKNOWN`; and
+`&item=load-factor` returns the load factor alone, avoiding "the performance
+penalty of checking Maintenance Mode."
+
 ## Scope: two releases
 
-The work splits cleanly on whether it depends on data we do not have.
+The work splits cleanly on whether it depends on data we do not have. Neither
+release is breaking, so neither needs a migration guide.
 
-**v4.0.0 — no external dependency, shippable now.**
-The ping-metric correction (breaking), plus `Sample.Type` as internal groundwork.
-The type change exports no new behaviour — the zero value is gauge and every
-existing sample stays one — but it touches `sample.go` and both export paths, so
-it is worth landing on its own while the Flux half is blocked.
+**v3.1.0 — no external dependency, shippable now.**
+The ping-decode correction, plus `Sample.Type` as internal groundwork. The type
+change exports no new behaviour — the zero value is gauge and every existing
+sample stays one — but it touches `sample.go` and both export paths, so it is
+worth landing on its own while the Flux half is blocked.
 
-**v4.1.0 — needs live traces.**
-The Flux collector. Entirely additive and opt-in; nothing in it is breaking.
+**v3.2.0 — needs live traces.**
+The Flux collector. Entirely additive and opt-in.
 
-## v4.0.0: the ping correction
+## v3.1.0: the ping correction
 
 `pingResp` becomes a slice matched by `Name`, never by position:
 
@@ -99,19 +134,43 @@ Emitted:
 
 | Metric | Source | Absent when |
 |---|---|---|
-| `ecs_node_load_factor{node}` | item `Name=LOAD_FACTOR`, `Value` | item missing, or `Value` unparseable |
-| `ecs_node_maintenance_mode{node}` | item `Name=MAINTENANCE_MODE`, `Status`: `OFF`→0, `ON`→1 | item missing, or `Status` is any other string |
+| `ecs_node_active_connections{node}` | item `Name=LOAD_FACTOR`, `Value` | item missing, or `Value` unparseable |
+| `ecs_node_maintenance_mode{node}` | item `Name=MAINTENANCE_MODE`, `Status`: `OFF`→0, `ON`→1 | item missing, or `Status` is `UNKNOWN` or any other string |
 | `ecs_node_scrape_up{node,endpoint="object"}` | unchanged | never |
 
-An unrecognised `MAINTENANCE_MODE` status yields an absent sample, not 0. Under
-ADR-0007 a value we cannot interpret must not be reported as "not in maintenance",
-which is the one reading an operator would act on.
+`ecs_node_active_connections` keeps its name — the reference confirms it is
+accurate — and gains a decode that cannot silently read the wrong item.
 
-`ecs_node_active_connections` is deleted, along with the false doc comment at
-`dt.go:27-28`.
+An unrecognised `MAINTENANCE_MODE` status yields an absent sample, not 0. The
+reference documents `UNKNOWN` as a real third value alongside `ON` and `OFF`, so
+this is not defensive coding against a hypothetical: under ADR-0007 a status the
+cluster itself calls unknown must not be reported as "not in maintenance", which
+is the one reading an operator would act on.
 
-Fallout: `docs/metrics.md`, a new `docs/migration-v4.md`, the Grafana panel bound
-to `active_connections`, and CHANGELOG.
+The doc comment at `dt.go:27-28` is rewritten: the `Value` it describes is right,
+but it documents a scalar field that no longer exists.
+
+**`&item=load-factor` considered and rejected.** It would avoid the documented
+maintenance-mode penalty, but that penalty is described as a concern for
+discovering load factor "with greater frequency" — a load balancer's polling
+rate, not one scrape per node per collection interval. Maintenance mode is the
+more operationally interesting of the two values, and dropping it to save a cost
+nobody has measured on a real cluster is a poor trade. Revisit if a live cluster
+shows the full ping is actually slow.
+
+Fallout: `docs/metrics.md` and CHANGELOG. No migration guide, and no Grafana
+change is required — though a `maintenance_mode` panel is worth adding.
+
+Tests in `dt_test.go`, against the reporter's verbatim 4.3 payload:
+
+- `active_connections` is the LOAD_FACTOR value, and stays correct when the two
+  `PingItem` elements are **reversed** — the case the current decode fails and
+  the whole reason for the change.
+- `maintenance_mode` is 0 for `OFF`, 1 for `ON`, absent for `UNKNOWN`, absent for
+  an unrecognised string.
+- A `PingList` with zero items emits neither metric, and still emits
+  `scrape_up{endpoint="object"}=1`.
+- An item carrying `Status` but no `Value` does not emit a zero.
 
 ### `Sample.Type`
 
@@ -140,7 +199,7 @@ Known pre-existing wart, not fixed here: `ecs_cluster_transactions_total` is a
 gauge whose name ends in `_total`. It predates this change and renaming it is a
 separate breaking decision.
 
-## v4.1.0: the Flux collector
+## v3.2.0: the Flux collector
 
 ### Config
 
@@ -237,7 +296,7 @@ These are rates by the bucket's definition, so they are gauges and must never be
 value space is undocumented, and a label whose values we cannot predict would be
 frozen into the metric's schema on first emission. It waits for traces.
 
-Deliberately out of scope for v4.1.0, available for later: `disk`, `diskio`,
+Deliberately out of scope for v3.2.0, available for later: `disk`, `diskio`,
 `nstat`, `system`, `linux_sysctl_fs`, the `_head` / `_namespace` / `_method`
 breakdowns, `dtquery_dt_status_detailed_type`, and the `cq_*` health summaries.
 
@@ -344,3 +403,4 @@ Everything above is structure; these are values only a real 4.3 response settles
 - [ADR-0009](../../adr/0009-modular-resource-collectors.md) — the collector interface and per-collector degradation.
 - ObjectScale 4.3 admin guide, "Advanced Monitoring → Flux API" and "Flux API field descriptions".
 - ObjectScale 4.3 release notes, OBS04J-596.
+- ObjectScale 4.3 REST API reference (`OBS_4.3.0.0_REST_API`), "S3 Ping → Ping", the service list, and the navigation tree that closes Q6.
