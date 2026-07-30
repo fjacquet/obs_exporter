@@ -108,6 +108,7 @@ config: |
       # insecureSkipVerify: true
       # collectMetering: false
       # collectDT: true
+      # collectFlux: true   # needs SYSTEM_MONITOR; no extra network access
 
 env: []
 # - name: OBS1_HOSTNAME

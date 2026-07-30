@@ -66,6 +66,10 @@ a provisioned dashboard at <http://localhost:3000> (admin/admin).
   (one bulk billing call per cycle).
 - **Meta**: `ecs_up` / `ecs_collector_up` per cluster, build info; `/health` JSON.
 - Opt-in (`collectDT: true`): legacy node-local DT and active-connection stats.
+- Opt-in (`collectFlux: true`): per-node CPU, memory and network, per-node request
+  counters, and cluster-wide DT and transaction metrics, read from the cluster's
+  Flux monitoring store over the same management port. Covers fields the dashboard
+  API does not serve on ObjectScale 4.3. Requires `SYSTEM_MONITOR`.
 
 Full catalog: [docs/metrics.md](docs/metrics.md).
 

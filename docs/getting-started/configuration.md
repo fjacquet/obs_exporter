@@ -29,6 +29,7 @@ clusters:
     collectMetering: true        # namespace usage via bulk billing (default true)
     collectQuotas: true          # per-namespace quota limits, own collector (default true)
     collectDT: false             # opt-in legacy node-local DT scraping
+    collectFlux: false           # opt-in Flux monitoring-store queries (needs SYSTEM_MONITOR)
     # objPort: 9021              # only used by collectDT
     # dtPort: 9101               # only used by collectDT
 ```
@@ -104,6 +105,15 @@ keeping the running config. Changes to `server.*` need a restart.
 | `collectMetering` | `true` | namespace usage via one bulk billing POST. Disable on very large clusters if the billing query is slow; this also disables `quotas`. |
 | `collectQuotas` | `true` | the `quotas` collector (per-namespace quota limits). Requires `collectMetering`. See below. |
 | `collectDT` | `false` | legacy node-local DT/connection stats over ports 9101/9021 (undocumented ECS internals, v1 parity). See the [DT reachability warning](../metrics.md#node-dt-opt-in-collectdt-true). |
+| `collectFlux` | `false` | per-node CPU/memory/network, per-node request counters, and cluster-wide DT and transaction metrics from the cluster's Flux monitoring store. Same management port and session as every other collector — **no extra network access** — but the account must hold `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. Adds eight requests per cycle. See the [Flux collector section](../metrics.md#flux-collector-opt-in-collectflux-true). |
+
+Enabling `collectFlux` makes it the **sole source** of `ecs_node_cpu_utilization_percent`,
+`ecs_node_memory_utilization_percent` and `ecs_node_memory_used_bytes` — the dashboard
+path stops emitting those three, so exactly one collector produces each. Everything else
+it emits is additive. On a 4.3 cluster the dashboard payloads do not carry those fields
+at all, which is the gap this collector exists to close; on a cluster that *does* serve
+them, enabling Flux switches their source, so verify they still appear before relying on
+it. `collectFlux` and `collectDT` are independent — enable either, both, or neither.
 
 ### Quotas on clusters with many namespaces
 
