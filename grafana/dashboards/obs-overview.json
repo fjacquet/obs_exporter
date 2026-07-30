@@ -1011,6 +1011,115 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Exporter health — is the exporter itself OK?",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "panels": [],
+      "id": 103
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Collector health",
+      "description": "One series per collector per cluster. A collector at 0 has failed its domain while the others keep working — the exporter degrades per domain rather than going dark. Check the exporter log for which endpoint refused.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 1,
+          "min": 0,
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "last"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_collector_up{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}} {{collector}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Flux hosts that did not map to a node",
+      "description": "Flux tags its rows by host; the exporter maps those onto the /vdc/nodes nodename every other collector labels with. Anything above zero means rows were dropped because their host matched no node — those per-node Flux metrics are silently missing, and the collector still reports up. Zero is the healthy value and is always published, so a flat line at zero means mapping is working, not that the metric is absent. Only meaningful when collectFlux is enabled.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ecs_collector_unmapped_nodes{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
