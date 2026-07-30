@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-30
+
 ### Removed — BREAKING
 - **Around thirty metric names are gone**, consolidated into one name plus a
   label wherever they were one measurement split across several names

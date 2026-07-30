@@ -99,7 +99,11 @@ homebrew_casks:
     # Two archives (tar.gz + raw binary) share each OS/arch; point the cask at the
     # tar.gz archive so it has one unambiguous artifact per platform.
     ids: [obs_exporter]
-    skip_upload: '{{ if .Env.HOMEBREW_TAP_GITHUB_TOKEN }}false{{ else }}true{{ end }}'
+    # Skipped without the cross-repo PAT, and skipped on every pre-release: the
+    # tap has a single current version, so publishing an -rc there would put a
+    # release candidate in front of `brew install` users who asked for a stable
+    # build. The GHCR `latest` tag is guarded the same way, above.
+    skip_upload: '{{ if and .Env.HOMEBREW_TAP_GITHUB_TOKEN (not .Prerelease) }}false{{ else }}true{{ end }}'
     repository:
       owner: fjacquet
       name: homebrew-tap
