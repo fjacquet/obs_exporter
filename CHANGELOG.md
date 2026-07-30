@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-07-30
+
 ### Fixed
 - Time-series metrics no longer publish a stale reading as a live value. When the
   newest point of a dashboard series was unreadable (`"N/A"`, `null`), the parser
@@ -14,6 +16,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   current one. The newest point is now chosen first and only then read, so an
   unreadable current reading yields an absent sample. This is the absent-never-zero
   rule of ADR-0007 applied to the time axis, and affects every `Series` metric.
+
+### Changed
+- Every collector now emits through the shared `appendSeries`/`appendNum`/
+  `appendBool` helpers; the hand-rolled equivalents in `cluster.go`, `nodes.go`
+  and `replication.go` are gone, so the absent-never-zero rule has one
+  implementation instead of four. The helpers also copy the caller's label slice,
+  which matters where one label set is built per instance and spread into a dozen
+  appends. No metric, label or value changes: the 127 samples emitted from the
+  reference payload are byte-identical before and after.
 
 ## [2.8.0] - 2026-07-29
 
