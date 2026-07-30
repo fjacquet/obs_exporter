@@ -1204,6 +1204,12 @@ nodename. Index every identifier a node publishes so the two sets join."
 
 - [ ] **Step 1: Add the fixtures**
 
+Every file added under `internal/ecs/testdata/` must also be copied
+byte-identically to `cmd/mockecs/fixtures/`, or `TestFixturesMatchMockecs`
+fails and the branch goes red. Mirror each of the three below as you add it.
+Wiring `cmd/mockecs` to *serve* the Flux endpoint is still Task 11's job; only
+the fixture copies belong here.
+
 `internal/ecs/testdata/flux_cpu.json`:
 
 ```json
@@ -1785,7 +1791,7 @@ Query a measurement that does not exist. If it answers 200 with empty `Series`, 
 
 - [ ] **Step 5: Sync the demo fixtures**
 
-Copy the Flux fixtures into `cmd/mockecs/fixtures/` and teach `cmd/mockecs` to answer `POST /flux/api/external/v2/query`, so `make demo` exercises the collector. Run `go test ./internal/ecs -run TestFixturesSync` to confirm the copies match.
+The fixture *copies* already live in `cmd/mockecs/fixtures/` — Tasks 5 and 8 mirror each file as they add it, because `TestFixturesMatchMockecs` fails otherwise. What remains here is teaching `cmd/mockecs` to **serve** them: answer `POST /flux/api/external/v2/query`, routing on the measurement named in the request body, so `make demo` exercises the collector end to end. Re-sync any fixture whose contents changed when the real traces replaced them, then run `go test ./internal/ecs -run TestFixturesMatchMockecs` to confirm the copies still match byte for byte.
 
 - [ ] **Step 6: Full gate and commit**
 
