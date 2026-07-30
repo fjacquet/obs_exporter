@@ -32,3 +32,9 @@ Thumbs.db
 
 # superpowers subagent-driven-development scratch workspace
 .superpowers/
+
+# Vendor reference documentation (Dell ObjectScale guides, REST API bundles).
+# Kept locally for research; never committed — they are Dell's copyrighted
+# material and this repository is public. Cite them by title and section
+# instead, as docs/adr/ and docs/superpowers/specs/ do.
+docs/references/

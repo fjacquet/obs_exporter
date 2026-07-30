@@ -37,6 +37,11 @@ make cli          # builds bin/obs_exporter
 
 - A management user with monitoring (read) rights on each cluster.
 - Network access from the exporter host to the cluster's management port (4443).
+- Only if you opt into `collectFlux`: no extra network access — the Flux query
+  endpoint is served on the same management port with the same session token —
+  but the account must hold the `SYSTEM_MONITOR` or `SYSTEM_ADMIN` role. Without
+  it the collector reports `ecs_collector_up{collector="flux"}=0` and every other
+  collector carries on unaffected.
 - Only if you opt into `collectDT`: each node's object port (9021) on its
   `data_ip`, and its DT stats port (9101) on its `mgmt_ip`. On the segmented
   network layout Dell recommends for production, 9101 listens on a private

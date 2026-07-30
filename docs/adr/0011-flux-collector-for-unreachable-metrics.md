@@ -2,10 +2,16 @@
 
 ## Status
 
-Accepted as direction (2026-07-30) — implementation deferred, pending the design
-questions below. Supersedes the "out of scope" position implied by
-[ADR-0008](0008-swagger-4.2-validation-findings.md) and by the deferred ADR-0011
-placeholder in the tolerant-HAL-decode plan.
+Accepted as direction (2026-07-30). **Design questions closed (2026-07-30)**:
+all six open questions below were answered against the 4.3 admin guide and
+REST API reference, with questions 1 (auth) and 3 (version skew) confirmed by
+the live-cluster reporter — see the [Flux collector
+design](../superpowers/specs/2026-07-30-flux-collector-design.md) for the full
+analysis. Implementation shipped across two releases: v3.1.0 (the object-port
+ping-decode correction and the internal `Sample.Type` groundwork) and v3.2.0
+(the Flux collector itself — see `docs/metrics.md`). Supersedes the "out of
+scope" position implied by [ADR-0008](0008-swagger-4.2-validation-findings.md)
+and by the deferred ADR-0011 placeholder in the tolerant-HAL-decode plan.
 
 ## Context
 
@@ -51,6 +57,20 @@ reporter, on 4.3:
   unready, plus per-node distribution via `dtquery_dt_dist_host_dt_node_id`.
   Present since 3.8, so this is not a 4.x-only path.
 
+  **Correction (2026-07-30):** the "plus per-node distribution" half of that
+  claim is wrong, and the error mattered — it was the basis for open question
+  5 below, which expected Flux to let `collectDT`'s per-node scrape be
+  narrowed or dropped. Per the ObjectScale 4.3 admin guide's tag listings,
+  `dtquery_dt_status` is tagged `process, tag` only — no `host`, no
+  `node_id` — so it is **cluster-scoped**, not per-node. And
+  `dtquery_dt_dist_host_dt_node_id`, despite its name, is tagged `dt_node_id,
+  process, tag`, also with no `host`. Neither measurement carries a per-node
+  breakdown Flux can report. The consequence: Flux yields cluster-wide DT
+  totals under new `ecs_cluster_dt_*` names, the per-node `ecs_node_dt_*`
+  names stay the `collectDT` collector's alone, and the two flags
+  (`collectFlux`, `collectDT`) are independent — see question 5, closed
+  below.
+
 A query without a host filter, closed with `|> last()`, returns the newest value
 **per node** in one call — one request covers the whole cluster, which fits the
 snapshot model's one-pass-per-cycle shape rather than forcing an N+1 per node.
@@ -94,30 +114,23 @@ re-litigation in the implementation:
 - **Never log the InfluxDB response body at `--trace` without the auth-path
   skip** applied to the token exchange, per the family tracing rule.
 
-## Open questions (to answer in the implementation PR)
+## Open questions — closed
 
-1. **Auth and config surface.** Does the `SYSTEM_MONITOR` role reuse the existing
-   cluster credentials and `X-SDS-AUTH-TOKEN`, or does the Flux endpoint need its
-   own token/org/bucket settings? This decides whether the config grows one flag
-   or a whole `flux:` block.
-2. **Bucket/measurement → metric mapping**, written as a table in
-   `docs/metrics.md` before the code, including which of the currently-silent
-   `nodes.go` / `cluster.go` fields the Flux path takes over.
-3. **Version skew.** `monitoring_op` measurement names are undocumented and
-   unversioned. What happens on a cluster where a measurement was renamed — a
-   warning and absent samples (the HAL-shape precedent), or a hard collector
-   failure?
-4. **Response parsing.** Flux returns annotated CSV or columnar JSON; which, and
-   does it need its own tolerant-parsing file the way `points.go` was needed for
-   the dashboard time series?
-5. **Whether DT stats move to Flux entirely.** If Flux covers
-   `dtquery_dt_status`, the node-local 9101 scrape has no remaining topology
-   where it is the better option, and `collectDT` could be narrowed to the object
-   port ping or deprecated outright.
-6. **The "DT Query Services" REST section.** The reference lists it; nobody has
-   found an endpoint under it serving these counters. If one exists on 4443 it
-   beats Flux for the DT half of this ADR, and that half should be revisited
-   before it is implemented.
+All six were answered against the 4.3 admin guide, release notes and REST API
+reference; per the Source column below, only questions 1 and 3 also carry
+live-cluster confirmation from the reporter. The full analysis for each is in
+the [Flux collector design
+spec](../superpowers/specs/2026-07-30-flux-collector-design.md); the mapping
+table question (2) resolved into `docs/metrics.md`'s "Flux collector" section.
+
+| # | Question | Answer | Source |
+| --- | --- | --- | --- |
+| 1 | Auth and config surface | Same 4443, same `X-SDS-AUTH-TOKEN` from `/login`, role `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. One bool flag, no `flux:` block. | reporter + admin guide, "Flux API" |
+| 2 | Bucket/measurement → metric mapping | Table in `docs/metrics.md`. Three buckets, not two. | admin guide, "Flux API field descriptions" |
+| 3 | Version skew | Warning plus absent series, never a hard collector failure. | reporter; the 4.3 guide confirms `net` has no `utilization` field. Its presence in 3.8 is the reporter's recollection, unverified either way — which is itself the argument for tolerating absence rather than asserting a schema |
+| 4 | Response parsing | Structured JSON (`Series`/`Datatypes`/`Columns`/`Values`) via `accept:application/json`. Annotated CSV is offered but not used. | admin guide worked example |
+| 5 | Whether DT stats move to Flux entirely | Partly. Flux DT is cluster-scoped (`ecs_cluster_dt_*`); per-node DT stays on `collectDT` (`ecs_node_dt_*`), and the two flags are independent — see the Context correction above. | admin guide tag listings |
+| 6 | The "DT Query Services" REST section | Does not exist as an API surface. In the 4.3 REST reference it is a navigation category whose sole child is *Data Migration* — an orphaned heading from Dell's doc generator, with no methods beneath it. No service in the reference exposes DT counters. `dtquery` is a *process* in the admin guide's system-process table that "provides REST APIs to get Directory Table details" — internal to the cluster, not published on 4443. | 4.3 REST reference navigation tree; admin guide Table 26 |
 
 ## Consequences
 
@@ -127,11 +140,21 @@ re-litigation in the implementation:
   and nothing else.
 - Operators who do not enable it see no change: no new requests, no new config
   required, no new failure mode.
-- The DT reachability caveat stays documented in `docs/metrics.md` until the Flux
-  collector ships. `collectDT` keeps working as-is for flat-network clusters and
-  for node-local exporter deployments.
+- The DT reachability caveat stays documented in `docs/metrics.md`, now
+  alongside the Flux collector's own section (shipped in v3.2.0). `collectDT`
+  keeps working as-is for flat-network clusters and for node-local exporter
+  deployments; per the Context correction above, Flux only ever adds
+  cluster-wide DT totals, so `collectFlux` is not a path to retiring
+  `collectDT`.
 - Two ADR-0008 findings stop being permanent caveats and become a tracked gap
   with an agreed route.
+- The bucket/measurement mapping (question 2), the response envelope (question
+  4), and the `host`-tag-to-`nodename` identity are documentation-derived —
+  read from the 4.3 admin guide and REST API reference, not observed on a live
+  cluster — and remain pending live confirmation. `cmd/mockecs` does not yet
+  serve `POST /flux/api/external/v2/query`, so `make demo` does not exercise
+  this collector end to end either. A future maintainer should treat this ADR
+  as recording a deliberately deferred verification, not a closed one.
 
 ## Related
 

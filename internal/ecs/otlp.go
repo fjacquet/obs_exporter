@@ -66,9 +66,9 @@ func newOTLPExporter(reader sdkmetric.Reader, store *SnapshotStore, serviceVersi
 	}
 }
 
-// EnsureInstruments registers an observable gauge for every metric name in the
-// current snapshot that does not already have one. Idempotent; runs after every
-// collection cycle via Collector.PostCycle.
+// EnsureInstruments registers an observable gauge or counter — per the sample
+// type — for every metric name in the current snapshot that does not already
+// have one. Idempotent; runs after every collection cycle via Collector.PostCycle.
 func (e *OTLPExporter) EnsureInstruments() error {
 	snap := e.store.Load()
 	e.mu.Lock()
@@ -79,14 +79,18 @@ func (e *OTLPExporter) EnsureInstruments() error {
 			continue
 		}
 		metricName := name
-		_, err := e.meter.Float64ObservableGauge(metricName,
-			metric.WithFloat64Callback(func(_ context.Context, obs metric.Float64Observer) error {
-				for _, s := range e.store.Load().SamplesByName(metricName) {
-					obs.Observe(s.Value, metric.WithAttributes(attrsFor(s.Labels)...))
-				}
-				return nil
-			}),
-		)
+		observe := func(_ context.Context, obs metric.Float64Observer) error {
+			for _, s := range e.store.Load().SamplesByName(metricName) {
+				obs.Observe(s.Value, metric.WithAttributes(attrsFor(s.Labels)...))
+			}
+			return nil
+		}
+		var err error
+		if snap.MetricType(metricName) == Counter {
+			_, err = e.meter.Float64ObservableCounter(metricName, metric.WithFloat64Callback(observe))
+		} else {
+			_, err = e.meter.Float64ObservableGauge(metricName, metric.WithFloat64Callback(observe))
+		}
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-30
+
+### Added
+
+- Opt-in `collectFlux` collector querying the cluster's Flux monitoring store
+  for per-node CPU, memory and network metrics, per-node request counters, and
+  cluster-wide DT and transaction metrics the management API does not serve.
+  Off by default; requires `SYSTEM_MONITOR` or `SYSTEM_ADMIN`.
+- `ecs_collector_unmapped_nodes{collector="flux"}` reports Flux rows whose host
+  tag matched no node in the inventory.
+
+### Changed
+
+- When `collectFlux` is enabled it becomes the sole source of
+  `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent` and
+  `ecs_node_memory_used_bytes`. Every other Flux metric is additive.
+
+## [3.1.0] - 2026-07-30
+
+### Fixed
+
+- The object-port ping is decoded by item `Name` rather than by position.
+  `PingItem` is documented as `0-*` elements with no guaranteed ordering, so
+  `ecs_node_active_connections` previously read whichever item came first. Its
+  name and meaning are unchanged — the 4.3 REST reference defines `LOAD_FACTOR`
+  as the node's active Jetty connection count.
+
+### Added
+
+- `ecs_node_maintenance_mode`, from the ping's `MAINTENANCE_MODE` item. A node
+  reporting `UNKNOWN` yields an absent sample, never 0.
+- Internal: samples carry a gauge/counter type, honoured by both the Prometheus
+  and OTLP export paths. No existing series changes type.
+
 ## [3.0.0] - 2026-07-30
 
 ### Removed — BREAKING

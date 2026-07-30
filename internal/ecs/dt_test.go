@@ -178,3 +178,100 @@ func TestDTCollectNodeDown(t *testing.T) {
 		t.Error("dt_total should be absent when the node scrape fails")
 	}
 }
+
+// The 4.3 REST reference documents PingList as 0-* PingItem elements with no
+// guaranteed ordering, and &item=load-factor changes which are present. Ordering
+// must not decide which item the metrics read.
+const pingReversedXML = `<?xml version="1.0" encoding="UTF-8"?>
+<PingList xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <PingItem><Name>MAINTENANCE_MODE</Name><Status>OFF</Status><Text>Data Node is Available</Text></PingItem>
+  <PingItem><Name>LOAD_FACTOR</Name><Value>7</Value></PingItem>
+</PingList>`
+
+// collectPing runs the DT collector against one ping payload, stubbing the DT
+// stats port so only the ping path is under test.
+func collectPing(t *testing.T, body string) []Sample {
+	t.Helper()
+	pingSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(pingSrv.Close)
+	dtSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(dtStatXML))
+	}))
+	t.Cleanup(dtSrv.Close)
+
+	d := &DT{
+		httpClient: &http.Client{Timeout: 5 * time.Second},
+		dtURL:      func(string) string { return dtSrv.URL },
+		pingURL:    func(string) string { return pingSrv.URL },
+	}
+	samples, err := d.Collect(context.Background(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return samples
+}
+
+func TestDTPingMatchesItemsByName(t *testing.T) {
+	samples := collectPing(t, pingReversedXML)
+	n1 := Label{"node", "supr01-r01"}
+	// A positional decode reads MAINTENANCE_MODE's (absent) Value here and
+	// reports either nothing or the wrong item.
+	mustSample(t, samples, "ecs_node_active_connections", 7, n1)
+	mustSample(t, samples, "ecs_node_maintenance_mode", 0, n1)
+}
+
+func TestDTPingMaintenanceModeStatuses(t *testing.T) {
+	// UNKNOWN is documented alongside ON and OFF. A status the cluster itself
+	// cannot determine must not be reported as 0 — "not in maintenance" is the
+	// reading an operator would act on.
+	for _, tc := range []struct {
+		status string
+		want   float64
+		absent bool
+	}{
+		{status: "OFF", want: 0},
+		{status: "ON", want: 1},
+		{status: "UNKNOWN", absent: true},
+		{status: "wedged", absent: true},
+	} {
+		t.Run(tc.status, func(t *testing.T) {
+			samples := collectPing(t, `<PingList><PingItem><Name>MAINTENANCE_MODE</Name><Status>`+tc.status+`</Status></PingItem></PingList>`)
+			s, ok := findSample(samples, "ecs_node_maintenance_mode", Label{"node", "supr01-r01"})
+			if tc.absent {
+				if ok {
+					t.Fatalf("status %q emitted %v, want an absent sample", tc.status, s.Value)
+				}
+				return
+			}
+			if !ok {
+				t.Fatalf("status %q emitted no sample, want %v", tc.status, tc.want)
+			}
+			if s.Value != tc.want {
+				t.Errorf("status %q = %v, want %v", tc.status, s.Value, tc.want)
+			}
+		})
+	}
+}
+
+func TestDTPingAbsentItemsEmitNothing(t *testing.T) {
+	// An empty PingList still means the port answered: reachability is reported,
+	// the two item metrics are not invented.
+	samples := collectPing(t, `<PingList></PingList>`)
+	n1 := Label{"node", "supr01-r01"}
+	mustSample(t, samples, "ecs_node_scrape_up", 1, n1, Label{"endpoint", "object"})
+	if _, ok := findSample(samples, "ecs_node_active_connections", n1); ok {
+		t.Error("active_connections emitted for a payload with no LOAD_FACTOR item")
+	}
+	if _, ok := findSample(samples, "ecs_node_maintenance_mode", n1); ok {
+		t.Error("maintenance_mode emitted for a payload with no MAINTENANCE_MODE item")
+	}
+}
+
+func TestDTPingUnparseableLoadFactorIsAbsent(t *testing.T) {
+	samples := collectPing(t, `<PingList><PingItem><Name>LOAD_FACTOR</Name><Value>N/A</Value></PingItem></PingList>`)
+	if _, ok := findSample(samples, "ecs_node_active_connections", Label{"node", "supr01-r01"}); ok {
+		t.Error("active_connections emitted for an unparseable Value")
+	}
+}

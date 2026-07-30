@@ -8,11 +8,26 @@ type Label struct {
 	Value string
 }
 
+// SampleType distinguishes a monotonic counter from a gauge. The zero value is
+// Gauge, so every collector that predates this type keeps emitting gauges with
+// no change.
+type SampleType uint8
+
+const (
+	// Gauge is a value that may move in either direction.
+	Gauge SampleType = iota
+	// Counter is a cumulative value that only increases, and restarts from zero
+	// when the process producing it restarts — which is exactly what ObjectScale
+	// documents for the monitoring_main fields. Consumers rate() it.
+	Counter
+)
+
 // Sample is one metric data point: a name, an ordered label set, and a value.
 type Sample struct {
 	Name   string
 	Labels []Label
 	Value  float64
+	Type   SampleType
 }
 
 // LabelValue returns the value of the named label, or "" if absent.
@@ -32,7 +47,7 @@ func (s Sample) WithCluster(name string) Sample {
 	labels := make([]Label, 0, len(s.Labels)+1)
 	labels = append(labels, Label{Key: "cluster", Value: name})
 	labels = append(labels, s.Labels...)
-	return Sample{Name: s.Name, Labels: labels, Value: s.Value}
+	return Sample{Name: s.Name, Labels: labels, Value: s.Value, Type: s.Type}
 }
 
 // copyLabels detaches a sample from the caller's label slice, as WithCluster

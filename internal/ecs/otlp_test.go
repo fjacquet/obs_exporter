@@ -89,3 +89,44 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOTLPExporterRegistersCounters(t *testing.T) {
+	store := NewSnapshotStore()
+	store.Store(&Snapshot{Clusters: []*ClusterSnapshot{{
+		Cluster: "c1",
+		Samples: []Sample{
+			{Name: "ecs_node_requests_total", Labels: []Label{{"node", "n1"}}, Value: 5, Type: Counter},
+			{Name: "ecs_node_cpu_utilization_percent", Labels: []Label{{"node", "n1"}}, Value: 12},
+		},
+	}}})
+
+	reader := sdkmetric.NewManualReader()
+	exp := newOTLPExporter(reader, store, "test")
+	if err := exp.EnsureInstruments(); err != nil {
+		t.Fatal(err)
+	}
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &rm); err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]string{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			switch d := m.Data.(type) {
+			case metricdata.Sum[float64]:
+				if d.IsMonotonic {
+					kinds[m.Name] = "counter"
+				}
+			case metricdata.Gauge[float64]:
+				kinds[m.Name] = "gauge"
+			}
+		}
+	}
+	if kinds["ecs_node_requests_total"] != "counter" {
+		t.Errorf("requests_total registered as %q, want counter", kinds["ecs_node_requests_total"])
+	}
+	if kinds["ecs_node_cpu_utilization_percent"] != "gauge" {
+		t.Errorf("cpu_utilization registered as %q, want gauge", kinds["ecs_node_cpu_utilization_percent"])
+	}
+}

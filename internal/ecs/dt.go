@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,10 +25,29 @@ type dtStatResp struct {
 	UnknownDT float64 `xml:"entry>unknown_dt_num"`
 }
 
-// pingResp models the object-port ping XML (GET https://<node>:9021/?ping); Value
-// is the node's current active-connection count.
+// pingItem is one entry of the object-port ping payload. The 4.3 REST reference
+// documents PingList as 0-* PingItem elements with no guaranteed ordering, and
+// the &item=load-factor parameter changes which are present, so items must be
+// matched by Name and never by position.
+type pingItem struct {
+	Name   string `xml:"Name"`
+	Value  string `xml:"Value"`
+	Status string `xml:"Status"`
+}
+
+// pingResp models the object-port ping XML (GET https://<node>:9021/?ping).
 type pingResp struct {
-	Value float64 `xml:"PingItem>Value"`
+	Items []pingItem `xml:"PingItem"`
+}
+
+// item returns the named PingItem, if the node reported it.
+func (p pingResp) item(name string) (pingItem, bool) {
+	for _, it := range p.Items {
+		if it.Name == name {
+			return it, true
+		}
+	}
+	return pingItem{}, false
 }
 
 // DT is the opt-in legacy collector for node-local directory-table stats and
@@ -154,7 +174,7 @@ func (d *DT) collectNode(ctx context.Context, cluster string, n dtNode) []Sample
 	}
 	out = append(out, Sample{Name: scrapeUp, Labels: []Label{node, {Key: "endpoint", Value: "object"}}, Value: upValue(pingErr)})
 	if pingErr == nil {
-		out = append(out, Sample{Name: "ecs_node_active_connections", Labels: []Label{node}, Value: ping.Value})
+		out = appendPing(out, ping, node)
 	}
 	return out
 }
@@ -165,6 +185,27 @@ func upValue(err error) float64 {
 		return 0
 	}
 	return 1
+}
+
+// appendPing maps the ping payload's two documented items onto samples.
+// LOAD_FACTOR is the node's active Jetty connection count, per the 4.3 REST
+// reference. MAINTENANCE_MODE is tri-state: the cluster may report UNKNOWN, and
+// flattening that to 0 would assert the one thing an operator acts on.
+func appendPing(out []Sample, p pingResp, node Label) []Sample {
+	if it, ok := p.item("LOAD_FACTOR"); ok {
+		if v, ok := anyToFloat(it.Value); ok {
+			out = append(out, Sample{Name: "ecs_node_active_connections", Labels: copyLabels([]Label{node}), Value: v})
+		}
+	}
+	if it, ok := p.item("MAINTENANCE_MODE"); ok {
+		switch strings.ToUpper(strings.TrimSpace(it.Status)) {
+		case "OFF":
+			out = append(out, Sample{Name: "ecs_node_maintenance_mode", Labels: copyLabels([]Label{node}), Value: 0})
+		case "ON":
+			out = append(out, Sample{Name: "ecs_node_maintenance_mode", Labels: copyLabels([]Label{node}), Value: 1})
+		}
+	}
+	return out
 }
 
 func (d *DT) fetchXML(ctx context.Context, url string, out any) error {

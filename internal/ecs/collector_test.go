@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -85,6 +86,71 @@ func TestCollectClusterPartialFailure(t *testing.T) {
 	mustSample(t, cs.Samples, "ecs_collector_up", 1, cluster, Label{"collector", "cluster"})
 }
 
+// emptyCollector always succeeds with no domain samples, modeling "every
+// other collector returned an empty success" — the scenario that let Flux's
+// always-present housekeeping counter alone keep ecs_up at 1.
+type emptyCollector struct{ name string }
+
+func (e emptyCollector) Name() string { return e.name }
+func (e emptyCollector) Collect(context.Context, ecsclient.Client) ([]Sample, error) {
+	return nil, nil
+}
+
+// TestCollectClusterFluxHousekeepingDoesNotCountAsDomainSample guards against
+// ecs_collector_unmapped_nodes{collector="flux"} — emitted every cycle,
+// including as 0 — being counted toward domainSamples in collectCluster. That
+// housekeeping sample alone must not be able to keep ecs_up at 1 when every
+// other collector, and every Flux measurement, produced nothing.
+func TestCollectClusterFluxHousekeepingDoesNotCountAsDomainSample(t *testing.T) {
+	client := fluxMock(t, nil) // every Flux measurement answers 200 with no rows
+	target := Target{
+		Client: client,
+		Collectors: []ResourceCollector{
+			emptyCollector{name: "cluster"},
+			Flux{},
+		},
+	}
+	store := NewSnapshotStore()
+	col := NewCollector([]Target{target}, store, time.Minute, 10*time.Second)
+	cs := col.CollectOnce(context.Background()).Clusters[0]
+
+	if cs.OK {
+		t.Fatalf("cluster should not be OK when only housekeeping samples were collected: err=%s", cs.Err)
+	}
+	cluster := Label{"cluster", "test-cluster"}
+	mustSample(t, cs.Samples, "ecs_up", 0, cluster)
+	mustSample(t, cs.Samples, "ecs_collector_unmapped_nodes", 0, cluster, Label{"collector", "flux"})
+}
+
+// assertLabelKeySchema enforces the family label-key invariant (ADR-0006):
+// every sample of a given metric name must carry the same ordered label-key
+// set. Shared by TestLabelKeyConsistency and TestLabelKeyConsistencyFlux so a
+// violation anywhere in either fixture set fails the same way.
+func assertLabelKeySchema(t *testing.T, samples []Sample) {
+	t.Helper()
+	schema := map[string][]string{}
+	for _, s := range samples {
+		keys := make([]string, len(s.Labels))
+		for i, l := range s.Labels {
+			keys[i] = l.Key
+		}
+		if want, ok := schema[s.Name]; ok {
+			if len(want) != len(keys) {
+				t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
+				continue
+			}
+			for i := range want {
+				if want[i] != keys[i] {
+					t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
+					break
+				}
+			}
+		} else {
+			schema[s.Name] = keys
+		}
+	}
+}
+
 // TestLabelKeyConsistency enforces the family label-key invariant: every sample of
 // a given metric name must carry the same ordered label-key set, across all
 // collectors and clusters, so dashboards never see mixed series schemas.
@@ -93,27 +159,115 @@ func TestLabelKeyConsistency(t *testing.T) {
 	col := NewCollector(testTargets(t), store, time.Minute, 10*time.Second)
 	snap := col.CollectOnce(context.Background())
 
-	schema := map[string][]string{}
+	var samples []Sample
 	for _, cs := range snap.Clusters {
-		for _, s := range cs.Samples {
-			keys := make([]string, len(s.Labels))
-			for i, l := range s.Labels {
-				keys[i] = l.Key
-			}
-			if want, ok := schema[s.Name]; ok {
-				if len(want) != len(keys) {
-					t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
-					continue
-				}
-				for i := range want {
-					if want[i] != keys[i] {
-						t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
-						break
-					}
-				}
-			} else {
-				schema[s.Name] = keys
-			}
+		samples = append(samples, cs.Samples...)
+	}
+	assertLabelKeySchema(t, samples)
+}
+
+// TestLabelKeyConsistencyFlux extends the same guard to the Flux collector.
+// testTargets (above) builds its cluster with CollectFlux left at its zero
+// value, so Registry never appends Flux{} there and none of its samples are
+// ever checked. This test wires a cluster with CollectFlux: true through the
+// same Registry/Collector path, using flux_test.go's measurement-routing mock
+// to feed the multi-key net measurement — ecs_node_network_bytes_total carries
+// {node, interface, direction} in that order from a static query table today;
+// nothing else in the suite would catch an edit that made the order depend on
+// row data instead.
+func TestLabelKeyConsistencyFlux(t *testing.T) {
+	cl := config.Cluster{Name: "test-cluster", CollectFlux: true, CollectMetering: boolPtr(false)}
+	client := fluxMock(t, map[string]string{
+		"cpu":               "flux_cpu.json",
+		"net":               "flux_net.json",
+		"dtquery_dt_status": "flux_dt_status.json",
+	})
+	store := NewSnapshotStore()
+	col := NewCollector([]Target{{Client: client, Collectors: Registry(cl)}}, store, time.Minute, 10*time.Second)
+	snap := col.CollectOnce(context.Background())
+
+	cs := snap.Clusters[0]
+	if !cs.OK {
+		t.Fatalf("cluster not OK: %s", cs.Err)
+	}
+	assertLabelKeySchema(t, cs.Samples)
+
+	// Guard against the schema check passing vacuously because Flux's samples
+	// never made it into cs.Samples. collectCluster stamps every domain sample
+	// with the cluster identity label first (Sample.WithCluster), so it leads
+	// the key order here too.
+	s, ok := findSample(cs.Samples, "ecs_node_network_bytes_total",
+		Label{"cluster", "test-cluster"}, Label{"node", "supr01-r01"}, Label{"interface", "eth0"}, Label{"direction", "received"})
+	if !ok {
+		t.Fatal("ecs_node_network_bytes_total not collected; schema check ran on nothing from Flux")
+	}
+	wantKeys := []string{"cluster", "node", "interface", "direction"}
+	gotKeys := make([]string, len(s.Labels))
+	for i, l := range s.Labels {
+		gotKeys[i] = l.Key
+	}
+	if !slices.Equal(gotKeys, wantKeys) {
+		t.Errorf("label keys = %v, want %v", gotKeys, wantKeys)
+	}
+}
+
+func TestRegistryArbitratesPerfNamesWithFlux(t *testing.T) {
+	// The three names below exist in both sources. Exactly one collector may own
+	// each per cycle, and the decision is made here, before any request goes out.
+	off := Registry(config.Cluster{})
+	on := Registry(config.Cluster{CollectFlux: true})
+
+	var offNodes, onNodes Nodes
+	for _, rc := range off {
+		if n, ok := rc.(Nodes); ok {
+			offNodes = n
 		}
+	}
+	for _, rc := range on {
+		if n, ok := rc.(Nodes); ok {
+			onNodes = n
+		}
+	}
+	if offNodes.FluxOwnsPerf {
+		t.Error("Nodes must keep the perf names when Flux is off")
+	}
+	if !onNodes.FluxOwnsPerf {
+		t.Error("Nodes must yield the perf names when Flux is on")
+	}
+
+	var hasFlux bool
+	for _, rc := range on {
+		if rc.Name() == "flux" {
+			hasFlux = true
+		}
+	}
+	if !hasFlux {
+		t.Error("collectFlux must register the flux collector")
+	}
+	for _, rc := range off {
+		if rc.Name() == "flux" {
+			t.Error("flux must not be registered when the flag is unset")
+		}
+	}
+}
+
+func TestNodesYieldsArbitratedNames(t *testing.T) {
+	samples, err := Nodes{FluxOwnsPerf: true}.Collect(t.Context(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"ecs_node_cpu_utilization_percent",
+		"ecs_node_memory_utilization_percent",
+		"ecs_node_memory_used_bytes",
+	} {
+		if _, ok := findSample(samples, name); ok {
+			t.Errorf("%s emitted by Nodes while Flux owns it", name)
+		}
+	}
+	// Names Flux cannot fill — its net measurement carries a per-interface
+	// dimension, so it must use a different name — stay with the dashboard.
+	if _, ok := findSample(samples, "ecs_node_nic_bandwidth"); !ok {
+		t.Error("nic_bandwidth must stay on the dashboard path")
 	}
 }

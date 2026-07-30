@@ -50,6 +50,21 @@ func (s *Snapshot) SamplesByName(name string) []Sample {
 	return out
 }
 
+// MetricType returns the sample type recorded for a metric name, defaulting to
+// Gauge when the name is absent. One name carries one type across every cluster
+// in a snapshot — the same single-schema-per-name invariant ADR-0006 imposes on
+// label keys — so the first match is authoritative.
+func (s *Snapshot) MetricType(name string) SampleType {
+	for _, c := range s.Clusters {
+		for _, smp := range c.Samples {
+			if smp.Name == name {
+				return smp.Type
+			}
+		}
+	}
+	return Gauge
+}
+
 // SnapshotStore holds the latest Snapshot behind an RWMutex pointer-swap.
 type SnapshotStore struct {
 	mu   sync.RWMutex

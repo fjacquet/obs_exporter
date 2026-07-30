@@ -39,15 +39,15 @@ type nodeInstance struct {
 }
 
 // Nodes collects per-node health, capacity, utilization, and transaction stats
-// from the documented dashboard nodes endpoint (replaces the v1 exporter's
-// undocumented node-local DT scraping for general node metrics).
-type Nodes struct{}
+// from the dashboard API. FluxOwnsPerf suppresses the three names the Flux
+// collector takes over, so exactly one source emits each per cycle (ADR-0006).
+type Nodes struct{ FluxOwnsPerf bool }
 
 // Name identifies this collector in ecs_collector_up.
 func (Nodes) Name() string { return "nodes" }
 
 // Collect fetches the per-node dashboard list and maps it to samples.
-func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
+func (nc Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 	var r localZoneNodesResp
 	if err := c.Get(ctx, pathLocalZoneNodes, &r); err != nil {
 		return nil, err
@@ -85,9 +85,11 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceAllocated, node, Label{"type", "allocated"})
 		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceFree, node, Label{"type", "free"})
 
-		out = appendSeries(out, "ecs_node_cpu_utilization_percent", n.NodeCPUUtilization, node)
-		out = appendSeries(out, "ecs_node_memory_utilization_percent", n.NodeMemoryUtilization, node)
-		out = appendSeries(out, "ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes, node)
+		if !nc.FluxOwnsPerf {
+			out = appendSeries(out, "ecs_node_cpu_utilization_percent", n.NodeCPUUtilization, node)
+			out = appendSeries(out, "ecs_node_memory_utilization_percent", n.NodeMemoryUtilization, node)
+			out = appendSeries(out, "ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes, node)
+		}
 
 		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicReceivedBandwidth, node, Label{"direction", "received"})
 		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicTransmittedBandwidth, node, Label{"direction", "transmitted"})

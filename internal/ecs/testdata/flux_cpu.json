@@ -1,0 +1,11 @@
+{
+  "Series": [
+    {
+      "Columns": ["_value", "_field", "_measurement", "cpu", "host", "node_id", "tag"],
+      "Values": [
+        ["31.5", "usage_user", "cpu", "cpu-total", "supr01-r01.example.com", "28cd473e-ca45-4623-b30d-0481c548a650", "dashboard"],
+        ["12.25", "usage_user", "cpu", "cpu-total", "supr01-r02.example.com", "39de584f-db56-5734-c41e-1592d659b761", "dashboard"]
+      ]
+    }
+  ]
+}

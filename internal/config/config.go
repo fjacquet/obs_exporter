@@ -25,6 +25,12 @@ type Cluster struct {
 	// CollectDT opts in to scraping the undocumented node-local DT stats
 	// (http://<node>:9101/stats/dt/DTInitStat and https://<node>:9021/?ping).
 	CollectDT bool `yaml:"collectDT"`
+	// CollectFlux opts in to querying the cluster's Flux/InfluxDB monitoring
+	// store (POST /flux/api/external/v2/query on the management port) for metric
+	// families the management API does not serve. Requires the cluster account to
+	// hold SYSTEM_MONITOR or SYSTEM_ADMIN. Off by default: it adds a second data
+	// protocol and a dependency on an ObjectScale internal.
+	CollectFlux bool `yaml:"collectFlux"`
 	// CollectMetering enables the namespace quota/billing collector (default true).
 	// Billing can be slow on large clusters; disable it (or raise
 	// collection.interval) if needed. Pointer so "unset" defaults to enabled.
