@@ -86,6 +86,42 @@ func TestCollectClusterPartialFailure(t *testing.T) {
 	mustSample(t, cs.Samples, "ecs_collector_up", 1, cluster, Label{"collector", "cluster"})
 }
 
+// emptyCollector always succeeds with no domain samples, modeling "every
+// other collector returned an empty success" — the scenario that let Flux's
+// always-present housekeeping counter alone keep ecs_up at 1.
+type emptyCollector struct{ name string }
+
+func (e emptyCollector) Name() string { return e.name }
+func (e emptyCollector) Collect(context.Context, ecsclient.Client) ([]Sample, error) {
+	return nil, nil
+}
+
+// TestCollectClusterFluxHousekeepingDoesNotCountAsDomainSample guards against
+// ecs_collector_unmapped_nodes{collector="flux"} — emitted every cycle,
+// including as 0 — being counted toward domainSamples in collectCluster. That
+// housekeeping sample alone must not be able to keep ecs_up at 1 when every
+// other collector, and every Flux measurement, produced nothing.
+func TestCollectClusterFluxHousekeepingDoesNotCountAsDomainSample(t *testing.T) {
+	client := fluxMock(t, nil) // every Flux measurement answers 200 with no rows
+	target := Target{
+		Client: client,
+		Collectors: []ResourceCollector{
+			emptyCollector{name: "cluster"},
+			Flux{},
+		},
+	}
+	store := NewSnapshotStore()
+	col := NewCollector([]Target{target}, store, time.Minute, 10*time.Second)
+	cs := col.CollectOnce(context.Background()).Clusters[0]
+
+	if cs.OK {
+		t.Fatalf("cluster should not be OK when only housekeeping samples were collected: err=%s", cs.Err)
+	}
+	cluster := Label{"cluster", "test-cluster"}
+	mustSample(t, cs.Samples, "ecs_up", 0, cluster)
+	mustSample(t, cs.Samples, "ecs_collector_unmapped_nodes", 0, cluster, Label{"collector", "flux"})
+}
+
 // assertLabelKeySchema enforces the family label-key invariant (ADR-0006):
 // every sample of a given metric name must carry the same ordered label-key
 // set. Shared by TestLabelKeyConsistency and TestLabelKeyConsistencyFlux so a

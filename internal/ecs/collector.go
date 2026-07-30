@@ -97,6 +97,14 @@ func (c *Collector) collectCluster(ctx context.Context, target Target) *ClusterS
 		}.WithCluster(name))
 		for _, s := range samples {
 			cs.Samples = append(cs.Samples, s.WithCluster(name))
+			// The Flux collector's unmapped-nodes counter is housekeeping, emitted
+			// unconditionally including as 0 (see flux.go). Counting it here would
+			// let it alone keep domainSamples non-zero — and therefore ecs_up=1 —
+			// on a cycle where every other collector, and every Flux measurement,
+			// produced no real data.
+			if s.Name == unmappedNodesMetric {
+				continue
+			}
 			domainSamples++
 		}
 	}

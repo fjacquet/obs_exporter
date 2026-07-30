@@ -217,7 +217,6 @@ func TestFluxCollectFailsOnEndpointError(t *testing.T) {
 	// An unreachable or unauthorized endpoint degrades this collector alone:
 	// returning an error is what drives ecs_collector_up{collector="flux"}=0.
 	c := mockClient(t)
-	c.Errs = map[string]error{fluxPath: errors.New("401 Unauthorized")}
 	if _, err := (Flux{}).Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, fail: true}); err == nil {
 		t.Error("Collect must return an error when the Flux endpoint rejects the query")
 	}

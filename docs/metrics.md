@@ -1,11 +1,16 @@
 # Metrics reference
 
 Every domain metric carries the `cluster` identity label (one exporter process can
-serve many clusters). All metrics are exported as gauges holding the latest
-snapshot value; per-second values (TPS, bandwidth, and the metrics named
-`…_rate` — `ecs_cluster_ec_rate`, `ecs_cluster_recovery_rate`) are already rates
-— aggregate them with `sum`/`avg`, **never `rate()`**. Metrics suffixed `_total`
-are the cumulative counters, and those are the ones `rate()` is for.
+serve many clusters). Metrics are gauges holding the latest snapshot value by
+default. Most `_total`-suffixed names are the exception: they export as
+Prometheus `TYPE counter` (and as OTLP observable counters) because the value
+is cumulative, and `rate()` is for those. `ecs_cluster_dt_total` is a gauge
+despite its name — it deliberately mirrors the pre-existing `ecs_node_dt_total`
+gauge — so `_total` is a strong hint, not a guarantee; the [Flux collector
+mapping tables](#flux-collector-opt-in-collectflux-true) below spell out each
+metric's type explicitly. Per-second values (TPS, bandwidth, and the metrics
+named `…_rate` — `ecs_cluster_ec_rate`, `ecs_cluster_recovery_rate`) are
+already rates — aggregate them with `sum`/`avg`, **never `rate()`**.
 
 Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 (replication), `…/nodes` (node), `/vdc/nodes` (info), `/object/namespaces` +
@@ -18,6 +23,7 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 | `obs_exporter_build_info` | `version`, `goversion` | constant `1`, build identity |
 | `ecs_up` | `cluster` | `1` when the last cycle produced domain samples for the cluster |
 | `ecs_collector_up` | `cluster`, `collector` | per-collector success (`cluster`, `replication`, `nodes`, `info`, `metering`, `quotas`, `dt`, `flux`) |
+| `ecs_collector_unmapped_nodes` | `cluster`, `collector` | Flux rows whose `host` tag joined no inventory node this cycle; always emitted, including `0`. Housekeeping only — excluded from the domain-sample count that drives `ecs_up` |
 
 ## Cluster (VDC-wide)
 
@@ -104,6 +110,13 @@ additional API call.
 ## Nodes (dashboard)
 
 All with the `node` label (the node's display name).
+
+!!! note "Three of these names can come from a different source"
+    `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent`
+    and `ecs_node_memory_used_bytes` are emitted here only when
+    `collectFlux` is off. See the [Flux collector](#flux-collector-opt-in-collectflux-true)
+    section's "Sole source for three names" note for the arbitration rule and
+    its trade-off.
 
 | Metric | Description |
 | --- | --- |
@@ -223,10 +236,24 @@ pre-rated:
     `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent`
     and `ecs_node_memory_used_bytes` — the [dashboard-sourced node
     collector](#nodes-dashboard) stops emitting them so exactly one source
-    owns each name (ADR-0006). Every other metric this collector emits is
-    additive: it carries a label the dashboard path does not (`interface` on
-    the network metrics, `outcome` on the transaction counters), so it
-    cannot collide.
+    owns each name (ADR-0006). Every other metric this collector emits uses a
+    **name no other collector emits** (`ecs_node_network_bytes_total`,
+    `ecs_node_requests_total`, `ecs_node_request_bytes_total`,
+    `ecs_cluster_dt_*`, `ecs_cluster_requests_per_second`,
+    `ecs_cluster_request_bytes_per_second`), so there is no shared name for
+    it to collide on. An extra label on a shared name would *not* be safe —
+    ADR-0006 requires one label-key set per name, and a second source adding
+    a label the first does not carry is exactly the drift it forbids.
+
+    Arbitration is unconditional on the flag, not on what the cluster
+    actually still serves: enabling `collectFlux` against a cluster whose
+    dashboard payload *does* still carry
+    `ecs_node_cpu_utilization_percent`/`ecs_node_memory_*`, but whose Flux
+    measurement names differ from the ones this collector queries, loses all
+    three — Flux's empty result does not fall back to the dashboard's. That
+    trade is deliberate: dynamic per-metric arbitration would make "who owns
+    this name" a runtime fact instead of a fixed one, which is the invariant
+    this note exists to protect.
 
 All per-node rows carry the `node` label, resolved from the Flux `host` tag
 against the same `/vdc/nodes` inventory every other collector joins on. A row

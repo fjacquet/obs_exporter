@@ -3,9 +3,9 @@
 ## Status
 
 Accepted as direction (2026-07-30). **Design questions closed (2026-07-30)**:
-all six open questions below were answered against a live ObjectScale 4.3
-cluster, cross-checked against the 4.3 admin guide, release notes and REST API
-reference — see the [Flux collector
+all six open questions below were answered against the 4.3 admin guide and
+REST API reference, with questions 1 (auth) and 3 (version skew) confirmed by
+the live-cluster reporter — see the [Flux collector
 design](../superpowers/specs/2026-07-30-flux-collector-design.md) for the full
 analysis. Implementation shipped across two releases: v3.1.0 (the object-port
 ping-decode correction and the internal `Sample.Type` groundwork) and v3.2.0
@@ -116,9 +116,10 @@ re-litigation in the implementation:
 
 ## Open questions — closed
 
-All six were answered against a live ObjectScale 4.3 cluster, independently
-validated against the 4.3 admin guide, release notes and REST API reference.
-The full analysis for each is in the [Flux collector design
+All six were answered against the 4.3 admin guide, release notes and REST API
+reference; per the Source column below, only questions 1 and 3 also carry
+live-cluster confirmation from the reporter. The full analysis for each is in
+the [Flux collector design
 spec](../superpowers/specs/2026-07-30-flux-collector-design.md); the mapping
 table question (2) resolved into `docs/metrics.md`'s "Flux collector" section.
 
@@ -147,6 +148,13 @@ table question (2) resolved into `docs/metrics.md`'s "Flux collector" section.
   `collectDT`.
 - Two ADR-0008 findings stop being permanent caveats and become a tracked gap
   with an agreed route.
+- The bucket/measurement mapping (question 2), the response envelope (question
+  4), and the `host`-tag-to-`nodename` identity are documentation-derived —
+  read from the 4.3 admin guide and REST API reference, not observed on a live
+  cluster — and remain pending live confirmation. `cmd/mockecs` does not yet
+  serve `POST /flux/api/external/v2/query`, so `make demo` does not exercise
+  this collector end to end either. A future maintainer should treat this ADR
+  as recording a deliberately deferred verification, not a closed one.
 
 ## Related
 

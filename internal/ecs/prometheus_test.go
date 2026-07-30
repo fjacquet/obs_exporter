@@ -97,6 +97,28 @@ func TestPromCollectorDropsLabelDrift(t *testing.T) {
 	}
 }
 
+// TestPromCollectorDropsDuplicateSeries guards against the failure mode where
+// two samples share both a name and identical label values (not just a
+// matching schema). client_golang's registry rejects that as "collected
+// metric ... was collected before with the same name and label values", and
+// main.go serves promhttp with the zero-value ErrorHandling
+// (HTTPErrorOnError), so a single duplicate would 500 the whole /metrics
+// endpoint for every cluster rather than drop one series.
+func TestPromCollectorDropsDuplicateSeries(t *testing.T) {
+	store := NewSnapshotStore()
+	store.Store(&Snapshot{Clusters: []*ClusterSnapshot{{
+		Cluster: "c1",
+		Samples: []Sample{
+			{Name: "ecs_dupe", Labels: []Label{{Key: "a", Value: "1"}}, Value: 1},
+			{Name: "ecs_dupe", Labels: []Label{{Key: "a", Value: "1"}}, Value: 2},
+		},
+	}}})
+	families := gather(t, store)
+	if got := families["ecs_dupe"]; got != 1 {
+		t.Errorf("duplicate series kept = %d, want 1 (the second occurrence dropped)", got)
+	}
+}
+
 func TestPromCollectorEmptyStore(t *testing.T) {
 	store := NewSnapshotStore()
 	if got := len(gather(t, store)); got != 0 {

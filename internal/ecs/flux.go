@@ -238,13 +238,21 @@ func (Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 
 	// Always emitted, including as 0: "mapping worked" is the information that
 	// distinguishes a healthy cycle from one where every node tag joined nothing.
+	// Because it is unconditional, collectCluster (collector.go) excludes it from
+	// domainSamples by name — otherwise this one housekeeping sample alone could
+	// keep ecs_up at 1 on a cycle where every measurement renamed out from under
+	// the query table and nothing else in the cluster produced real data.
 	out = append(out, Sample{
-		Name:   "ecs_collector_unmapped_nodes",
+		Name:   unmappedNodesMetric,
 		Labels: []Label{{"collector", "flux"}},
 		Value:  unmapped,
 	})
 	return out, nil
 }
+
+// unmappedNodesMetric is Flux's housekeeping sample name (see Collect above).
+// collectCluster keys off this constant, not a literal, so the two stay in sync.
+const unmappedNodesMetric = "ecs_collector_unmapped_nodes"
 
 // samples maps one measurement's rows, returning the samples and how many rows
 // were dropped for an unresolvable host.
