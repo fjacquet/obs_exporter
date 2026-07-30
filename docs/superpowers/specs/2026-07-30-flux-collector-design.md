@@ -8,8 +8,13 @@ Implements: [ADR-0011](../../adr/0011-flux-collector-for-unreachable-metrics.md)
 
 ADR-0011 accepted an opt-in Flux collector as the route to metric families the
 management API does not serve, and left six questions to the implementation PR.
-All six are now answered — by the live-4.3 reporter, and independently validated
-against the ObjectScale 4.3 admin guide, release notes, and REST API reference.
+All six are now **answered**, which is not the same as validated. The answers come
+from the ObjectScale 4.3 admin guide, release notes and REST API reference; only
+questions 1 (auth) and 3 (version skew) carry live-cluster confirmation from the
+reporter. The bucket and measurement mapping, the response envelope, and the
+`host`-tag node identity are documentation-derived and remain unconfirmed against
+a running cluster — see "Open, pending live traces" below, which is the
+authoritative statement of validation status for this design.
 
 The reporter also found a defect while reviewing the DT collector. The object
 port's ping payload is
@@ -342,8 +347,16 @@ than absent (ADR-0011).
 
 The mapper indexes each inventory node under several candidate keys — `nodename`,
 `nodename` truncated at the first `.`, `mgmtIP`, `dataIP` — and looks up the Flux
-`host` both whole and truncated at the first `.`, case-insensitively. First match
-wins.
+`host` both whole and truncated at the first `.`, case-insensitively.
+
+A candidate key claimed by **two different nodes** identifies neither, so it is
+invalidated rather than resolved: the lookup fails, and the row is dropped and
+counted like any other unmappable host. Resolving it to whichever node happened
+to be indexed last would attribute that node's series to the wrong one, and a
+wrong join is indistinguishable downstream from a right one — strictly worse
+than the dropped row. One node re-registering *its own* key is not a collision
+and still resolves; that happens routinely, since `mgmtIP` equals `dataIP` on a
+flat network and an unqualified `nodename` equals its own truncated form.
 
 A row whose `host` matches nothing emits **no sample**, and increments
 `ecs_collector_unmapped_nodes{collector="flux"}`. Without that counter, a cluster
@@ -355,10 +368,17 @@ the one assumption no document settles.
 
 | Condition | Behaviour |
 | --- | --- |
-| Endpoint unreachable, 401, 403 | `ecs_collector_up{collector="flux"}=0`, no samples, every other collector unaffected |
-| One measurement absent or renamed | warning logged once per cycle, samples absent, collector stays up |
+| Any query fails at the transport or auth layer — unreachable, TLS failure, 401, 403, or any non-2xx | `Collect` returns an error, so `ecs_collector_up{collector="flux"}=0`, no samples, every other collector unaffected |
+| A query returns 2xx but no rows, because the measurement is absent or was renamed | warning logged once per cycle for that measurement, its samples absent, the collector and its other seven queries stay up |
 | Column missing, or a cell that will not parse | that sample absent (ADR-0007) |
 | `host` unmappable | sample dropped, `ecs_collector_unmapped_nodes` incremented |
+
+That split rests on an assumption no document settles: that a query naming a
+measurement the cluster does not carry answers 2xx with an empty `Series`, rather
+than an HTTP error. It is open question 4 below. If a real cluster answers with a
+4xx instead, a single renamed measurement would fail the whole collector under the
+table's first row — so the code must then learn to distinguish a per-measurement
+4xx (warn, continue) from a transport or auth failure (fail the collector).
 
 The response body is never logged at `--trace` without the auth-path skip the
 family tracing rule requires.
