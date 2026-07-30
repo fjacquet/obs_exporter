@@ -87,3 +87,32 @@ func TestAppendBool(t *testing.T) {
 		t.Error("an unreported flag must be absent, not zero")
 	}
 }
+
+// nodes.go and replication.go build one label set per instance and spread it
+// into a dozen appends, so the helpers must copy it: sharing the caller's
+// backing array would let a later edit rewrite samples already emitted. Passing
+// labels as literals cannot catch that — Go allocates a fresh slice per call —
+// so each case spreads a slice it then mutates, which is the real call shape.
+func TestAppendHelpersDetachLabelSlices(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		emit func(out []Sample, name string, labels ...Label) []Sample
+	}{
+		{"ecs_detached_series_bytes", func(out []Sample, name string, labels ...Label) []Sample {
+			return appendSeries(out, name, Series{{"t": "1", "Capacity": "1"}}, labels...)
+		}},
+		{"ecs_detached_num_bytes", func(out []Sample, name string, labels ...Label) []Sample {
+			return appendNum(out, name, Num{Val: 1, Set: true}, labels...)
+		}},
+		{"ecs_detached_bool", func(out []Sample, name string, labels ...Label) []Sample {
+			return appendBool(out, name, Bool{Val: true, Set: true}, labels...)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			shared := []Label{{"rg", "old"}}
+			out := tc.emit(nil, tc.name, shared...)
+			shared[0].Value = "rewritten"
+			mustSample(t, out, tc.name, 1, Label{"rg", "old"})
+		})
+	}
+}
