@@ -178,8 +178,12 @@ inventory's `nodename`, so these series join with the [node metrics](#nodes-dash
     those counts from outside the cluster needs a different source; see
     [ADR-0011](adr/0011-flux-collector-for-unreachable-metrics.md).
 
+The ping payload's items are matched by `Name`, because the API documents
+`PingList` as `0-*` `PingItem` elements with no guaranteed order.
+
 | Metric | Description |
 | --- | --- |
 | `ecs_node_scrape_up` (extra label `endpoint`: `dt` / `object`) | reachability of each node-local port, reported separately because they sit on different networks |
 | `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts (port 9101, `mgmt_ip`) |
-| `ecs_node_active_connections` | active connections (object-port ping, port 9021, `data_ip`) |
+| `ecs_node_active_connections` | active Jetty connections on the node, from the object-port ping's `LOAD_FACTOR` item (port 9021, `data_ip`) |
+| `ecs_node_maintenance_mode` | 1 when the node reports `MAINTENANCE_MODE` `ON`, 0 when `OFF`. Absent when the node reports `UNKNOWN` — the exporter does not guess a node out of maintenance. |

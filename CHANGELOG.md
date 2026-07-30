@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-30
+
+### Fixed
+
+- The object-port ping is decoded by item `Name` rather than by position.
+  `PingItem` is documented as `0-*` elements with no guaranteed ordering, so
+  `ecs_node_active_connections` previously read whichever item came first. Its
+  name and meaning are unchanged — the 4.3 REST reference defines `LOAD_FACTOR`
+  as the node's active Jetty connection count.
+
+### Added
+
+- `ecs_node_maintenance_mode`, from the ping's `MAINTENANCE_MODE` item. A node
+  reporting `UNKNOWN` yields an absent sample, never 0.
+- Internal: samples carry a gauge/counter type, honoured by both the Prometheus
+  and OTLP export paths. No existing series changes type.
+
 ## [3.0.0] - 2026-07-30
 
 ### Removed — BREAKING
