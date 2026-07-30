@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"sync"
 
-	"github.com/fjacquet/obs_exporter/internal/config"
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -55,18 +55,16 @@ type billingBulkResp struct {
 // API has no bulk quota endpoint, so this is one request per namespace per
 // cycle; a limit keeps a thousand-namespace cluster from opening a thousand
 // connections at once while still finishing well inside a collection interval.
-const quotaConcurrency = 8
+// It is derived from the client's idle-connection pool size rather than chosen
+// independently: fanning out wider than the pool trades pooled connections for
+// a TLS handshake per excess request, every cycle.
+const quotaConcurrency = ecsclient.MaxConcurrentRequests
 
 // Metering collects per-namespace quota and billing (usage) stats.
 type Metering struct {
 	// Quotas enables the per-namespace quota GETs. Billing is one bulk POST and
 	// is always collected; quotas are the part that scales with namespace count.
 	Quotas bool
-}
-
-// NewMetering builds the metering collector for one cluster's feature flags.
-func NewMetering(cl config.Cluster) Metering {
-	return Metering{Quotas: cl.QuotasEnabled()}
 }
 
 // Name identifies this collector in ecs_collector_up.
@@ -89,14 +87,30 @@ func (m Metering) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, er
 		return nil, nil
 	}
 
-	var out []Sample
+	// Quotas and billing share nothing but the namespace list, which is already
+	// in hand, so the bulk POST runs alongside the quota fan-out instead of
+	// queueing behind it: the cycle costs the slower of the two rather than the
+	// sum. Both are the calls this collector is documented as being able to
+	// outrun a collection interval with.
+	var quotas []Sample
+	var wg sync.WaitGroup
 	if m.Quotas {
-		out = collectQuotas(ctx, c, names)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			quotas = collectQuotas(ctx, c, names)
+		}()
 	}
 
 	var billing billingBulkResp
-	if err := c.Post(ctx, pathBillingBulk, billingBulkReq{ID: names}, &billing); err != nil {
-		return out, err
+	billingErr := c.Post(ctx, pathBillingBulk, billingBulkReq{ID: names}, &billing)
+	wg.Wait()
+
+	// Quota samples stay ahead of billing samples, as when the two ran in
+	// sequence, so --once --debug output is unchanged.
+	out := quotas
+	if billingErr != nil {
+		return out, billingErr
 	}
 	for _, info := range billing.Infos {
 		nsLabel := []Label{{Key: "namespace", Value: info.Namespace}}
@@ -133,15 +147,16 @@ func collectQuotas(ctx context.Context, c ecsclient.Client, names []string) []Sa
 					Debug("namespace quota fetch failed")
 				return nil
 			}
+			// This goroutine owns slot i, so appending straight into it is
+			// race-free. Sized for the two samples a namespace can produce.
 			nsLabel := []Label{{Key: "namespace", Value: name}}
-			var samples []Sample
+			per[i] = make([]Sample, 0, 2)
 			if q.BlockSize.Set && q.BlockSize.Val >= 0 {
-				samples = append(samples, Sample{Name: "ecs_namespace_quota_hard_bytes", Labels: nsLabel, Value: q.BlockSize.Val * gib})
+				per[i] = append(per[i], Sample{Name: "ecs_namespace_quota_hard_bytes", Labels: nsLabel, Value: q.BlockSize.Val * gib})
 			}
 			if q.NotificationSize.Set && q.NotificationSize.Val >= 0 {
-				samples = append(samples, Sample{Name: "ecs_namespace_quota_soft_bytes", Labels: nsLabel, Value: q.NotificationSize.Val * gib})
+				per[i] = append(per[i], Sample{Name: "ecs_namespace_quota_soft_bytes", Labels: nsLabel, Value: q.NotificationSize.Val * gib})
 			}
-			per[i] = samples
 			return nil
 		})
 	}

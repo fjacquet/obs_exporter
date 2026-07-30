@@ -94,15 +94,18 @@ func (d *DT) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(8)
 	for _, n := range inv.Node {
+		// Guard the raw inventory, not the derived fields: after the fallbacks
+		// below the two addresses are empty together, so testing them would read
+		// as two conditions where there is one.
+		if n.MgmtIP == "" && n.DataIP == "" {
+			continue
+		}
 		// A cluster that publishes only one of the two addresses is still worth
-		// scraping on the one it has; only a node with neither is unreachable.
+		// scraping on the one it has.
 		node := dtNode{
 			label:  cmp.Or(n.Nodename, n.MgmtIP, n.DataIP),
 			mgmtIP: cmp.Or(n.MgmtIP, n.DataIP),
 			dataIP: cmp.Or(n.DataIP, n.MgmtIP),
-		}
-		if node.mgmtIP == "" && node.dataIP == "" {
-			continue
 		}
 		g.Go(func() error {
 			samples := d.collectNode(gctx, c.Name(), node)

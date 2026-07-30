@@ -26,7 +26,7 @@ func Registry(cl config.Cluster) []ResourceCollector {
 		Info{},
 	}
 	if cl.MeteringEnabled() {
-		rcs = append(rcs, NewMetering(cl))
+		rcs = append(rcs, Metering{Quotas: cl.QuotasEnabled()})
 	}
 	if cl.CollectDT {
 		rcs = append(rcs, NewDT(cl))

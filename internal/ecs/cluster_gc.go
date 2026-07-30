@@ -40,33 +40,21 @@ type gcFields struct {
 func (g gcFields) samples() []Sample {
 	var out []Sample
 
-	for _, s := range []struct {
-		scope         Label
-		pending       Series
-		reclaimed     Series
-		unreclaimable Series
-		detected      Series
-		enabled       Bool
-	}{
-		{
-			scope:   Label{Key: "scope", Value: "user"},
-			pending: g.GCUserPending, reclaimed: g.GCUserReclaimed,
-			unreclaimable: g.GCUserUnreclaimable, detected: g.GCUserTotalDetected,
-			enabled: g.GCUserDataIsEnabled,
-		},
-		{
-			scope:   Label{Key: "scope", Value: "system"},
-			pending: g.GCSystemPending, reclaimed: g.GCSystemReclaimed,
-			unreclaimable: g.GCSystemUnreclaimable, detected: g.GCSystemTotalDetected,
-			enabled: g.GCSystemMetadataIsEnabled,
-		},
-	} {
-		out = appendSeries(out, "ecs_cluster_gc_bytes", s.pending, s.scope, Label{"state", "pending"})
-		out = appendSeries(out, "ecs_cluster_gc_bytes", s.unreclaimable, s.scope, Label{"state", "unreclaimable"})
-		out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", s.reclaimed, s.scope)
-		out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", s.detected, s.scope)
-		out = appendBool(out, "ecs_cluster_gc_enabled", s.enabled, s.scope)
-	}
+	pending, unreclaimable := Label{"state", "pending"}, Label{"state", "unreclaimable"}
+
+	user := Label{Key: "scope", Value: "user"}
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCUserPending, user, pending)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCUserUnreclaimable, user, unreclaimable)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCUserReclaimed, user)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCUserTotalDetected, user)
+	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCUserDataIsEnabled, user)
+
+	system := Label{Key: "scope", Value: "system"}
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCSystemPending, system, pending)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCSystemUnreclaimable, system, unreclaimable)
+	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCSystemReclaimed, system)
+	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCSystemTotalDetected, system)
+	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCSystemMetadataIsEnabled, system)
 
 	return out
 }

@@ -38,15 +38,15 @@ type Cluster struct {
 	CollectQuotas *bool `yaml:"collectQuotas"`
 }
 
+// enabled reads a default-true flag: unset (nil) means on, so a collector can be
+// added without every existing config file having to opt into it.
+func enabled(flag *bool) bool { return flag == nil || *flag }
+
 // MeteringEnabled reports whether the metering collector should run.
-func (c Cluster) MeteringEnabled() bool {
-	return c.CollectMetering == nil || *c.CollectMetering
-}
+func (c Cluster) MeteringEnabled() bool { return enabled(c.CollectMetering) }
 
 // QuotasEnabled reports whether metering should fetch per-namespace quotas.
-func (c Cluster) QuotasEnabled() bool {
-	return c.CollectQuotas == nil || *c.CollectQuotas
-}
+func (c Cluster) QuotasEnabled() bool { return enabled(c.CollectQuotas) }
 
 // BaseURL returns the https://host:port root of the ECS management API.
 func (c Cluster) BaseURL() string {

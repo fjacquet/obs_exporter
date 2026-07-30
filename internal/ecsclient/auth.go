@@ -14,10 +14,25 @@ const (
 )
 
 // ensureToken logs in if no token is cached, capturing X-SDS-AUTH-TOKEN.
+//
+// The login is single-flighted. Checking the token and storing it are two steps,
+// so concurrent callers that all find it empty would otherwise each log in, and
+// every login past the first produces a token that is immediately overwritten in
+// c.token and therefore never logged out. ECS caps session tokens per user (see
+// Close), so those are leaked for the life of the process. loginMu — not mu,
+// which must not be held across a network call — makes check-login-store atomic.
 func (c *ClusterClient) ensureToken(ctx context.Context) error {
 	if c.currentToken() != "" {
 		return nil
 	}
+
+	c.loginMu.Lock()
+	defer c.loginMu.Unlock()
+	// Someone else may have logged in while we waited for the lock.
+	if c.currentToken() != "" {
+		return nil
+	}
+
 	resp, err := c.rc.R().SetContext(ctx).
 		SetBasicAuth(c.cfg.Username, c.cfg.Password).
 		Get(loginPath)

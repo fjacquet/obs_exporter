@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"bytes"
 	"encoding/json"
 	"reflect"
 
@@ -25,6 +24,16 @@ import (
 type halList[T any] struct {
 	// Instances holds the decoded array, empty when the payload carried none.
 	Instances []T
+	// halShape is embedded rather than mirrored into a parallel struct: a new
+	// way for a list to be untrustworthy is then one field to add, not one field
+	// plus a copy in an adapter that compiles fine when you forget it.
+	halShape
+}
+
+// halShape describes a decoded HAL list's key situation, without the element
+// type, so the warning helper does not have to be generic in something it never
+// looks at.
+type halShape struct {
 	// KeySeen reports whether either spelling of the array key was present.
 	// False means the payload shape is unrecognised, which callers surface as
 	// a warning; it is distinct from a present-but-empty list.
@@ -38,58 +47,28 @@ type halList[T any] struct {
 
 // UnmarshalJSON accepts either spelling of the instance-array key, preferring
 // the "_instances" form that real clusters emit when both are present.
+//
+// Presence is tested against nil, which encoding/json already gives us for free
+// with the exact semantics needed: a present-but-empty array decodes to a
+// non-nil empty slice (a legitimately empty cluster, so a key sighting), while
+// an absent key and an explicit null both leave the field nil (no list, so no
+// sighting and the shape warning still fires).
 func (h *halList[T]) UnmarshalJSON(b []byte) error {
 	var raw struct {
-		Underscore json.RawMessage `json:"_instances"`
-		Documented json.RawMessage `json:"instances"`
+		Underscore []T `json:"_instances"`
+		Documented []T `json:"instances"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	under, underSeen, err := decodeInstances[T](raw.Underscore)
-	if err != nil {
-		return err
-	}
-	doc, docSeen, err := decodeInstances[T](raw.Documented)
-	if err != nil {
-		return err
-	}
 	switch {
-	case underSeen:
-		h.Instances, h.KeySeen = under, true
-		h.Conflict = docSeen && !reflect.DeepEqual(under, doc)
-	case docSeen:
-		h.Instances, h.KeySeen = doc, true
+	case raw.Underscore != nil:
+		h.Instances, h.KeySeen = raw.Underscore, true
+		h.Conflict = raw.Documented != nil && !reflect.DeepEqual(raw.Underscore, raw.Documented)
+	case raw.Documented != nil:
+		h.Instances, h.KeySeen = raw.Documented, true
 	}
 	return nil
-}
-
-// decodeInstances decodes one spelling of the instance array and reports whether
-// the key was present with a value. Presence is not tested by length: an empty
-// array is a legitimately empty cluster and must still count as a key sighting.
-// An explicit null does not — it carries no list, so treating it as a sighting
-// would suppress the shape warning on a payload that told us nothing.
-func decodeInstances[T any](raw json.RawMessage) (list []T, seen bool, err error) {
-	if raw == nil || bytes.Equal(raw, []byte("null")) {
-		return nil, false, nil
-	}
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return nil, false, err
-	}
-	return list, true, nil
-}
-
-// halShape describes a decoded HAL list's key situation. It exists so the
-// warning helper is not generic in the element type, which the callers do not
-// care about.
-type halShape struct {
-	KeySeen  bool
-	Conflict bool
-}
-
-// Shape reports the key situation for warnHalShape.
-func (h halList[T]) Shape() halShape {
-	return halShape{KeySeen: h.KeySeen, Conflict: h.Conflict}
 }
 
 // warnHalShape logs the two ways a HAL instance list can be untrustworthy, so
@@ -110,6 +89,11 @@ func (h halList[T]) Shape() halShape {
 // "_embedded" entirely on an empty cluster would be indistinguishable from
 // shape drift, and a false ecs_collector_up=0 is worse than a missed alert.
 func warnHalShape(cluster, path string, s halShape) {
+	// The silent path is every call in normal operation; returning before
+	// building the field map keeps it allocation-free.
+	if s.KeySeen && !s.Conflict {
+		return
+	}
 	fields := log.Fields{"cluster": cluster, "path": path}
 	if !s.KeySeen {
 		log.WithFields(fields).

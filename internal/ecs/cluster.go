@@ -19,11 +19,7 @@ type localZoneResp struct {
 	NumBadNodes         Num `json:"numBadNodes"`
 	NumMaintenanceNodes Num `json:"numMaintenanceNodes"`
 
-	NumDisks               Num `json:"numDisks"`
-	NumGoodDisks           Num `json:"numGoodDisks"`
-	NumBadDisks            Num `json:"numBadDisks"`
-	NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
-	NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
+	diskCountFields
 
 	AlertsNumUnackCritical Series `json:"alertsNumUnackCritical"`
 	AlertsNumUnackError    Series `json:"alertsNumUnackError"`
@@ -36,12 +32,7 @@ type localZoneResp struct {
 	DiskSpaceReservedCurrent     Series `json:"diskSpaceReservedCurrent"`
 	DiskSpaceOfflineTotalCurrent Series `json:"diskSpaceOfflineTotalCurrent"`
 
-	TransactionReadLatency             Series `json:"transactionReadLatency"`
-	TransactionWriteLatency            Series `json:"transactionWriteLatency"`
-	TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
-	TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
-	TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
-	TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
+	transactionFields
 
 	TransactionErrors struct {
 		ErrorSuccessTotals []struct {
@@ -96,11 +87,7 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	out = appendNum(out, "ecs_cluster_nodes", z.NumBadNodes, Label{"state", "bad"})
 	out = appendNum(out, "ecs_cluster_nodes", z.NumMaintenanceNodes, Label{"state", "maintenance"})
 
-	out = appendNum(out, "ecs_cluster_disks_installed", z.NumDisks)
-	out = appendNum(out, "ecs_cluster_disks", z.NumGoodDisks, Label{"state", "good"})
-	out = appendNum(out, "ecs_cluster_disks", z.NumBadDisks, Label{"state", "bad"})
-	out = appendNum(out, "ecs_cluster_disks", z.NumMaintenanceDisks, Label{"state", "maintenance"})
-	out = appendNum(out, "ecs_cluster_disks", z.NumReadyToReplaceDisks, Label{"state", "ready_to_replace"})
+	out = append(out, z.diskCountFields.samples("ecs_cluster")...)
 
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackCritical, Label{"severity", "critical"})
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackError, Label{"severity", "error"})
@@ -117,13 +104,7 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	out = appendSeries(out, "ecs_cluster_disk_space_bytes", z.DiskSpaceReservedCurrent, Label{"type", "reserved"})
 	out = appendSeries(out, "ecs_cluster_disk_space_offline_total_bytes", z.DiskSpaceOfflineTotalCurrent)
 
-	read, write := Label{"op", "read"}, Label{"op", "write"}
-	out = appendSeries(out, "ecs_cluster_transaction_latency_milliseconds", z.TransactionReadLatency, read)
-	out = appendSeries(out, "ecs_cluster_transaction_latency_milliseconds", z.TransactionWriteLatency, write)
-	out = appendSeries(out, "ecs_cluster_transaction_bandwidth_mb_per_second", z.TransactionReadBandwidth, read)
-	out = appendSeries(out, "ecs_cluster_transaction_bandwidth_mb_per_second", z.TransactionWriteBandwidth, write)
-	out = appendSeries(out, "ecs_cluster_transactions_per_second", z.TransactionReadTransactionsPerSec, read)
-	out = appendSeries(out, "ecs_cluster_transactions_per_second", z.TransactionWriteTransactionsPerSec, write)
+	out = append(out, z.transactionFields.samples("ecs_cluster")...)
 
 	if len(z.TransactionErrors.ErrorSuccessTotals) > 0 {
 		totals := z.TransactionErrors.ErrorSuccessTotals[0]

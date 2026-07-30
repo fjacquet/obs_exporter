@@ -21,11 +21,7 @@ type nodeInstance struct {
 	DisplayName  string `json:"displayName"`
 	HealthStatus string `json:"healthStatus"`
 
-	NumDisks               Num `json:"numDisks"`
-	NumGoodDisks           Num `json:"numGoodDisks"`
-	NumBadDisks            Num `json:"numBadDisks"`
-	NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
-	NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
+	diskCountFields
 
 	DiskSpaceTotal     Series `json:"diskSpaceTotal"`
 	DiskSpaceFree      Series `json:"diskSpaceFree"`
@@ -39,12 +35,7 @@ type nodeInstance struct {
 	NodeNicTransmittedBandwidth Series `json:"nodeNicTransmittedBandwidth"`
 	NodeNicUtilization          Series `json:"nodeNicUtilization"`
 
-	TransactionReadLatency             Series `json:"transactionReadLatency"`
-	TransactionWriteLatency            Series `json:"transactionWriteLatency"`
-	TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
-	TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
-	TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
-	TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
+	transactionFields
 }
 
 // Nodes collects per-node health, capacity, utilization, and transaction stats
@@ -61,7 +52,7 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	if err := c.Get(ctx, pathLocalZoneNodes, &r); err != nil {
 		return nil, err
 	}
-	warnHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.Shape())
+	warnHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.halShape)
 	var out []Sample
 	for _, n := range r.Embedded.Instances {
 		node := Label{Key: "node", Value: n.DisplayName}
@@ -83,14 +74,7 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 			})
 		}
 
-		// Same split as the cluster counts: the per-state counts share a name, the
-		// installed total keeps its own because the states are not a proven
-		// partition of it (ADR-0012).
-		out = appendNum(out, "ecs_node_disks_installed", n.NumDisks, node)
-		out = appendNum(out, "ecs_node_disks", n.NumGoodDisks, node, Label{"state", "good"})
-		out = appendNum(out, "ecs_node_disks", n.NumBadDisks, node, Label{"state", "bad"})
-		out = appendNum(out, "ecs_node_disks", n.NumMaintenanceDisks, node, Label{"state", "maintenance"})
-		out = appendNum(out, "ecs_node_disks", n.NumReadyToReplaceDisks, node, Label{"state", "ready_to_replace"})
+		out = append(out, n.diskCountFields.samples("ecs_node", node)...)
 
 		// Unlike the cluster payload, the per-node one publishes no reserved
 		// series, so allocated + free falls short of the total by the reserve (10%
@@ -109,13 +93,7 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicTransmittedBandwidth, node, Label{"direction", "transmitted"})
 		out = appendSeries(out, "ecs_node_nic_utilization_percent", n.NodeNicUtilization, node)
 
-		read, write := Label{"op", "read"}, Label{"op", "write"}
-		out = appendSeries(out, "ecs_node_transaction_latency_milliseconds", n.TransactionReadLatency, node, read)
-		out = appendSeries(out, "ecs_node_transaction_latency_milliseconds", n.TransactionWriteLatency, node, write)
-		out = appendSeries(out, "ecs_node_transaction_bandwidth_mb_per_second", n.TransactionReadBandwidth, node, read)
-		out = appendSeries(out, "ecs_node_transaction_bandwidth_mb_per_second", n.TransactionWriteBandwidth, node, write)
-		out = appendSeries(out, "ecs_node_transactions_per_second", n.TransactionReadTransactionsPerSec, node, read)
-		out = appendSeries(out, "ecs_node_transactions_per_second", n.TransactionWriteTransactionsPerSec, node, write)
+		out = append(out, n.transactionFields.samples("ecs_node", node)...)
 	}
 	return out, nil
 }

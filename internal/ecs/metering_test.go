@@ -5,8 +5,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/fjacquet/obs_exporter/internal/config"
 )
 
 func TestMeteringCollect(t *testing.T) {
@@ -84,15 +82,5 @@ func TestMeteringWithoutQuotas(t *testing.T) {
 	}
 	if _, ok := findSample(samples, "ecs_namespace_quota_hard_bytes", Label{"namespace", "s3"}); ok {
 		t.Error("quota samples should be absent with quotas disabled")
-	}
-}
-
-func TestNewMeteringHonorsClusterFlag(t *testing.T) {
-	off := false
-	if got := NewMetering(config.Cluster{}); !got.Quotas {
-		t.Error("quotas should default to enabled when collectQuotas is unset")
-	}
-	if got := NewMetering(config.Cluster{CollectQuotas: &off}); got.Quotas {
-		t.Error("collectQuotas: false should disable the quota fetch")
 	}
 }

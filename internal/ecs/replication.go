@@ -40,7 +40,7 @@ func (Replication) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, e
 	if err := c.Get(ctx, pathReplicationGroups, &r); err != nil {
 		return nil, err
 	}
-	warnHalShape(c.Name(), pathReplicationGroups, r.Embedded.Shape())
+	warnHalShape(c.Name(), pathReplicationGroups, r.Embedded.halShape)
 	var out []Sample
 	for _, rg := range r.Embedded.Instances {
 		group := Label{Key: "rg", Value: rg.Name}
