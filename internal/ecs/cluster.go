@@ -86,38 +86,49 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	}
 
 	var out []Sample
-	out = appendNum(out, "ecs_cluster_nodes", z.NumNodes)
-	out = appendNum(out, "ecs_cluster_good_nodes", z.NumGoodNodes)
-	out = appendNum(out, "ecs_cluster_bad_nodes", z.NumBadNodes)
-	out = appendNum(out, "ecs_cluster_maintenance_nodes", z.NumMaintenanceNodes)
+	// The per-state counts share one metric name; the population total keeps its
+	// own (_installed) because the states are NOT a proven partition of it — ECS
+	// documents five health states and publishes a count for only three, so
+	// sum(ecs_cluster_nodes) may fall short of the installed count rather than
+	// equal it. See ADR-0012.
+	out = appendNum(out, "ecs_cluster_nodes_installed", z.NumNodes)
+	out = appendNum(out, "ecs_cluster_nodes", z.NumGoodNodes, Label{"state", "good"})
+	out = appendNum(out, "ecs_cluster_nodes", z.NumBadNodes, Label{"state", "bad"})
+	out = appendNum(out, "ecs_cluster_nodes", z.NumMaintenanceNodes, Label{"state", "maintenance"})
 
-	out = appendNum(out, "ecs_cluster_disks", z.NumDisks)
-	out = appendNum(out, "ecs_cluster_good_disks", z.NumGoodDisks)
-	out = appendNum(out, "ecs_cluster_bad_disks", z.NumBadDisks)
-	out = appendNum(out, "ecs_cluster_maintenance_disks", z.NumMaintenanceDisks)
-	out = appendNum(out, "ecs_cluster_ready_to_replace_disks", z.NumReadyToReplaceDisks)
+	out = appendNum(out, "ecs_cluster_disks_installed", z.NumDisks)
+	out = appendNum(out, "ecs_cluster_disks", z.NumGoodDisks, Label{"state", "good"})
+	out = appendNum(out, "ecs_cluster_disks", z.NumBadDisks, Label{"state", "bad"})
+	out = appendNum(out, "ecs_cluster_disks", z.NumMaintenanceDisks, Label{"state", "maintenance"})
+	out = appendNum(out, "ecs_cluster_disks", z.NumReadyToReplaceDisks, Label{"state", "ready_to_replace"})
 
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackCritical, Label{"severity", "critical"})
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackError, Label{"severity", "error"})
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackInfo, Label{"severity", "info"})
 	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackWarning, Label{"severity", "warning"})
 
+	// allocated + free + reserved partitions the total exactly (verified to the
+	// byte on a live 4.3 cluster), so the total must stay outside the labeled
+	// family or sum(ecs_cluster_disk_space_bytes) would double it. Offline space
+	// is not part of that partition and keeps its own name too.
 	out = appendSeries(out, "ecs_cluster_disk_space_total_bytes", z.DiskSpaceTotalCurrent)
-	out = appendSeries(out, "ecs_cluster_disk_space_free_bytes", z.DiskSpaceFreeCurrent)
-	out = appendSeries(out, "ecs_cluster_disk_space_allocated_bytes", z.DiskSpaceAllocatedCurrent)
-	out = appendSeries(out, "ecs_cluster_disk_space_reserved_bytes", z.DiskSpaceReservedCurrent)
+	out = appendSeries(out, "ecs_cluster_disk_space_bytes", z.DiskSpaceAllocatedCurrent, Label{"type", "allocated"})
+	out = appendSeries(out, "ecs_cluster_disk_space_bytes", z.DiskSpaceFreeCurrent, Label{"type", "free"})
+	out = appendSeries(out, "ecs_cluster_disk_space_bytes", z.DiskSpaceReservedCurrent, Label{"type", "reserved"})
 	out = appendSeries(out, "ecs_cluster_disk_space_offline_total_bytes", z.DiskSpaceOfflineTotalCurrent)
 
-	out = appendSeries(out, "ecs_cluster_transaction_read_latency_milliseconds", z.TransactionReadLatency)
-	out = appendSeries(out, "ecs_cluster_transaction_write_latency_milliseconds", z.TransactionWriteLatency)
-	out = appendSeries(out, "ecs_cluster_transaction_read_bandwidth_mb_per_second", z.TransactionReadBandwidth)
-	out = appendSeries(out, "ecs_cluster_transaction_write_bandwidth_mb_per_second", z.TransactionWriteBandwidth)
-	out = appendSeries(out, "ecs_cluster_transactions_read_per_second", z.TransactionReadTransactionsPerSec)
-	out = appendSeries(out, "ecs_cluster_transactions_write_per_second", z.TransactionWriteTransactionsPerSec)
+	read, write := Label{"op", "read"}, Label{"op", "write"}
+	out = appendSeries(out, "ecs_cluster_transaction_latency_milliseconds", z.TransactionReadLatency, read)
+	out = appendSeries(out, "ecs_cluster_transaction_latency_milliseconds", z.TransactionWriteLatency, write)
+	out = appendSeries(out, "ecs_cluster_transaction_bandwidth_mb_per_second", z.TransactionReadBandwidth, read)
+	out = appendSeries(out, "ecs_cluster_transaction_bandwidth_mb_per_second", z.TransactionWriteBandwidth, write)
+	out = appendSeries(out, "ecs_cluster_transactions_per_second", z.TransactionReadTransactionsPerSec, read)
+	out = appendSeries(out, "ecs_cluster_transactions_per_second", z.TransactionWriteTransactionsPerSec, write)
 
 	if len(z.TransactionErrors.ErrorSuccessTotals) > 0 {
-		out = appendNum(out, "ecs_cluster_transaction_errors_total", z.TransactionErrors.ErrorSuccessTotals[0].ErrorTotal)
-		out = appendNum(out, "ecs_cluster_transaction_successes_total", z.TransactionErrors.ErrorSuccessTotals[0].SuccessTotal)
+		totals := z.TransactionErrors.ErrorSuccessTotals[0]
+		out = appendNum(out, "ecs_cluster_transactions_total", totals.ErrorTotal, Label{"outcome", "error"})
+		out = appendNum(out, "ecs_cluster_transactions_total", totals.SuccessTotal, Label{"outcome", "success"})
 	}
 	for _, te := range z.TransactionErrors.Types {
 		if !te.ErrorCount.Set {
@@ -135,8 +146,8 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 		})
 	}
 
-	out = appendSeries(out, "ecs_cluster_replication_ingress_traffic", z.ReplicationIngressTrafficCurrent)
-	out = appendSeries(out, "ecs_cluster_replication_egress_traffic", z.ReplicationEgressTrafficCurrent)
+	out = appendSeries(out, "ecs_cluster_replication_traffic", z.ReplicationIngressTrafficCurrent, Label{"direction", "ingress"})
+	out = appendSeries(out, "ecs_cluster_replication_traffic", z.ReplicationEgressTrafficCurrent, Label{"direction", "egress"})
 
 	out = appendNum(out, "ecs_cluster_replication_rpo_lag_seconds", z.ReplicationRpoLag)
 	out = appendNum(out, "ecs_cluster_replication_rpo_timestamp_seconds", z.ReplicationRpoTimestamp)

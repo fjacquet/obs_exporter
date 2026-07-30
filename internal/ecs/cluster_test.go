@@ -11,15 +11,15 @@ func TestClusterCollect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mustSample(t, samples, "ecs_cluster_nodes", 4)
-	mustSample(t, samples, "ecs_cluster_good_nodes", 4)
-	mustSample(t, samples, "ecs_cluster_bad_nodes", 0)
-	mustSample(t, samples, "ecs_cluster_maintenance_nodes", 0)
-	mustSample(t, samples, "ecs_cluster_disks", 32)
-	mustSample(t, samples, "ecs_cluster_good_disks", 31)
-	mustSample(t, samples, "ecs_cluster_bad_disks", 1)
-	mustSample(t, samples, "ecs_cluster_maintenance_disks", 0)
-	mustSample(t, samples, "ecs_cluster_ready_to_replace_disks", 0)
+	mustSample(t, samples, "ecs_cluster_nodes_installed", 4)
+	mustSample(t, samples, "ecs_cluster_nodes", 4, Label{"state", "good"})
+	mustSample(t, samples, "ecs_cluster_nodes", 0, Label{"state", "bad"})
+	mustSample(t, samples, "ecs_cluster_nodes", 0, Label{"state", "maintenance"})
+	mustSample(t, samples, "ecs_cluster_disks_installed", 32)
+	mustSample(t, samples, "ecs_cluster_disks", 31, Label{"state", "good"})
+	mustSample(t, samples, "ecs_cluster_disks", 1, Label{"state", "bad"})
+	mustSample(t, samples, "ecs_cluster_disks", 0, Label{"state", "maintenance"})
+	mustSample(t, samples, "ecs_cluster_disks", 0, Label{"state", "ready_to_replace"})
 
 	mustSample(t, samples, "ecs_cluster_alerts_unacknowledged", 1, Label{"severity", "critical"})
 	mustSample(t, samples, "ecs_cluster_alerts_unacknowledged", 0, Label{"severity", "error"})
@@ -31,39 +31,39 @@ func TestClusterCollect(t *testing.T) {
 	// (offline is a separate dimension, not part of the online total):
 	// 12000 = 5000 + 5500 + 1500.
 	mustSample(t, samples, "ecs_cluster_disk_space_total_bytes", 12000)
-	mustSample(t, samples, "ecs_cluster_disk_space_free_bytes", 5500)
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_bytes", 5000)
-	mustSample(t, samples, "ecs_cluster_disk_space_reserved_bytes", 1500)
+	mustSample(t, samples, "ecs_cluster_disk_space_bytes", 5500, Label{"type", "free"})
+	mustSample(t, samples, "ecs_cluster_disk_space_bytes", 5000, Label{"type", "allocated"})
+	mustSample(t, samples, "ecs_cluster_disk_space_bytes", 1500, Label{"type", "reserved"})
 	mustSample(t, samples, "ecs_cluster_disk_space_offline_total_bytes", 300)
 
-	mustSample(t, samples, "ecs_cluster_transaction_read_latency_milliseconds", 12)
-	mustSample(t, samples, "ecs_cluster_transaction_write_latency_milliseconds", 22)
-	mustSample(t, samples, "ecs_cluster_transaction_read_bandwidth_mb_per_second", 110)
-	mustSample(t, samples, "ecs_cluster_transaction_write_bandwidth_mb_per_second", 220)
-	mustSample(t, samples, "ecs_cluster_transactions_read_per_second", 1100)
-	mustSample(t, samples, "ecs_cluster_transactions_write_per_second", 2200)
+	mustSample(t, samples, "ecs_cluster_transaction_latency_milliseconds", 12, Label{"op", "read"})
+	mustSample(t, samples, "ecs_cluster_transaction_latency_milliseconds", 22, Label{"op", "write"})
+	mustSample(t, samples, "ecs_cluster_transaction_bandwidth_mb_per_second", 110, Label{"op", "read"})
+	mustSample(t, samples, "ecs_cluster_transaction_bandwidth_mb_per_second", 220, Label{"op", "write"})
+	mustSample(t, samples, "ecs_cluster_transactions_per_second", 1100, Label{"op", "read"})
+	mustSample(t, samples, "ecs_cluster_transactions_per_second", 2200, Label{"op", "write"})
 
-	mustSample(t, samples, "ecs_cluster_transaction_errors_total", 6298)
-	mustSample(t, samples, "ecs_cluster_transaction_successes_total", 2020)
+	mustSample(t, samples, "ecs_cluster_transactions_total", 6298, Label{"outcome", "error"})
+	mustSample(t, samples, "ecs_cluster_transactions_total", 2020, Label{"outcome", "success"})
 	mustSample(t, samples, "ecs_cluster_transaction_errors", 6293,
 		Label{"code", "404"}, Label{"protocol", "S3"}, Label{"category", "User"})
 	mustSample(t, samples, "ecs_cluster_transaction_errors", 1,
 		Label{"code", "412"}, Label{"protocol", "ATMOS"}, Label{"category", "User"})
 
-	mustSample(t, samples, "ecs_cluster_replication_ingress_traffic", 50000)
-	mustSample(t, samples, "ecs_cluster_replication_egress_traffic", 35000)
+	mustSample(t, samples, "ecs_cluster_replication_traffic", 50000, Label{"direction", "ingress"})
+	mustSample(t, samples, "ecs_cluster_replication_traffic", 35000, Label{"direction", "egress"})
 
 	mustSample(t, samples, "ecs_cluster_replication_rpo_lag_seconds", 7200)
 	mustSample(t, samples, "ecs_cluster_replication_rpo_timestamp_seconds", 1502820000)
 
 	gcUser := Label{"scope", "user"}
 	gcSystem := Label{"scope", "system"}
-	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_bytes", 900, gcUser, Label{"state", "pending"})
 	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
+	mustSample(t, samples, "ecs_cluster_gc_bytes", 640, gcUser, Label{"state", "unreclaimable"})
 	mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
 	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
+	mustSample(t, samples, "ecs_cluster_gc_bytes", 130, gcSystem, Label{"state", "pending"})
 	// The fixture omits gcSystemMetadataIsEnabled on purpose.
 	if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
 		t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")

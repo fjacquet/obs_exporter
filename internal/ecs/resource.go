@@ -26,7 +26,7 @@ func Registry(cl config.Cluster) []ResourceCollector {
 		Info{},
 	}
 	if cl.MeteringEnabled() {
-		rcs = append(rcs, Metering{})
+		rcs = append(rcs, NewMetering(cl))
 	}
 	if cl.CollectDT {
 		rcs = append(rcs, NewDT(cl))

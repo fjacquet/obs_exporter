@@ -28,15 +28,15 @@ func TestGCFieldsSamples(t *testing.T) {
 	system := Label{"scope", "system"}
 
 	// "Current" is the newest point by t, not the first.
-	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 900, user)
+	mustSample(t, got, "ecs_cluster_gc_bytes", 900, user, Label{"state", "pending"})
 	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
-	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 640, user)
+	mustSample(t, got, "ecs_cluster_gc_bytes", 640, user, Label{"state", "unreclaimable"})
 	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 9700, user)
 	mustSample(t, got, "ecs_cluster_gc_enabled", 1, user)
 
-	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 130, system)
+	mustSample(t, got, "ecs_cluster_gc_bytes", 130, system, Label{"state", "pending"})
 	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 2500, system)
-	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 70, system)
+	mustSample(t, got, "ecs_cluster_gc_bytes", 70, system, Label{"state", "unreclaimable"})
 	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 2600, system)
 
 	// gcSystemMetadataIsEnabled was absent: the sample must be absent, not 0.

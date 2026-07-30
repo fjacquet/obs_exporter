@@ -31,18 +31,19 @@ func TestPromCollectorGather(t *testing.T) {
 	for _, want := range []string{
 		"ecs_up",
 		"ecs_collector_up",
-		"ecs_cluster_good_nodes",
+		"ecs_cluster_nodes",
+		"ecs_cluster_nodes_installed",
 		"ecs_cluster_alerts_unacknowledged",
 		"ecs_cluster_transaction_errors",
-		"ecs_cluster_disk_space_reserved_bytes",
+		"ecs_cluster_disk_space_bytes",
 		"ecs_cluster_disk_space_offline_total_bytes",
 		"ecs_cluster_replication_rpo_lag_seconds",
-		"ecs_replication_group_ingress_traffic",
+		"ecs_replication_group_traffic",
 		"ecs_node_cpu_utilization_percent",
 		"ecs_node_health_state",
 		"ecs_namespace_used_bytes",
 		"ecs_cluster_info",
-		"ecs_cluster_gc_pending_bytes",
+		"ecs_cluster_gc_bytes",
 		"ecs_cluster_gc_enabled",
 		"ecs_cluster_recovery_bad_chunks_bytes",
 		"ecs_cluster_ec_coded_ratio_percent",
@@ -58,9 +59,16 @@ func TestPromCollectorGather(t *testing.T) {
 	if got := families["ecs_node_healthy"]; got != 5 {
 		t.Errorf("node healthy series = %d, want 5", got)
 	}
-	// scope=user and scope=system both report pending bytes.
-	if got := families["ecs_cluster_gc_pending_bytes"]; got != 2 {
-		t.Errorf("gc pending series = %d, want 2 (one per scope)", got)
+	// Two scopes × {pending, unreclaimable} now share one metric name.
+	if got := families["ecs_cluster_gc_bytes"]; got != 4 {
+		t.Errorf("gc bytes series = %d, want 4 (scope × state)", got)
+	}
+	// allocated, free and reserved; the total keeps its own name.
+	if got := families["ecs_cluster_disk_space_bytes"]; got != 3 {
+		t.Errorf("cluster disk space series = %d, want 3 (allocated, free, reserved)", got)
+	}
+	if got := families["ecs_cluster_disk_space_total_bytes"]; got != 1 {
+		t.Errorf("cluster disk space total series = %d, want 1 (the aggregate is not in the labelled family)", got)
 	}
 	// The fixture omits gcSystemMetadataIsEnabled, so only scope=user is enabled.
 	if got := families["ecs_cluster_gc_enabled"]; got != 1 {

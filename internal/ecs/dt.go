@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"encoding/xml"
@@ -31,14 +32,33 @@ type pingResp struct {
 
 // DT is the opt-in legacy collector for node-local directory-table stats and
 // active connections. Both endpoints are UNDOCUMENTED internal ECS services kept
-// for v1 parity; enable per cluster with collectDT. Node addresses come from the
-// management API's /vdc/nodes inventory.
+// for v1 parity; enable per cluster with collectDT. Node addressing comes from
+// the management API's /vdc/nodes inventory.
+//
+// The two ports do NOT share an address on a network-segmented cluster (the
+// layout Dell recommends for production since ECS 3.8, and the default from 4.x
+// on): the object port answers on the node's data network and the DT stats port
+// on a private link-local fabric VLAN. See dtNode for which address each scrape
+// uses and docs/metrics.md for the reachability caveat this leaves.
 type DT struct {
 	httpClient *http.Client
-	// dtURL/pingURL build the node-local endpoint URLs; tests override them to
-	// point at httptest servers.
-	dtURL   func(node string) string
-	pingURL func(node string) string
+	// dtURL/pingURL build the node-local endpoint URLs from the host each port
+	// answers on; tests override them to point at httptest servers.
+	dtURL   func(host string) string
+	pingURL func(host string) string
+}
+
+// dtNode is one node's addressing for the two node-local scrapes.
+type dtNode struct {
+	// label identifies the node in the emitted metrics. It is the inventory's
+	// nodename, which is the same identifier the dashboard collectors expose as
+	// displayName — so DT series join with the rest of the per-node metrics
+	// instead of forming a disjoint IP-keyed set.
+	label string
+	// mgmtIP hosts the DT stats port, dataIP the object port. On clusters that
+	// carry both networks on one interface these are equal.
+	mgmtIP string
+	dataIP string
 }
 
 // NewDT builds the DT collector for one cluster's ports/TLS settings.
@@ -52,8 +72,8 @@ func NewDT(cl config.Cluster) *DT {
 	}
 	return &DT{
 		httpClient: &http.Client{Transport: transport, Timeout: 30 * time.Second},
-		dtURL:      func(node string) string { return fmt.Sprintf("http://%s:%d/stats/dt/DTInitStat", node, cl.DTPort) },
-		pingURL:    func(node string) string { return fmt.Sprintf("https://%s:%d/?ping", node, cl.ObjPort) },
+		dtURL:      func(host string) string { return fmt.Sprintf("http://%s:%d/stats/dt/DTInitStat", host, cl.DTPort) },
+		pingURL:    func(host string) string { return fmt.Sprintf("https://%s:%d/?ping", host, cl.ObjPort) },
 	}
 }
 
@@ -74,8 +94,14 @@ func (d *DT) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(8)
 	for _, n := range inv.Node {
-		node := n.MgmtIP
-		if node == "" {
+		// A cluster that publishes only one of the two addresses is still worth
+		// scraping on the one it has; only a node with neither is unreachable.
+		node := dtNode{
+			label:  cmp.Or(n.Nodename, n.MgmtIP, n.DataIP),
+			mgmtIP: cmp.Or(n.MgmtIP, n.DataIP),
+			dataIP: cmp.Or(n.DataIP, n.MgmtIP),
+		}
+		if node.mgmtIP == "" && node.dataIP == "" {
 			continue
 		}
 		g.Go(func() error {
@@ -90,13 +116,14 @@ func (d *DT) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	return out, nil
 }
 
-func (d *DT) collectNode(ctx context.Context, cluster, node string) []Sample {
-	nodeLabel := []Label{{Key: "node", Value: node}}
+func (d *DT) collectNode(ctx context.Context, cluster string, n dtNode) []Sample {
+	nodeLabel := []Label{{Key: "node", Value: n.label}}
 	up := 1.0
 
 	var dt dtStatResp
-	if err := d.fetchXML(ctx, d.dtURL(node), &dt); err != nil {
-		log.WithFields(log.Fields{"cluster": cluster, "node": node, "err": err}).Debug("DT stats scrape failed")
+	if err := d.fetchXML(ctx, d.dtURL(n.mgmtIP), &dt); err != nil {
+		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.mgmtIP, "err": err}).
+			Debug("DT stats scrape failed")
 		up = 0
 	}
 
@@ -110,8 +137,9 @@ func (d *DT) collectNode(ctx context.Context, cluster, node string) []Sample {
 	}
 
 	var ping pingResp
-	if err := d.fetchXML(ctx, d.pingURL(node), &ping); err != nil {
-		log.WithFields(log.Fields{"cluster": cluster, "node": node, "err": err}).Debug("ping scrape failed")
+	if err := d.fetchXML(ctx, d.pingURL(n.dataIP), &ping); err != nil {
+		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.dataIP, "err": err}).
+			Debug("ping scrape failed")
 		return out
 	}
 	return append(out, Sample{Name: "ecs_node_active_connections", Labels: nodeLabel, Value: ping.Value})

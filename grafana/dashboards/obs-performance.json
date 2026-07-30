@@ -111,7 +111,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_read_latency_milliseconds{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transaction_latency_milliseconds{op=\"read\",cluster=~\"$cluster\"}",
           "legendFormat": "read {{cluster}}",
           "refId": "A"
         },
@@ -120,7 +120,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_write_latency_milliseconds{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transaction_latency_milliseconds{op=\"write\",cluster=~\"$cluster\"}",
           "legendFormat": "write {{cluster}}",
           "refId": "B"
         }
@@ -165,7 +165,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transactions_read_per_second{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transactions_per_second{op=\"read\",cluster=~\"$cluster\"}",
           "legendFormat": "read {{cluster}}",
           "refId": "A"
         },
@@ -174,7 +174,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transactions_write_per_second{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transactions_per_second{op=\"write\",cluster=~\"$cluster\"}",
           "legendFormat": "write {{cluster}}",
           "refId": "B"
         }
@@ -219,7 +219,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_read_bandwidth_mb_per_second{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transaction_bandwidth_mb_per_second{op=\"read\",cluster=~\"$cluster\"}",
           "legendFormat": "read {{cluster}}",
           "refId": "A"
         },
@@ -228,7 +228,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_write_bandwidth_mb_per_second{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transaction_bandwidth_mb_per_second{op=\"write\",cluster=~\"$cluster\"}",
           "legendFormat": "write {{cluster}}",
           "refId": "B"
         }
@@ -316,7 +316,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_errors_total{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transactions_total{outcome=\"error\",cluster=~\"$cluster\"}",
           "legendFormat": "errors {{cluster}}",
           "refId": "A"
         },
@@ -325,7 +325,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_transaction_successes_total{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_transactions_total{outcome=\"success\",cluster=~\"$cluster\"}",
           "legendFormat": "successes {{cluster}}",
           "refId": "B"
         }
@@ -387,7 +387,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transaction_read_latency_milliseconds{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transaction_latency_milliseconds{op=\"read\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "read {{cluster}} {{node}}",
           "refId": "A"
         },
@@ -396,7 +396,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transaction_write_latency_milliseconds{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transaction_latency_milliseconds{op=\"write\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "write {{cluster}} {{node}}",
           "refId": "B"
         }
@@ -441,7 +441,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transactions_read_per_second{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transactions_per_second{op=\"read\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "read {{cluster}} {{node}}",
           "refId": "A"
         },
@@ -450,7 +450,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transactions_write_per_second{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transactions_per_second{op=\"write\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "write {{cluster}} {{node}}",
           "refId": "B"
         }
@@ -495,7 +495,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transaction_read_bandwidth_mb_per_second{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transaction_bandwidth_mb_per_second{op=\"read\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "read {{cluster}} {{node}}",
           "refId": "A"
         },
@@ -504,7 +504,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_transaction_write_bandwidth_mb_per_second{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_transaction_bandwidth_mb_per_second{op=\"write\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "write {{cluster}} {{node}}",
           "refId": "B"
         }

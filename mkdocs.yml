@@ -2,6 +2,10 @@ site_name: obs_exporter
 site_description: Prometheus + OTLP exporter for Dell EMC ECS / ObjectScale object storage
 repo_url: https://github.com/fjacquet/obs_exporter
 repo_name: fjacquet/obs_exporter
+# Material derives edit links from repo_url as edit/master/docs/; this repo's
+# default branch is main, so the default would 404 the day content.action.edit
+# is switched on.
+edit_uri: edit/main/docs/
 theme:
   name: material
   favicon: assets/favicon.png
@@ -19,6 +23,7 @@ nav:
       - Quick start: getting-started/quickstart.md
   - Metrics reference: metrics.md
   - Migrating from v1: migration-v2.md
+  - Migrating to v3: migration-v3.md
   - Deployment:
       - systemd: deployment/systemd.md
   - Architecture decisions:
@@ -33,6 +38,5 @@ nav:
       - 0008 Swagger 4.2 validation findings: adr/0008-swagger-4.2-validation-findings.md
       - 0009 Modular resource collectors: adr/0009-modular-resource-collectors.md
       - 0010 mockecs demo harness: adr/0010-mockecs-demo-harness.md
-
-extra:
-  version: v2.5.2
+      - 0011 Opt-in Flux collector: adr/0011-flux-collector-for-unreachable-metrics.md
+      - 0012 Label consolidation: adr/0012-label-consolidation-and-sum-safety.md

@@ -29,6 +29,10 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 	}
 
 	got := map[string]float64{}
+	// bySeries keys data points by name plus their full attribute set, so the
+	// consolidated families (state/type/op/direction/kind) can be asserted without
+	// their series colliding under the bare metric name.
+	bySeries := map[string]float64{}
 	var clusterAttr bool
 	for _, sm := range rm.ScopeMetrics {
 		for _, m := range sm.Metrics {
@@ -38,6 +42,7 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 			}
 			for _, dp := range g.DataPoints {
 				got[m.Name] = dp.Value
+				bySeries[m.Name+"{"+dp.Attributes.Encoded(attribute.DefaultEncoder())+"}"] = dp.Value
 				if v, ok := dp.Attributes.Value(attribute.Key("cluster")); ok && v.AsString() == "test-cluster" {
 					clusterAttr = true
 				}
@@ -47,12 +52,19 @@ func TestOTLPExporterObservesSnapshot(t *testing.T) {
 	if got["ecs_up"] != 1 {
 		t.Errorf("ecs_up = %v, want 1", got["ecs_up"])
 	}
-	if got["ecs_cluster_good_nodes"] != 4 {
-		t.Errorf("ecs_cluster_good_nodes = %v, want 4", got["ecs_cluster_good_nodes"])
+	if got["ecs_cluster_nodes_installed"] != 4 {
+		t.Errorf("ecs_cluster_nodes_installed = %v, want 4", got["ecs_cluster_nodes_installed"])
 	}
-	// New cluster capacity + RPO samples must also reach the OTLP export path.
-	if got["ecs_cluster_disk_space_reserved_bytes"] != 1500 {
-		t.Errorf("ecs_cluster_disk_space_reserved_bytes = %v, want 1500", got["ecs_cluster_disk_space_reserved_bytes"])
+	// The consolidated families must survive the OTLP path with their
+	// distinguishing attribute intact, not just their name.
+	for key, want := range map[string]float64{
+		"ecs_cluster_nodes{cluster=test-cluster,state=good}":                  4,
+		"ecs_cluster_disk_space_bytes{cluster=test-cluster,type=reserved}":    1500,
+		"ecs_cluster_gc_bytes{cluster=test-cluster,scope=user,state=pending}": 900,
+	} {
+		if bySeries[key] != want {
+			t.Errorf("%s = %v, want %v", key, bySeries[key], want)
+		}
 	}
 	if got["ecs_cluster_replication_rpo_lag_seconds"] != 7200 {
 		t.Errorf("ecs_cluster_replication_rpo_lag_seconds = %v, want 7200", got["ecs_cluster_replication_rpo_lag_seconds"])

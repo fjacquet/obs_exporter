@@ -128,7 +128,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_maintenance_disks{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_disks{state=\"maintenance\",cluster=~\"$cluster\"}",
           "legendFormat": "maintenance {{cluster}}",
           "refId": "A"
         },
@@ -137,7 +137,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_ready_to_replace_disks{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_disks{state=\"ready_to_replace\",cluster=~\"$cluster\"}",
           "legendFormat": "ready-to-replace {{cluster}}",
           "refId": "B"
         }
@@ -181,7 +181,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_maintenance_disks{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_disks{state=\"maintenance\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "maintenance {{cluster}} {{node}}",
           "refId": "A"
         },
@@ -190,7 +190,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_ready_to_replace_disks{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_disks{state=\"ready_to_replace\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "ready-to-replace {{cluster}} {{node}}",
           "refId": "B"
         }

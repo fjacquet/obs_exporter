@@ -29,11 +29,23 @@ type Cluster struct {
 	// Billing can be slow on large clusters; disable it (or raise
 	// collection.interval) if needed. Pointer so "unset" defaults to enabled.
 	CollectMetering *bool `yaml:"collectMetering"`
+	// CollectQuotas enables the per-namespace quota fetch inside the metering
+	// collector (default true). The management API has no bulk quota endpoint, so
+	// this costs one request per namespace per cycle — the only part of metering
+	// that scales with namespace count. Turning it off keeps namespace usage
+	// (one bulk billing POST) while dropping the quota metrics. Pointer so
+	// "unset" defaults to enabled.
+	CollectQuotas *bool `yaml:"collectQuotas"`
 }
 
 // MeteringEnabled reports whether the metering collector should run.
 func (c Cluster) MeteringEnabled() bool {
 	return c.CollectMetering == nil || *c.CollectMetering
+}
+
+// QuotasEnabled reports whether metering should fetch per-namespace quotas.
+func (c Cluster) QuotasEnabled() bool {
+	return c.CollectQuotas == nil || *c.CollectQuotas
 }
 
 // BaseURL returns the https://host:port root of the ECS management API.

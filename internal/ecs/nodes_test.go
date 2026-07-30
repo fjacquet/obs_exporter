@@ -22,25 +22,25 @@ func TestNodesCollect(t *testing.T) {
 	if _, ok := findSample(samples, "ecs_node_health_state", n1, Label{"state", "bad"}); ok {
 		t.Error("node1 (Good) must not emit ecs_node_health_state{state=bad}")
 	}
-	mustSample(t, samples, "ecs_node_disks", 40, n1)
-	mustSample(t, samples, "ecs_node_good_disks", 40, n1)
+	mustSample(t, samples, "ecs_node_disks_installed", 40, n1)
+	mustSample(t, samples, "ecs_node_disks", 40, n1, Label{"state", "good"})
 	mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
-	mustSample(t, samples, "ecs_node_disk_space_free_bytes", 90, n1)
-	mustSample(t, samples, "ecs_node_disk_space_allocated_bytes", 420, n1)
+	mustSample(t, samples, "ecs_node_disk_space_bytes", 90, n1, Label{"type", "free"})
+	mustSample(t, samples, "ecs_node_disk_space_bytes", 420, n1, Label{"type", "allocated"})
 	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 43, n1)
 	mustSample(t, samples, "ecs_node_memory_utilization_percent", 35, n1)
 	mustSample(t, samples, "ecs_node_memory_used_bytes", 11000, n1)
-	mustSample(t, samples, "ecs_node_nic_received_bandwidth", 4300, n1)
-	mustSample(t, samples, "ecs_node_nic_transmitted_bandwidth", 3009, n1)
+	mustSample(t, samples, "ecs_node_nic_bandwidth", 4300, n1, Label{"direction", "received"})
+	mustSample(t, samples, "ecs_node_nic_bandwidth", 3009, n1, Label{"direction", "transmitted"})
 	mustSample(t, samples, "ecs_node_nic_utilization_percent", 14, n1)
-	mustSample(t, samples, "ecs_node_transaction_read_latency_milliseconds", 9, n1)
-	mustSample(t, samples, "ecs_node_transactions_write_per_second", 1600, n1)
+	mustSample(t, samples, "ecs_node_transaction_latency_milliseconds", 9, n1, Label{"op", "read"})
+	mustSample(t, samples, "ecs_node_transactions_per_second", 1600, n1, Label{"op", "write"})
 
 	n2 := Label{"node", "supr01-r02"}
 	mustSample(t, samples, "ecs_node_healthy", 0, n2)
 	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
-	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
-	mustSample(t, samples, "ecs_node_ready_to_replace_disks", 1, n2)
+	mustSample(t, samples, "ecs_node_disks", 1, n2, Label{"state", "bad"})
+	mustSample(t, samples, "ecs_node_disks", 1, n2, Label{"state", "ready_to_replace"})
 	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 88, n2)
 	// node 2 reports no NIC stats: samples must be absent, not zero.
 	if _, ok := findSample(samples, "ecs_node_nic_utilization_percent", n2); ok {
@@ -62,7 +62,7 @@ func TestNodesCollect(t *testing.T) {
 	n5 := Label{"node", "supr01-r05"} // Maintenance
 	mustSample(t, samples, "ecs_node_healthy", 0, n5)
 	mustSample(t, samples, "ecs_node_health_state", 1, n5, Label{"state", "maintenance"})
-	mustSample(t, samples, "ecs_node_maintenance_disks", 2, n5)
+	mustSample(t, samples, "ecs_node_disks", 2, n5, Label{"state", "maintenance"})
 }
 
 // TestNodesCollectDocumentedInstancesKey serves the real fixture with the HAL
@@ -89,19 +89,19 @@ func TestNodesCollectDocumentedInstancesKey(t *testing.T) {
 	n1 := Label{"node", "supr01-r01"}
 	mustSample(t, samples, "ecs_node_healthy", 1, n1)
 	mustSample(t, samples, "ecs_node_health_state", 1, n1, Label{"state", "good"})
-	mustSample(t, samples, "ecs_node_disks", 40, n1)
+	mustSample(t, samples, "ecs_node_disks_installed", 40, n1)
 	mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
 	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 43, n1)
 
 	n2 := Label{"node", "supr01-r02"}
 	mustSample(t, samples, "ecs_node_healthy", 0, n2)
 	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
-	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
+	mustSample(t, samples, "ecs_node_disks", 1, n2, Label{"state", "bad"})
 }
 
 // TestNodesCollectUnknownShapeWarns pins the wiring between Collect and
-// warnUnknownHalShape: deleting the call site should fail this test even
-// though TestWarnUnknownHalShape covers the helper in isolation.
+// warnHalShape: deleting the call site should fail this test even
+// though TestWarnHalShape covers the helper in isolation.
 func TestNodesCollectUnknownShapeWarns(t *testing.T) {
 	hook := test.NewGlobal()
 	defer hook.Reset()

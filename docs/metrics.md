@@ -24,18 +24,31 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 | Metric | Labels | Description |
 | --- | --- | --- |
 | `ecs_cluster_info` | `version` | constant `1`, ECS software version |
-| `ecs_cluster_nodes` / `_good_nodes` / `_bad_nodes` / `_maintenance_nodes` | | node counts |
-| `ecs_cluster_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | | disk counts |
+| `ecs_cluster_nodes` | `state` (`good`/`bad`/`maintenance`) | node count in each health state |
+| `ecs_cluster_nodes_installed` | | nodes in the cluster, whatever their state |
+| `ecs_cluster_disks` | `state` (`good`/`bad`/`maintenance`/`ready_to_replace`) | disk count in each state |
+| `ecs_cluster_disks_installed` | | disks in the cluster, whatever their state |
 | `ecs_cluster_alerts_unacknowledged` | `severity` (`critical`/`error`/`info`/`warning`) | unacknowledged alert counts |
-| `ecs_cluster_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` / `_reserved_bytes` / `_offline_total_bytes` | | cluster capacity |
-| `ecs_cluster_transaction_read_latency_milliseconds` / `_write_…` | | transaction latency |
-| `ecs_cluster_transaction_read_bandwidth_mb_per_second` / `_write_…` | | transaction bandwidth (MB/s, as reported by the dashboard API) |
-| `ecs_cluster_transactions_read_per_second` / `_write_…` | | transactions per second |
-| `ecs_cluster_transaction_errors_total` / `_successes_total` | | cumulative error/success counts |
+| `ecs_cluster_disk_space_bytes` | `type` (`allocated`/`free`/`reserved`) | cluster capacity by what holds it |
+| `ecs_cluster_disk_space_total_bytes` | | online capacity; equals the sum of the three types above |
+| `ecs_cluster_disk_space_offline_total_bytes` | | capacity on offline disks; not part of the online total |
+| `ecs_cluster_transaction_latency_milliseconds` | `op` (`read`/`write`) | transaction latency |
+| `ecs_cluster_transaction_bandwidth_mb_per_second` | `op` | transaction bandwidth (MB/s, as reported by the dashboard API) |
+| `ecs_cluster_transactions_per_second` | `op` | transactions per second |
+| `ecs_cluster_transactions_total` | `outcome` (`error`/`success`) | cumulative transaction counts |
 | `ecs_cluster_transaction_errors` | `code`, `protocol`, `category` | error counts split by HTTP code and protocol (e.g. `404`/`S3`) |
-| `ecs_cluster_replication_ingress_traffic` / `_egress_traffic` | | cluster-level replication traffic (unit as reported by the dashboard API) |
+| `ecs_cluster_replication_traffic` | `direction` (`ingress`/`egress`) | cluster-level replication traffic (unit as reported by the dashboard API) |
 | `ecs_cluster_replication_rpo_lag_seconds` | | VDC-wide RPO lag (seconds); zone-level counterpart of the per-group metric |
 | `ecs_cluster_replication_rpo_timestamp_seconds` | | VDC-wide unix timestamp of the recovery point |
+
+!!! warning "`_installed` is not the sum of the states"
+    ECS documents five node health states and publishes a count for only three
+    (`good`, `bad`, `maintenance`), so a node that is `suspect` or `notaccessible`
+    appears in `ecs_cluster_nodes_installed` and in **no** `ecs_cluster_nodes`
+    series. `ecs_cluster_nodes_installed - sum(ecs_cluster_nodes)` is therefore a
+    useful "unaccounted-for nodes" alert, not a bug. The same holds for disks.
+    This is also why the totals are separate metric names: folding them in as
+    another `state` would make `sum()` double-count.
 
 ## Cluster background processes
 
@@ -44,15 +57,14 @@ additional API call.
 
 | Metric | Labels | Description |
 | --- | --- | --- |
-| `ecs_cluster_gc_pending_bytes` | `scope` (`user`/`system`) | space detected as reclaimable but not yet reclaimed |
+| `ecs_cluster_gc_bytes` | `scope` (`user`/`system`), `state` (`pending`/`unreclaimable`) | current GC backlog: `pending` is detected and reclaimable, `unreclaimable` is detected and not. The two are disjoint |
 | `ecs_cluster_gc_reclaimed_bytes_total` | `scope` | space reclaimed since the cluster was built — a lifetime counter, not a backlog |
-| `ecs_cluster_gc_unreclaimable_bytes` | `scope` | space detected but not reclaimable |
 | `ecs_cluster_gc_detected_bytes_total` | `scope` | space detected by GC over the cluster's lifetime; equals pending + unreclaimable + reclaimed |
 | `ecs_cluster_gc_enabled` | `scope` | `1` when that GC scope is enabled, `0` when explicitly disabled. The flag is assumed to scope the same subsystem as the byte series above — inferred from the API's field naming (`gcUserDataIsEnabled` / `gcSystemMetadataIsEnabled`), not documented by Dell |
 | `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery. The cluster may report a long-stale computation here: on a real 4.3 cluster this field's timestamp was 55 days older than every other field in the same response |
 | `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
 | `ecs_cluster_recovery_complete_time_estimate` | | estimated time to finish recovery (unit as reported by the dashboard API) |
-| `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding |
+| `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding. Kept a separate name from the one below on purpose: coded is a *subset* of applicable, so one `ec_bytes{kind}` family would count the coded bytes twice under `sum()` |
 | `ecs_cluster_ec_coded_bytes` | | sealed data already erasure-coded |
 | `ecs_cluster_ec_coded_ratio_percent` | | coded share of applicable data |
 | `ecs_cluster_ec_rate` | | erasure-coding throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
@@ -72,17 +84,17 @@ additional API call.
 !!! note "There is no combined scope"
     The API also reports combined GC figures, which equal `user + system` exactly
     (verified to the byte on a live cluster). Exporting them would make
-    `sum(ecs_cluster_gc_pending_bytes)` double-count, so they are omitted:
-    `sum without(scope) (ecs_cluster_gc_pending_bytes)` reproduces them.
+    `sum(ecs_cluster_gc_bytes)` double-count, so they are omitted:
+    `sum without(scope) (ecs_cluster_gc_bytes)` reproduces them. The same rule is
+    why `detected` is not a `state` of `ecs_cluster_gc_bytes`: it is the sum of
+    pending, unreclaimable and reclaimed.
 
 ## Replication groups
 
 | Metric | Labels | Description |
 | --- | --- | --- |
-| `ecs_replication_group_ingress_traffic` / `_egress_traffic` | `rg` | per-group replication traffic |
-| `ecs_replication_group_chunks_repo_pending_replication_bytes` | `rg` | repo data awaiting replication |
-| `ecs_replication_group_chunks_journal_pending_replication_bytes` | `rg` | journal data awaiting replication |
-| `ecs_replication_group_chunks_pending_xor_bytes` | `rg` | data pending XOR |
+| `ecs_replication_group_traffic` | `rg`, `direction` (`ingress`/`egress`) | per-group replication traffic |
+| `ecs_replication_group_chunks_pending_bytes` | `rg`, `kind` (`repo`/`journal`/`xor`) | backlog awaiting replication (`repo`, `journal`) or XOR (`xor`). The three pools are disjoint, so `sum without(kind)` is the total backlog |
 | `ecs_replication_group_rpo_timestamp_seconds` | `rg` | unix timestamp of the recovery point |
 | `ecs_replication_group_rpo_lag_seconds` | `rg` | RPO lag (new in OBS 4.1) |
 | `ecs_replication_group_zones` | `rg` | zone count of the group |
@@ -95,14 +107,23 @@ All with the `node` label (the node's display name).
 | --- | --- |
 | `ecs_node_healthy` | `1` when `healthStatus` is `Good` |
 | `ecs_node_health_state` (extra label `state`) | `1` for the node's current `healthStatus`; `state` is one of `good` / `suspect` / `bad` / `notaccessible` / `maintenance` (the five values the API documents), keeping e.g. bad vs maintenance distinguishable |
-| `ecs_node_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | per-node disk counts |
-| `ecs_node_disk_space_total_bytes` / `_free_bytes` / `_allocated_bytes` | per-node capacity |
+| `ecs_node_disks` (extra label `state`) | per-node disk count in each state (`good` / `bad` / `maintenance` / `ready_to_replace`) |
+| `ecs_node_disks_installed` | disks on the node, whatever their state |
+| `ecs_node_disk_space_bytes` (extra label `type`) | per-node capacity by `allocated` / `free` |
+| `ecs_node_disk_space_total_bytes` | per-node capacity total |
 | `ecs_node_cpu_utilization_percent` | CPU usage |
 | `ecs_node_memory_utilization_percent` / `ecs_node_memory_used_bytes` | memory usage |
-| `ecs_node_nic_received_bandwidth` / `_transmitted_bandwidth` / `_utilization_percent` | NIC stats (bandwidth unit as reported by the dashboard API) |
-| `ecs_node_transaction_read_latency_milliseconds` / `_write_…` | per-node latency |
-| `ecs_node_transaction_read_bandwidth_mb_per_second` / `_write_…` | per-node bandwidth |
-| `ecs_node_transactions_read_per_second` / `_write_…` | per-node TPS |
+| `ecs_node_nic_bandwidth` (extra label `direction`: `received` / `transmitted`) | NIC throughput (unit as reported by the dashboard API) |
+| `ecs_node_nic_utilization_percent` | NIC utilization |
+| `ecs_node_transaction_latency_milliseconds` (extra label `op`: `read` / `write`) | per-node latency |
+| `ecs_node_transaction_bandwidth_mb_per_second` (extra label `op`) | per-node bandwidth |
+| `ecs_node_transactions_per_second` (extra label `op`) | per-node TPS |
+
+!!! warning "Per-node capacity does not add up, by design"
+    The per-node payload publishes no reserved series, so
+    `sum(ecs_node_disk_space_bytes)` falls short of `ecs_node_disk_space_total_bytes`
+    by the node's reserve — 10% of the total on a live 4.3 cluster. Do not read the
+    difference as free space; `type="free"` is the free space.
 
 !!! note "Availability varies by cluster and version"
     `ecs_node_cpu_utilization_percent`, `ecs_node_memory_*`, `ecs_node_nic_*` and

@@ -37,4 +37,8 @@ make cli          # builds bin/obs_exporter
 
 - A management user with monitoring (read) rights on each cluster.
 - Network access from the exporter host to the cluster's management port (4443).
-- Only if you opt into `collectDT`: node-local ports 9101 and 9021 as well.
+- Only if you opt into `collectDT`: each node's object port (9021) on its
+  `data_ip`, and its DT stats port (9101) on its `mgmt_ip`. On the segmented
+  network layout Dell recommends for production, 9101 listens on a private
+  link-local VLAN and is **not** reachable from an external exporter — see the
+  [reachability warning](../metrics.md#node-dt-opt-in-collectdt-true).

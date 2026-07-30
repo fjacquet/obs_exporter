@@ -42,9 +42,10 @@ func TestLocalZoneLivePayloadShape(t *testing.T) {
 	// name twice and drop another while keeping the total intact.
 	wantNames := map[string][]string{
 		"gc": {
-			"ecs_cluster_gc_pending_bytes", "ecs_cluster_gc_pending_bytes",
+			// Two scopes × {pending, unreclaimable} under one name.
+			"ecs_cluster_gc_bytes", "ecs_cluster_gc_bytes",
+			"ecs_cluster_gc_bytes", "ecs_cluster_gc_bytes",
 			"ecs_cluster_gc_reclaimed_bytes_total", "ecs_cluster_gc_reclaimed_bytes_total",
-			"ecs_cluster_gc_unreclaimable_bytes", "ecs_cluster_gc_unreclaimable_bytes",
 			"ecs_cluster_gc_detected_bytes_total", "ecs_cluster_gc_detected_bytes_total",
 			"ecs_cluster_gc_enabled", "ecs_cluster_gc_enabled",
 		},
@@ -96,9 +97,8 @@ func TestLocalZoneLivePayloadShape(t *testing.T) {
 	// Every emitted series must carry the label keys its metric name declares,
 	// or the Prometheus collector drops it at scrape time (ADR-0006).
 	wantKeys := map[string][]string{
-		"ecs_cluster_gc_pending_bytes":                     {"scope"},
+		"ecs_cluster_gc_bytes":                             {"scope", "state"},
 		"ecs_cluster_gc_reclaimed_bytes_total":             {"scope"},
-		"ecs_cluster_gc_unreclaimable_bytes":               {"scope"},
 		"ecs_cluster_gc_detected_bytes_total":              {"scope"},
 		"ecs_cluster_gc_enabled":                           {"scope"},
 		"ecs_cluster_disk_space_allocated_component_bytes": {"purpose"},

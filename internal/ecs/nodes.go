@@ -61,15 +61,15 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	if err := c.Get(ctx, pathLocalZoneNodes, &r); err != nil {
 		return nil, err
 	}
-	warnUnknownHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.KeySeen)
+	warnHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.Shape())
 	var out []Sample
 	for _, n := range r.Embedded.Instances {
-		nodeLabel := []Label{{Key: "node", Value: n.DisplayName}}
+		node := Label{Key: "node", Value: n.DisplayName}
 		healthy := 0.0
 		if strings.EqualFold(n.HealthStatus, "good") {
 			healthy = 1
 		}
-		out = append(out, Sample{Name: "ecs_node_healthy", Labels: nodeLabel, Value: healthy})
+		out = append(out, Sample{Name: "ecs_node_healthy", Labels: []Label{node}, Value: healthy})
 
 		// Enum/state pattern: expose the raw health state as a label so bad and
 		// maintenance stay distinguishable (the boolean above collapses them).
@@ -77,39 +77,45 @@ func (Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 		// state series on the next cycle without manual bookkeeping.
 		if n.HealthStatus != "" {
 			out = append(out, Sample{
-				Name: "ecs_node_health_state",
-				Labels: []Label{
-					{Key: "node", Value: n.DisplayName},
-					{Key: "state", Value: strings.ToLower(n.HealthStatus)},
-				},
-				Value: 1,
+				Name:   "ecs_node_health_state",
+				Labels: []Label{node, {Key: "state", Value: strings.ToLower(n.HealthStatus)}},
+				Value:  1,
 			})
 		}
 
-		out = appendNum(out, "ecs_node_disks", n.NumDisks, nodeLabel...)
-		out = appendNum(out, "ecs_node_good_disks", n.NumGoodDisks, nodeLabel...)
-		out = appendNum(out, "ecs_node_bad_disks", n.NumBadDisks, nodeLabel...)
-		out = appendNum(out, "ecs_node_maintenance_disks", n.NumMaintenanceDisks, nodeLabel...)
-		out = appendNum(out, "ecs_node_ready_to_replace_disks", n.NumReadyToReplaceDisks, nodeLabel...)
+		// Same split as the cluster counts: the per-state counts share a name, the
+		// installed total keeps its own because the states are not a proven
+		// partition of it (ADR-0012).
+		out = appendNum(out, "ecs_node_disks_installed", n.NumDisks, node)
+		out = appendNum(out, "ecs_node_disks", n.NumGoodDisks, node, Label{"state", "good"})
+		out = appendNum(out, "ecs_node_disks", n.NumBadDisks, node, Label{"state", "bad"})
+		out = appendNum(out, "ecs_node_disks", n.NumMaintenanceDisks, node, Label{"state", "maintenance"})
+		out = appendNum(out, "ecs_node_disks", n.NumReadyToReplaceDisks, node, Label{"state", "ready_to_replace"})
 
-		out = appendSeries(out, "ecs_node_disk_space_total_bytes", n.DiskSpaceTotal, nodeLabel...)
-		out = appendSeries(out, "ecs_node_disk_space_free_bytes", n.DiskSpaceFree, nodeLabel...)
-		out = appendSeries(out, "ecs_node_disk_space_allocated_bytes", n.DiskSpaceAllocated, nodeLabel...)
+		// Unlike the cluster payload, the per-node one publishes no reserved
+		// series, so allocated + free falls short of the total by the reserve (10%
+		// of total on a live 4.3 cluster). The total therefore keeps its own name
+		// AND the labeled family is knowingly incomplete — documented in
+		// docs/metrics.md so nobody reads the difference as free space.
+		out = appendSeries(out, "ecs_node_disk_space_total_bytes", n.DiskSpaceTotal, node)
+		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceAllocated, node, Label{"type", "allocated"})
+		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceFree, node, Label{"type", "free"})
 
-		out = appendSeries(out, "ecs_node_cpu_utilization_percent", n.NodeCPUUtilization, nodeLabel...)
-		out = appendSeries(out, "ecs_node_memory_utilization_percent", n.NodeMemoryUtilization, nodeLabel...)
-		out = appendSeries(out, "ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes, nodeLabel...)
+		out = appendSeries(out, "ecs_node_cpu_utilization_percent", n.NodeCPUUtilization, node)
+		out = appendSeries(out, "ecs_node_memory_utilization_percent", n.NodeMemoryUtilization, node)
+		out = appendSeries(out, "ecs_node_memory_used_bytes", n.NodeMemoryUtilizationBytes, node)
 
-		out = appendSeries(out, "ecs_node_nic_received_bandwidth", n.NodeNicReceivedBandwidth, nodeLabel...)
-		out = appendSeries(out, "ecs_node_nic_transmitted_bandwidth", n.NodeNicTransmittedBandwidth, nodeLabel...)
-		out = appendSeries(out, "ecs_node_nic_utilization_percent", n.NodeNicUtilization, nodeLabel...)
+		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicReceivedBandwidth, node, Label{"direction", "received"})
+		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicTransmittedBandwidth, node, Label{"direction", "transmitted"})
+		out = appendSeries(out, "ecs_node_nic_utilization_percent", n.NodeNicUtilization, node)
 
-		out = appendSeries(out, "ecs_node_transaction_read_latency_milliseconds", n.TransactionReadLatency, nodeLabel...)
-		out = appendSeries(out, "ecs_node_transaction_write_latency_milliseconds", n.TransactionWriteLatency, nodeLabel...)
-		out = appendSeries(out, "ecs_node_transaction_read_bandwidth_mb_per_second", n.TransactionReadBandwidth, nodeLabel...)
-		out = appendSeries(out, "ecs_node_transaction_write_bandwidth_mb_per_second", n.TransactionWriteBandwidth, nodeLabel...)
-		out = appendSeries(out, "ecs_node_transactions_read_per_second", n.TransactionReadTransactionsPerSec, nodeLabel...)
-		out = appendSeries(out, "ecs_node_transactions_write_per_second", n.TransactionWriteTransactionsPerSec, nodeLabel...)
+		read, write := Label{"op", "read"}, Label{"op", "write"}
+		out = appendSeries(out, "ecs_node_transaction_latency_milliseconds", n.TransactionReadLatency, node, read)
+		out = appendSeries(out, "ecs_node_transaction_latency_milliseconds", n.TransactionWriteLatency, node, write)
+		out = appendSeries(out, "ecs_node_transaction_bandwidth_mb_per_second", n.TransactionReadBandwidth, node, read)
+		out = appendSeries(out, "ecs_node_transaction_bandwidth_mb_per_second", n.TransactionWriteBandwidth, node, write)
+		out = appendSeries(out, "ecs_node_transactions_per_second", n.TransactionReadTransactionsPerSec, node, read)
+		out = appendSeries(out, "ecs_node_transactions_per_second", n.TransactionWriteTransactionsPerSec, node, write)
 	}
 	return out, nil
 }
