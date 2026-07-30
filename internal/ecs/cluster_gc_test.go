@@ -76,7 +76,7 @@ func TestGCFieldsSamplesUnparseableValue(t *testing.T) {
 	}
 	got := g.samples()
 	user := Label{"scope", "user"}
-	if _, ok := findSample(got, "ecs_cluster_gc_pending_bytes", user); ok {
+	if _, ok := findSample(got, "ecs_cluster_gc_bytes", user, Label{"state", "pending"}); ok {
 		t.Error("an unparseable value must yield an absent sample, not zero")
 	}
 	// The rest of the family still emits.

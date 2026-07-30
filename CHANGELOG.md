@@ -42,30 +42,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The consolidation moves series between names; it does not add or drop any. A
   full `--once --debug` cycle against the reference payload still emits exactly
   127 samples, the same count as 2.8.1.
-
-### Added
-- ADR-0012 records the consolidation rule and the **sum-safety rule** that bounds
-  it — a whole and its parts never share a metric name — with the identities that
-  forced three exceptions, each verified on a live 4.3 payload:
-  `disk_space_total = allocated + free + reserved` (delta 0),
-  `gc_detected = pending + unreclaimable + reclaimed` (delta 0 on both scopes),
-  and `ec_coded ⊂ ec_applicable`. So `disk_space_total_bytes`, the two GC
-  counters, and the `ec_applicable`/`ec_coded` pair keep separate names —
-  the last being the one item of the proposal that was declined.
-- `docs/migration-v3.md`: full rename table, the two meaning changes called out
-  first, query-rewrite patterns, and the aggregations the consolidation makes
-  possible (`topk` across states, `state!="good"`, `sum without(kind)`).
-
-### Fixed
-- The opt-in DT collector scraped both of its node-local ports at the node's
-  `mgmt_ip`. The object port (9021) answers on the **data** network, so on any
-  cluster that separates management from data traffic — the layout Dell
-  recommends for production, and the one a 4.3 site confirmed with `ss` and
-  `curl` — every `ecs_node_active_connections` scrape silently failed. The ping
-  now targets `data_ip` from `/vdc/nodes`, falling back to `mgmt_ip` when the
-  inventory publishes no data address; DT stats keep using `mgmt_ip`.
-
-### Changed
 - **DT node labels now match the other collectors.** `ecs_node_dt_*` and
   `ecs_node_active_connections` were labeled `node="<management IP>"` while every
   other per-node metric used the dashboard's `displayName`, so the two sets could
@@ -80,6 +56,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `--once --debug` output stays diffable between cycles.
 
 ### Added
+- ADR-0012 records the consolidation rule and the **sum-safety rule** that bounds
+  it — a whole and its parts never share a metric name — with the identities that
+  forced three exceptions, each verified on a live 4.3 payload:
+  `disk_space_total = allocated + free + reserved` (delta 0),
+  `gc_detected = pending + unreclaimable + reclaimed` (delta 0 on both scopes),
+  and `ec_coded ⊂ ec_applicable`. So `disk_space_total_bytes`, the two GC
+  counters, and the `ec_applicable`/`ec_coded` pair keep separate names —
+  the last being the one item of the proposal that was declined.
+- `docs/migration-v3.md`: full rename table, the three meaning changes called out
+  first, query-rewrite patterns, and the aggregations the consolidation makes
+  possible (`topk` across states, `state!="good"`, `sum without(kind)`).
 - `collectQuotas` (per cluster, default `true`) disables the per-namespace quota
   fetch while keeping the rest of metering. The management API has no bulk quota
   endpoint, so quotas are the only part of a collection cycle that scales with
@@ -91,6 +78,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   other array is no longer silent. Never observed in the field — from ECS 3.8 to
   ObjectScale 4.3 only `_instances` has been seen — but it was the one remaining
   way this decoder could drop data without saying so.
+
+### Fixed
+- The opt-in DT collector scraped both of its node-local ports at the node's
+  `mgmt_ip`. The object port (9021) answers on the **data** network, so on any
+  cluster that separates management from data traffic — the layout Dell
+  recommends for production, and the one a 4.3 site confirmed with `ss` and
+  `curl` — every `ecs_node_active_connections` scrape silently failed. The ping
+  now targets `data_ip` from `/vdc/nodes`, falling back to `mgmt_ip` when the
+  inventory publishes no data address; DT stats keep using `mgmt_ip`.
 
 ### Documentation
 - ADR-0011 accepts an **opt-in Flux collector** as the direction for the metrics

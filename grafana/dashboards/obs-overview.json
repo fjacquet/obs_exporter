@@ -451,7 +451,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * (1 - ecs_cluster_disk_space_bytes{type=\"free\",cluster=~\"$cluster\"} / ecs_cluster_disk_space_total_bytes{cluster=~\"$cluster\"})",
+          "expr": "100 * (1 - ecs_cluster_disk_space_bytes{type=\"free\",cluster=~\"$cluster\"} / on(cluster) ecs_cluster_disk_space_total_bytes{cluster=~\"$cluster\"})",
           "legendFormat": "{{cluster}}",
           "refId": "A"
         }

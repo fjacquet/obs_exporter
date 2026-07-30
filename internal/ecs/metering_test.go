@@ -40,7 +40,15 @@ func TestMeteringCollect(t *testing.T) {
 // Quotas are fetched concurrently; the emitted order must still follow the
 // namespace inventory so --once --debug output is stable between cycles.
 func TestMeteringQuotaOrderFollowsInventory(t *testing.T) {
-	samples, err := Metering{Quotas: true}.Collect(context.Background(), mockClient(t))
+	// The shipped swift fixture has both quotas unset, which would leave only s3
+	// contributing samples — and a single contributing namespace cannot tell
+	// inventory order from completion order. Give swift a quota so the assertion
+	// can actually fail if the ordering regresses.
+	c := mockClient(t)
+	c.Responses[pathNamespaces+"/namespace/swift/quota"] =
+		`{"namespace":"swift","blockSize":20,"notificationSize":16}`
+
+	samples, err := Metering{Quotas: true}.Collect(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +58,9 @@ func TestMeteringQuotaOrderFollowsInventory(t *testing.T) {
 			quotaNamespaces = append(quotaNamespaces, s.LabelValue("namespace"))
 		}
 	}
-	// namespaces.json lists s3 before swift, and swift's quotas are both unset.
-	if want := []string{"s3", "s3"}; !slices.Equal(quotaNamespaces, want) {
+	// namespaces.json lists s3 before swift; each contributes a hard and a soft
+	// quota sample, and the pair stays with its namespace.
+	if want := []string{"s3", "s3", "swift", "swift"}; !slices.Equal(quotaNamespaces, want) {
 		t.Errorf("quota namespaces = %v, want %v", quotaNamespaces, want)
 	}
 }

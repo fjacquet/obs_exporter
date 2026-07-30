@@ -44,8 +44,17 @@ proposed consolidations had exactly that shape, which we could check because a
 
 **Consolidate a set of metric names into one name plus a label when, and only
 when, the series are the same measurement in the same unit and of the same type
-(gauge vs counter), differing only along one dimension — and the values are
-mutually exclusive, so summing the family is meaningful.**
+(gauge vs counter), differing only along one dimension — and no member of the
+family is an aggregate of the others.**
+
+The second clause is about double-counting, not about `sum()` being the right
+operator. Whether summing a family means anything stays metric-specific:
+`sum` over `ecs_cluster_disks{state}` is a disk count, while `sum` over
+`ecs_cluster_transaction_latency_milliseconds{op}` is nonsense and `avg` is what
+you want — that is a property of latency, not a reason to keep `read` and
+`write` under separate names. What consolidation must never do is put a total
+and its components under one name, because then even the *correct* operator
+gives a wrong answer and nothing warns you.
 
 Applied to this repo, that yields (full old→new table in
 [Migrating to v3](../migration-v3.md)):

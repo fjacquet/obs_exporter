@@ -45,8 +45,10 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
     ECS documents five node health states and publishes a count for only three
     (`good`, `bad`, `maintenance`), so a node that is `suspect` or `notaccessible`
     appears in `ecs_cluster_nodes_installed` and in **no** `ecs_cluster_nodes`
-    series. `ecs_cluster_nodes_installed - sum(ecs_cluster_nodes)` is therefore a
-    useful "unaccounted-for nodes" alert, not a bug. The same holds for disks.
+    series. `ecs_cluster_nodes_installed - sum by (cluster) (ecs_cluster_nodes)`
+    is therefore a useful "unaccounted-for nodes" alert, not a bug — keep the
+    `by (cluster)`, since a bare `sum()` drops the label the subtraction matches
+    on and yields an empty result. The same holds for disks.
     This is also why the totals are separate metric names: folding them in as
     another `state` would make `sum()` double-count.
 
@@ -121,9 +123,11 @@ All with the `node` label (the node's display name).
 
 !!! warning "Per-node capacity does not add up, by design"
     The per-node payload publishes no reserved series, so
-    `sum(ecs_node_disk_space_bytes)` falls short of `ecs_node_disk_space_total_bytes`
-    by the node's reserve — 10% of the total on a live 4.3 cluster. Do not read the
-    difference as free space; `type="free"` is the free space.
+    `sum by (cluster, node) (ecs_node_disk_space_bytes)` falls short of
+    `ecs_node_disk_space_total_bytes` by the node's reserve — 10% of the total on
+    a live 4.3 cluster. Keep the `by (cluster, node)`: a bare `sum()` collapses
+    every node into one figure and no longer lines up with the per-node total. Do
+    not read the difference as free space; `type="free"` is the free space.
 
 !!! note "Availability varies by cluster and version"
     `ecs_node_cpu_utilization_percent`, `ecs_node_memory_*`, `ecs_node_nic_*` and

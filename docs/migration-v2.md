@@ -33,7 +33,7 @@ today has one hop to make rather than two. If you are coming from v2 instead, us
 | --- | --- |
 | `emcecs_collection_success` | `ecs_up{cluster}` |
 | `emcecs_collector_build_info` | `obs_exporter_build_info` |
-| `emcecs_request_errors_total` | removed — use `ecs_collector_up{collector}` |
+| `emcecs_request_errors_total` | removed, no equivalent — nothing counts request errors cumulatively. `ecs_collector_up{cluster,collector}` is a current-state health signal, not a counter |
 | `emcecs_cluster_version` | `ecs_cluster_info{version}` |
 | `emcecs_cluster_alerts_critical` / `_error` / `_info` / `_warning` | `ecs_cluster_alerts_unacknowledged{severity="…"}` |
 | `emcecs_cluster_good_nodes` / `_bad_nodes` | `ecs_cluster_nodes{state="good"}` / `{state="bad"}` (+ `maintenance`, and the total `ecs_cluster_nodes_installed`) |
@@ -46,9 +46,9 @@ today has one hop to make rather than two. If you are coming from v2 instead, us
 | `emcecs_cluster_transaction_error_detail{errorcode,errorproto,category}` | `ecs_cluster_transaction_errors{code,protocol,category}` |
 | `emcecs_cluster_transaction_success` | `ecs_cluster_transactions_total{outcome="success"}` |
 | `emcecs_cluster_replication_ingress_traffic` / `_egress_traffic` | `ecs_cluster_replication_traffic{direction="ingress"}` / `{direction="egress"}`, plus per-group `ecs_replication_group_traffic{rg,direction}` |
-| `emcecs_cluster_data_replication_pending` | `ecs_replication_group_chunks_pending_bytes{rg,kind="repo"}` |
-| `emcecs_cluster_journal_replication_pending` | `ecs_replication_group_chunks_pending_bytes{rg,kind="journal"}` |
-| `emcecs_cluster_chunks_pending_xor` | `ecs_replication_group_chunks_pending_bytes{rg,kind="xor"}` |
+| `emcecs_cluster_data_replication_pending` | `sum without(rg) (ecs_replication_group_chunks_pending_bytes{kind="repo"})` — the v3 series is per group, so the sum is what reproduces the v1 cluster-level figure |
+| `emcecs_cluster_journal_replication_pending` | `sum without(rg) (ecs_replication_group_chunks_pending_bytes{kind="journal"})` |
+| `emcecs_cluster_chunks_pending_xor` | `sum without(rg) (ecs_replication_group_chunks_pending_bytes{kind="xor"})` |
 | `emcecs_cluster_last_replication_timestamp` | `ecs_replication_group_rpo_timestamp_seconds{rg}` |
 | `emcecs_metering_namespacequota{ecsnamespace,type}` | `ecs_namespace_quota_hard_bytes{namespace}` / `_soft_bytes` (bytes, not KB) |
 | `emcecs_metering_namespace_object_count{ecsnamespace}` | `ecs_namespace_objects{namespace}` (+ new `ecs_namespace_used_bytes`, MPU stats) |

@@ -10,7 +10,7 @@ same absent-never-zero behaviour. The bundled Grafana dashboards are updated in
 the same release — if you run them from this repo, pull them together with the
 binary.
 
-## Read this first: two metrics changed meaning
+## Read this first: three metrics changed meaning
 
 These two names still exist and still return data. A query against them keeps
 working and starts answering a different question, so a search-and-replace for
@@ -124,13 +124,15 @@ ecs_cluster_disks{cluster=~"$cluster"}
 ```
 
 The bundled dashboards keep one query per series for now, so the migration is a
-pure rename there; collapsing panels is an improvement you can make afterwards.
+pure rename there; collapsing panels is an improvement you can make afterward.
 
 ## What you can now do that you could not
 
 ```promql
-# worst-off state per cluster, previously four separate queries
-topk(1, ecs_cluster_disks{cluster=~"$cluster"})
+# worst-off state per cluster, previously four separate queries.
+# The by (cluster) is required: bare topk(1, …) ranks across every cluster at
+# once and returns a single series, not one per cluster.
+topk by (cluster) (1, ecs_cluster_disks{cluster=~"$cluster"})
 
 # every non-good disk, including states ECS may add later
 sum by (cluster) (ecs_cluster_disks{state!="good"})
@@ -150,6 +152,10 @@ Run one cycle and diff the emitted names against this page:
 obs_exporter --config /etc/obs_exporter/config.yaml --once --debug | sort
 ```
 
-Every name in the v3 column should appear (subject to what your cluster
-populates — see the availability notes in [Metrics](metrics.md)); no name in the
-v2 column should.
+Every name in the v3 column should appear, subject to what your cluster
+populates — see the availability notes in [Metrics](metrics.md).
+
+No name in the v2 column should appear **except the three retained above**:
+`ecs_cluster_nodes`, `ecs_cluster_disks` and `ecs_node_disks` are still emitted,
+now carrying a `state` label. Seeing them is expected; seeing them *without* a
+`state` label means you are still running a v2 binary.
