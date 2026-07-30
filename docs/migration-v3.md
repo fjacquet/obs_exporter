@@ -12,7 +12,7 @@ binary.
 
 ## Read this first: three metrics changed meaning
 
-These two names still exist and still return data. A query against them keeps
+These three names still exist and still return data. A query against them keeps
 working and starts answering a different question, so a search-and-replace for
 removed names will not find them.
 
@@ -55,6 +55,7 @@ per-state series and will fire wrongly. Point it at `_installed`.
 | `ecs_cluster_replication_egress_traffic` | `ecs_cluster_replication_traffic{direction="egress"}` |
 | `ecs_cluster_gc_pending_bytes` | `ecs_cluster_gc_bytes{state="pending"}` |
 | `ecs_cluster_gc_unreclaimable_bytes` | `ecs_cluster_gc_bytes{state="unreclaimable"}` |
+| `ecs_cluster_disk_space_allocated_component_bytes{purpose=…}` | same name, label key renamed to `type` |
 
 `ecs_cluster_disk_space_total_bytes`, `_offline_total_bytes`,
 `ecs_cluster_gc_reclaimed_bytes_total`, `_detected_bytes_total`,
@@ -82,11 +83,25 @@ the `ec_*` and `recovery_*` families, and everything under `ecs_namespace_*` are
 | `ecs_node_transactions_read_per_second` | `ecs_node_transactions_per_second{op="read"}` |
 | `ecs_node_transactions_write_per_second` | `ecs_node_transactions_per_second{op="write"}` |
 
+### Node-local scrapes (opt-in `collectDT`)
+
+| v2 | v3 |
+| --- | --- |
+| `ecs_node_dt_up` | `ecs_node_scrape_up{endpoint="dt"}` |
+| *(no equivalent — the object-port ping had no up-signal)* | `ecs_node_scrape_up{endpoint="object"}` |
+
+The two node-local ports answer on different networks, so one up-metric could
+not describe both. On a segmented cluster you will now see
+`ecs_node_scrape_up{endpoint="dt"}=0` alongside `{endpoint="object"}=1` — that
+is the topology being reported accurately, not a new failure.
+
 `ecs_node_healthy`, `ecs_node_health_state{state}`,
 `ecs_node_disk_space_total_bytes`, `ecs_node_cpu_utilization_percent`,
-`ecs_node_memory_*`, `ecs_node_nic_utilization_percent` and the opt-in
-`ecs_node_dt_*` family are **unchanged** — but see the v3 changelog for the DT
-collector's `node` label, which changes value from an IP to the node name.
+`ecs_node_memory_*`, `ecs_node_nic_utilization_percent`, the opt-in
+`ecs_node_dt_total` / `_unready` / `_unknown` counts and
+`ecs_node_active_connections` are **unchanged** in name — but the DT collector's
+`node` label changes value from an IP to the node name, so those series will not
+line up with v2 history.
 
 ### Replication groups
 
@@ -94,9 +109,9 @@ collector's `node` label, which changes value from an IP to the node name.
 | --- | --- |
 | `ecs_replication_group_ingress_traffic` | `ecs_replication_group_traffic{direction="ingress"}` |
 | `ecs_replication_group_egress_traffic` | `ecs_replication_group_traffic{direction="egress"}` |
-| `ecs_replication_group_chunks_repo_pending_replication_bytes` | `ecs_replication_group_chunks_pending_bytes{kind="repo"}` |
-| `ecs_replication_group_chunks_journal_pending_replication_bytes` | `ecs_replication_group_chunks_pending_bytes{kind="journal"}` |
-| `ecs_replication_group_chunks_pending_xor_bytes` | `ecs_replication_group_chunks_pending_bytes{kind="xor"}` |
+| `ecs_replication_group_chunks_repo_pending_replication_bytes` | `ecs_replication_group_chunks_pending_bytes{type="repo"}` |
+| `ecs_replication_group_chunks_journal_pending_replication_bytes` | `ecs_replication_group_chunks_pending_bytes{type="journal"}` |
+| `ecs_replication_group_chunks_pending_xor_bytes` | `ecs_replication_group_chunks_pending_bytes{type="xor"}` |
 
 `ecs_replication_group_rpo_*` and `_zones` are **unchanged**.
 
@@ -141,7 +156,11 @@ sum by (cluster) (ecs_cluster_disks{state!="good"})
 ecs_cluster_nodes_installed - sum by (cluster) (ecs_cluster_nodes)
 
 # total replication backlog per group
-sum without (kind) (ecs_replication_group_chunks_pending_bytes)
+sum without (type) (ecs_replication_group_chunks_pending_bytes)
+
+# one clause across every "which partition of these bytes" family, which three
+# different label keys used to prevent
+sum by (type) ({__name__=~"ecs_.*_bytes", type!=""})
 ```
 
 ## Sanity check after upgrading

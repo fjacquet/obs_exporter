@@ -81,7 +81,7 @@ func NewDT(cl config.Cluster) *DT {
 func (*DT) Name() string { return "dt" }
 
 // Collect lists the cluster's nodes and scrapes each node's DT stats and active
-// connections in parallel. A node failure degrades to ecs_node_dt_up=0 for that
+// connections in parallel. A node failure degrades to ecs_node_scrape_up=0 for that
 // node only.
 func (d *DT) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 	var inv vdcNodesResp
@@ -119,33 +119,52 @@ func (d *DT) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) 
 	return out, nil
 }
 
+// scrapeUp is the per-endpoint reachability metric. The two node-local ports sit
+// on different networks, so one up-signal cannot describe both: on the segmented
+// layout the DT port is unreachable while the object port answers normally, and
+// nothing would report the reverse. One name plus {endpoint} makes each failure
+// visible on its own and leaves room for a third port without a new metric name
+// (ADR-0012).
+const scrapeUp = "ecs_node_scrape_up"
+
 func (d *DT) collectNode(ctx context.Context, cluster string, n dtNode) []Sample {
-	nodeLabel := []Label{{Key: "node", Value: n.label}}
-	up := 1.0
+	node := Label{Key: "node", Value: n.label}
 
+	var out []Sample
 	var dt dtStatResp
-	if err := d.fetchXML(ctx, d.dtURL(n.mgmtIP), &dt); err != nil {
-		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.mgmtIP, "err": err}).
+	dtErr := d.fetchXML(ctx, d.dtURL(n.mgmtIP), &dt)
+	if dtErr != nil {
+		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.mgmtIP, "err": dtErr}).
 			Debug("DT stats scrape failed")
-		up = 0
 	}
-
-	out := []Sample{{Name: "ecs_node_dt_up", Labels: nodeLabel, Value: up}}
-	if up == 1 {
+	out = append(out, Sample{Name: scrapeUp, Labels: []Label{node, {Key: "endpoint", Value: "dt"}}, Value: upValue(dtErr)})
+	if dtErr == nil {
 		out = append(out,
-			Sample{Name: "ecs_node_dt_total", Labels: nodeLabel, Value: dt.TotalDT},
-			Sample{Name: "ecs_node_dt_unready", Labels: nodeLabel, Value: dt.UnreadyDT},
-			Sample{Name: "ecs_node_dt_unknown", Labels: nodeLabel, Value: dt.UnknownDT},
+			Sample{Name: "ecs_node_dt_total", Labels: []Label{node}, Value: dt.TotalDT},
+			Sample{Name: "ecs_node_dt_unready", Labels: []Label{node}, Value: dt.UnreadyDT},
+			Sample{Name: "ecs_node_dt_unknown", Labels: []Label{node}, Value: dt.UnknownDT},
 		)
 	}
 
 	var ping pingResp
-	if err := d.fetchXML(ctx, d.pingURL(n.dataIP), &ping); err != nil {
-		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.dataIP, "err": err}).
+	pingErr := d.fetchXML(ctx, d.pingURL(n.dataIP), &ping)
+	if pingErr != nil {
+		log.WithFields(log.Fields{"cluster": cluster, "node": n.label, "host": n.dataIP, "err": pingErr}).
 			Debug("ping scrape failed")
-		return out
 	}
-	return append(out, Sample{Name: "ecs_node_active_connections", Labels: nodeLabel, Value: ping.Value})
+	out = append(out, Sample{Name: scrapeUp, Labels: []Label{node, {Key: "endpoint", Value: "object"}}, Value: upValue(pingErr)})
+	if pingErr == nil {
+		out = append(out, Sample{Name: "ecs_node_active_connections", Labels: []Label{node}, Value: ping.Value})
+	}
+	return out
+}
+
+// upValue maps a scrape outcome onto the 1/0 an up-metric carries.
+func upValue(err error) float64 {
+	if err != nil {
+		return 0
+	}
+	return 1
 }
 
 func (d *DT) fetchXML(ctx context.Context, url string, out any) error {

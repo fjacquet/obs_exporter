@@ -17,7 +17,7 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 | --- | --- | --- |
 | `obs_exporter_build_info` | `version`, `goversion` | constant `1`, build identity |
 | `ecs_up` | `cluster` | `1` when the last cycle produced domain samples for the cluster |
-| `ecs_collector_up` | `cluster`, `collector` | per-collector success (`cluster`, `replication`, `nodes`, `info`, `metering`, `dt`) |
+| `ecs_collector_up` | `cluster`, `collector` | per-collector success (`cluster`, `replication`, `nodes`, `info`, `metering`, `quotas`, `dt`) |
 
 ## Cluster (VDC-wide)
 
@@ -66,14 +66,14 @@ additional API call.
 | `ecs_cluster_recovery_bad_chunks_bytes` | | corrupted chunk data still awaiting recovery. The cluster may report a long-stale computation here: on a real 4.3 cluster this field's timestamp was 55 days older than every other field in the same response |
 | `ecs_cluster_recovery_rate` | | recovery throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
 | `ecs_cluster_recovery_complete_time_estimate` | | estimated time to finish recovery (unit as reported by the dashboard API) |
-| `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding. Kept a separate name from the one below on purpose: coded is a *subset* of applicable, so one `ec_bytes{kind}` family would count the coded bytes twice under `sum()` |
+| `ecs_cluster_ec_applicable_bytes` | | sealed data eligible for erasure coding. Kept a separate name from the one below on purpose: coded is a *subset* of applicable, so one `ec_bytes{type}` family would count the coded bytes twice under `sum()` |
 | `ecs_cluster_ec_coded_bytes` | | sealed data already erasure-coded |
 | `ecs_cluster_ec_coded_ratio_percent` | | coded share of applicable data |
 | `ecs_cluster_ec_rate` | | erasure-coding throughput (unit as reported by the dashboard API). Already a rate — never wrap in `rate()` |
 | `ecs_cluster_ec_complete_time_estimate` | | estimated time to finish coding (unit as reported by the dashboard API) |
-| `ecs_cluster_disk_space_allocated_component_bytes` | `purpose` | allocated space broken down by what holds it |
+| `ecs_cluster_disk_space_allocated_component_bytes` | `type` | allocated space broken down by what holds it |
 
-`purpose` is one of `user_data`, `system_metadata`, `geo_cache`, `geo_copy`,
+`type` is one of `user_data`, `system_metadata`, `geo_cache`, `geo_copy`,
 `local_protection`.
 
 !!! warning "The allocation breakdown is not exhaustive"
@@ -96,7 +96,7 @@ additional API call.
 | Metric | Labels | Description |
 | --- | --- | --- |
 | `ecs_replication_group_traffic` | `rg`, `direction` (`ingress`/`egress`) | per-group replication traffic |
-| `ecs_replication_group_chunks_pending_bytes` | `rg`, `kind` (`repo`/`journal`/`xor`) | backlog awaiting replication (`repo`, `journal`) or XOR (`xor`). The three pools are disjoint, so `sum without(kind)` is the total backlog |
+| `ecs_replication_group_chunks_pending_bytes` | `rg`, `type` (`repo`/`journal`/`xor`) | backlog awaiting replication (`repo`, `journal`) or XOR (`xor`). The three pools are disjoint, so `sum without(type)` is the total backlog |
 | `ecs_replication_group_rpo_timestamp_seconds` | `rg` | unix timestamp of the recovery point |
 | `ecs_replication_group_rpo_lag_seconds` | `rg` | RPO lag (new in OBS 4.1) |
 | `ecs_replication_group_zones` | `rg` | zone count of the group |
@@ -137,7 +137,16 @@ All with the `node` label (the node's display name).
     simply not present in the response. Missing fields yield absent series, never
     zeros, so these metrics may not appear at all on your cluster.
 
-## Namespaces (metering, `collectMetering: true`)
+## Namespaces (`collectMetering: true`)
+
+Usage comes from the `metering` collector (one bulk billing POST, whatever the
+namespace count). Quota limits come from a separate `quotas` collector
+(`collectQuotas`, default on), because there is no bulk quota endpoint and it
+therefore costs one GET per namespace per cycle. They are separate collectors so
+that `ecs_collector_up{collector="quotas"}` tells you when quota reads are
+failing — otherwise a cluster whose quota reads are all denied would look
+exactly like one with `collectQuotas: false`.
+
 
 All with the `namespace` label.
 
@@ -162,13 +171,15 @@ inventory's `nodename`, so these series join with the [node metrics](#nodes-dash
     and a private fabric. On it the DT stats port (9101) listens on a private
     link-local VLAN (169.254.0.0/16), reachable only from the node itself or
     across the fabric — never from a routed network. An exporter running outside
-    the cluster therefore gets `ecs_node_dt_up=0` and no DT counts, while
-    `ecs_node_active_connections` still works over the data network. Covering
+    the cluster therefore gets `ecs_node_scrape_up{endpoint="dt"}=0` and no DT
+    counts, while `endpoint="object"` stays at 1 and
+    `ecs_node_active_connections` keeps working over the data network — which is
+    exactly why the two endpoints report separately. Covering
     those counts from outside the cluster needs a different source; see
     [ADR-0011](adr/0011-flux-collector-for-unreachable-metrics.md).
 
 | Metric | Description |
 | --- | --- |
-| `ecs_node_dt_up` | node-local DT stats scrape success (port 9101, `mgmt_ip`) |
-| `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts |
+| `ecs_node_scrape_up` (extra label `endpoint`: `dt` / `object`) | reachability of each node-local port, reported separately because they sit on different networks |
+| `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts (port 9101, `mgmt_ip`) |
 | `ecs_node_active_connections` | active connections (object-port ping, port 9021, `data_ip`) |

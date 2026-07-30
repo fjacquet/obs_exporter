@@ -64,13 +64,14 @@ func TestDTCollect(t *testing.T) {
 	// identifier the dashboard nodes collector emits as displayName — the two
 	// metric sets must join on {node=...}.
 	n1 := Label{"node", "supr01-r01"}
-	mustSample(t, samples, "ecs_node_dt_up", 1, n1)
+	mustSample(t, samples, "ecs_node_scrape_up", 1, n1, Label{"endpoint", "dt"})
+	mustSample(t, samples, "ecs_node_scrape_up", 1, n1, Label{"endpoint", "object"})
 	mustSample(t, samples, "ecs_node_dt_total", 128, n1)
 	mustSample(t, samples, "ecs_node_dt_unready", 2, n1)
 	mustSample(t, samples, "ecs_node_dt_unknown", 1, n1)
 	mustSample(t, samples, "ecs_node_active_connections", 42, n1)
 	// Both inventory nodes get scraped.
-	mustSample(t, samples, "ecs_node_dt_up", 1, Label{"node", "supr01-r02"})
+	mustSample(t, samples, "ecs_node_scrape_up", 1, Label{"node", "supr01-r02"}, Label{"endpoint", "dt"})
 
 	// The object port answers on the data network, the DT stats port on the
 	// management address: scraping both at mgmt_ip silently loses connections
@@ -137,7 +138,7 @@ func TestDTCollectLabelsByIPWithoutNodename(t *testing.T) {
 func TestDTCollectSkipsNodeWithoutAddress(t *testing.T) {
 	c := mockClient(t)
 	// A named node with no address at all cannot be scraped; emitting
-	// ecs_node_dt_up=0 for it would report a healthy node as down.
+	// a scrape_up=0 for it would report a healthy node as down.
 	c.Responses[pathVdcNodes] = `{"node":[{"nodename":"supr01-r01"}]}`
 
 	d := &DT{
@@ -170,7 +171,9 @@ func TestDTCollectNodeDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	n1 := Label{"node", "supr01-r01"}
-	mustSample(t, samples, "ecs_node_dt_up", 0, n1)
+	mustSample(t, samples, "ecs_node_scrape_up", 0, n1, Label{"endpoint", "dt"})
+	// The object port is a separate network and gets its own signal.
+	mustSample(t, samples, "ecs_node_scrape_up", 0, n1, Label{"endpoint", "object"})
 	if _, ok := findSample(samples, "ecs_node_dt_total", n1); ok {
 		t.Error("dt_total should be absent when the node scrape fails")
 	}

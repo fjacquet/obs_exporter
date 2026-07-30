@@ -26,8 +26,8 @@ clusters:
     password: "${OBS1_PASSWORD}"  # ${ENV_VAR} works in host, username, password, and insecureSkipVerify
     # passwordFile: /run/secrets/ecs01  # alternative to password
     insecureSkipVerify: false    # self-signed certs (dev/test only); also accepts ${OBS1_SKIP_CERTIFICATE}
-    collectMetering: true        # namespace quota + billing (default true)
-    collectQuotas: true          # per-namespace quota GETs inside metering (default true)
+    collectMetering: true        # namespace usage via bulk billing (default true)
+    collectQuotas: true          # per-namespace quota limits, own collector (default true)
     collectDT: false             # opt-in legacy node-local DT scraping
     # objPort: 9021              # only used by collectDT
     # dtPort: 9101               # only used by collectDT
@@ -101,17 +101,21 @@ keeping the running config. Changes to `server.*` need a restart.
 
 | Flag | Default | Effect |
 | --- | --- | --- |
-| `collectMetering` | `true` | namespace list + quota + bulk billing. Disable on very large clusters if the billing query is slow. |
-| `collectQuotas` | `true` | the per-namespace quota fetch inside metering. See below. |
+| `collectMetering` | `true` | namespace usage via one bulk billing POST. Disable on very large clusters if the billing query is slow; this also disables `quotas`. |
+| `collectQuotas` | `true` | the `quotas` collector (per-namespace quota limits). Requires `collectMetering`. See below. |
 | `collectDT` | `false` | legacy node-local DT/connection stats over ports 9101/9021 (undocumented ECS internals, v1 parity). See the [DT reachability warning](../metrics.md#node-dt-opt-in-collectdt-true). |
 
 ### Quotas on clusters with many namespaces
 
 Namespace **usage** costs one bulk billing POST per cycle regardless of namespace
 count. Namespace **quotas** are different: the management API has no bulk quota
-endpoint, so metering issues one `GET …/namespace/{ns}/quota` per namespace per
-cycle. Those requests run concurrently (8 in flight), which keeps a large cluster
-inside a normal collection interval, but they still hit the API.
+endpoint, so the `quotas` collector issues one `GET …/namespace/{ns}/quota` per
+namespace per cycle. Those requests run concurrently (8 in flight), which keeps a
+large cluster inside a normal collection interval, but they still hit the API.
+
+Quotas are their own collector rather than a flag inside metering so that
+`ecs_collector_up{collector="quotas"}` reports when the quota reads themselves
+are failing. The cost is one extra namespace listing per cycle.
 
 A cluster that sets no quotas gets nothing back for them — on a 55-namespace 4.3
 cluster, all 55 requests returned `blockSize: -1` and `notificationSize: -1`, and

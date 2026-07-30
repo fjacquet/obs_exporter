@@ -68,7 +68,12 @@ Applied to this repo, that yields (full old→new table in
   `ecs_replication_group_traffic{direction}`
 - `ecs_cluster_gc_bytes{scope,state}`
 - `ecs_node_nic_bandwidth{direction}`
-- `ecs_replication_group_chunks_pending_bytes{kind}`
+- `ecs_replication_group_chunks_pending_bytes{type}`
+- `ecs_node_scrape_up{endpoint}`, replacing `ecs_node_dt_up`. The DT collector
+  scrapes two ports that a segmented network puts on different addresses, so one
+  up-signal could not describe both: the object-port ping had no signal at all
+  and its failure showed only as an absent series. One name plus `{endpoint}`
+  makes each failure visible and leaves room for a third port.
 
 And the **sum-safety rule** that bounds it: *a whole and its parts never share a
 metric name.* Where a total exists, it keeps its own name:
@@ -88,6 +93,23 @@ metric name.* Where a total exists, it keeps its own name:
   family would double-count. Revisit only with a payload from a cluster mid-EC
   that proves otherwise.
 
+### One key per dimension
+
+A consolidation also has to pick a label *key*, and picking one per call site
+produced three keys for one semantic: `disk_space_bytes{type}`,
+`chunks_pending_bytes{kind}` and `disk_space_allocated_component_bytes{purpose}`
+all name disjoint partitions of a byte quantity. Query-side that is the cost that
+matters — an alert author asking "bytes by partition, any family" could not write
+one `by (…)` clause, and every dashboard variable had to hardcode which family
+used which key.
+
+**`type` is this exporter's key for "which partition of the quantity".** All
+three families carry it. The other keys in use name genuinely different
+dimensions and stay as they are: `state` (what condition a thing is in),
+`op` (read vs write), `direction` (ingress vs egress), `outcome`, `scope`,
+`severity`, `endpoint`. A new consolidation picks from this list or extends it
+deliberately, rather than inventing a synonym.
+
 Metrics that differ in unit, type, or measured quantity stay separate names:
 `ec_coded_ratio_percent` (%), `ec_rate` and `recovery_rate`, the
 `*_complete_time_estimate` pair (time), `recovery_bad_chunks_bytes` (single
@@ -100,19 +122,22 @@ count families.
 
 ## Consequences
 
-- **Breaking.** Roughly thirty metric names disappear or change meaning. Two
-  changes are meaning changes rather than renames and deserve the loudest
-  warning: `ecs_cluster_nodes` and `ecs_cluster_disks` still exist but no longer
-  mean the total — a dashboard querying them keeps working and starts showing
-  something else. `docs/migration-v3.md` leads with those two.
-- All six bundled Grafana dashboards were rewritten in the same change (47 query
-  references). A dashboard that lags the exporter shows empty panels, not wrong
-  numbers, except for the two meaning changes above.
+- **Breaking.** Roughly thirty metric names disappear or change meaning. Three
+  are meaning changes rather than renames and deserve the loudest warning:
+  `ecs_cluster_nodes`, `ecs_cluster_disks` and `ecs_node_disks` still exist but no
+  longer mean the total — a dashboard querying them keeps working and starts
+  showing something else. `docs/migration-v3.md` leads with those three.
+- All six bundled Grafana dashboards were rewritten in the same change. A
+  dashboard that lags the exporter shows empty panels, not wrong numbers, except
+  for the three meaning changes above.
 - `_installed` counts are deliberately **not** the sum of the state series: ECS
   documents five node health states and publishes counts for three, so
   `installed - sum(by_state)` is a legitimate "unaccounted for" signal.
 - Adding a state, type or direction is now a new series, not a new metric name, a
   docs row and a dashboard edit.
+- Quotas became their own collector in the same release, which is not a naming
+  change but follows the same reasoning: an optional collection needs its own
+  `ecs_collector_up` or its failure is indistinguishable from being switched off.
 - The label-key invariant test (ADR-0006) covers the consolidated families
   unchanged: one name, one ordered label-key set, still enforced.
 

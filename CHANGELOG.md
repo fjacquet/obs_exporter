@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   - GC — `gc_pending_bytes` and `gc_unreclaimable_bytes` →
     `ecs_cluster_gc_bytes{scope,state}`
   - NIC — `nic_{received,transmitted}_bandwidth` → `ecs_node_nic_bandwidth{direction}`
+  - node-local scrapes — `ecs_node_dt_up` → `ecs_node_scrape_up{endpoint}`
+- **One label key per dimension.** `kind` and `purpose` both named the same
+  "which partition of these bytes" semantic as `type`, chosen independently at
+  each call site, so no query could group across the families. `type` is now the
+  one key: `ecs_replication_group_chunks_pending_bytes{kind}` →`{type}` and
+  `ecs_cluster_disk_space_allocated_component_bytes{purpose}` → `{type}`. The
+  metric names are unchanged; the label key is not. ADR-0012 records the key
+  vocabulary so the next consolidation picks from it instead of inventing a
+  synonym.
 
 ### Changed — BREAKING
 - **`ecs_cluster_nodes`, `ecs_cluster_disks` and `ecs_node_disks` changed
@@ -56,6 +65,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `--once --debug` output stays diffable between cycles.
 
 ### Added
+- **`ecs_node_scrape_up{node,endpoint="dt"|"object"}`** replaces
+  `ecs_node_dt_up`. The DT collector scrapes two node-local ports that a
+  segmented network puts on different addresses, so one up-signal could not
+  describe both — and the object-port ping had **no** signal at all: its failure
+  showed only as an absent `ecs_node_active_connections`. Each endpoint now
+  reports its own reachability. On the recommended production layout you will see
+  `{endpoint="dt"}=0` beside `{endpoint="object"}=1`, which is the topology being
+  reported accurately rather than a new failure.
+- **A `quotas` collector**, split out of `metering`, so
+  `ecs_collector_up{collector="quotas"}` exists. Quota reads previously failed
+  silently inside metering: a cluster whose every quota GET was denied looked
+  identical to one with `collectQuotas: false` — no samples either way, metering
+  still reporting up. `collectQuotas` (default `true`, requires
+  `collectMetering`) now gates the collector. The split costs one extra namespace
+  listing per cycle and gives up the overlap between the quota fan-out and the
+  billing POST, since collectors run in sequence within a cluster; both are small
+  against the per-namespace GETs they guard.
 - ADR-0012 records the consolidation rule and the **sum-safety rule** that bounds
   it — a whole and its parts never share a metric name — with the identities that
   forced three exceptions, each verified on a live 4.3 payload:

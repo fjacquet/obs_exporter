@@ -332,7 +332,7 @@
             "uid": "prometheus"
           },
           "expr": "ecs_cluster_disk_space_allocated_component_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{purpose}} {{cluster}}",
+          "legendFormat": "{{type}} {{cluster}}",
           "refId": "A"
         }
       ]

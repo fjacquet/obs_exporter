@@ -216,7 +216,7 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "DT scrape up",
+      "title": "Node-local scrape up (DT + object port)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -240,8 +240,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_dt_up{cluster=~\"$cluster\",node=~\"$node\"}",
-          "legendFormat": "{{cluster}} {{node}}",
+          "expr": "ecs_node_scrape_up{cluster=~\"$cluster\",node=~\"$node\"}",
+          "legendFormat": "{{endpoint}} {{cluster}} {{node}}",
           "refId": "A"
         }
       ]

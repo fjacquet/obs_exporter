@@ -18,9 +18,9 @@ func TestReplicationCollect(t *testing.T) {
 	rg1 := Label{"rg", "rg_name1"}
 	mustSample(t, samples, "ecs_replication_group_traffic", 12000, rg1, Label{"direction", "ingress"})
 	mustSample(t, samples, "ecs_replication_group_traffic", 9500, rg1, Label{"direction", "egress"})
-	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 500000, rg1, Label{"kind", "repo"})
-	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 400000, rg1, Label{"kind", "journal"})
-	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 300000, rg1, Label{"kind", "xor"})
+	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 500000, rg1, Label{"type", "repo"})
+	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 400000, rg1, Label{"type", "journal"})
+	mustSample(t, samples, "ecs_replication_group_chunks_pending_bytes", 300000, rg1, Label{"type", "xor"})
 	mustSample(t, samples, "ecs_replication_group_rpo_timestamp_seconds", 12345678, rg1)
 	mustSample(t, samples, "ecs_replication_group_rpo_lag_seconds", 7200, rg1)
 	mustSample(t, samples, "ecs_replication_group_zones", 3, rg1)

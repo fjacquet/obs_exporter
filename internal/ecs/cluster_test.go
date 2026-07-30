@@ -82,12 +82,12 @@ func TestClusterCollect(t *testing.T) {
 	mustSample(t, samples, "ecs_cluster_ec_rate", 12.5)
 	mustSample(t, samples, "ecs_cluster_ec_complete_time_estimate", 3.25)
 
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"type", "user_data"})
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"type", "system_metadata"})
+	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"type", "local_protection"})
 	// The fixture omits the geo components on purpose: the breakdown is not
 	// exhaustive, and 3100+1200+600 = 4900 against an allocated total of 5000.
-	if _, ok := findSample(samples, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", "geo_cache"}); ok {
+	if _, ok := findSample(samples, "ecs_cluster_disk_space_allocated_component_bytes", Label{"type", "geo_cache"}); ok {
 		t.Error("purpose=geo_cache should be absent: the fixture omits it")
 	}
 }

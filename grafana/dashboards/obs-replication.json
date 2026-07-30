@@ -164,7 +164,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_pending_bytes{kind=\"repo\",cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"repo\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "repo {{cluster}} {{rg}}",
           "refId": "A"
         },
@@ -173,7 +173,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_pending_bytes{kind=\"journal\",cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"journal\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "journal {{cluster}} {{rg}}",
           "refId": "B"
         },
@@ -182,7 +182,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_pending_bytes{kind=\"xor\",cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"xor\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "xor {{cluster}} {{rg}}",
           "refId": "C"
         }

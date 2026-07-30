@@ -49,9 +49,9 @@ func (Replication) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, e
 		// collapse to one name plus a dimension (ADR-0012).
 		out = appendSeries(out, "ecs_replication_group_traffic", rg.ReplicationIngressTraffic, group, Label{"direction", "ingress"})
 		out = appendSeries(out, "ecs_replication_group_traffic", rg.ReplicationEgressTraffic, group, Label{"direction", "egress"})
-		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksRepoPendingReplicationTotalSize, group, Label{"kind", "repo"})
-		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksJournalPendingReplicationTotalSize, group, Label{"kind", "journal"})
-		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksPendingXorTotalSize, group, Label{"kind", "xor"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksRepoPendingReplicationTotalSize, group, Label{"type", "repo"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksJournalPendingReplicationTotalSize, group, Label{"type", "journal"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksPendingXorTotalSize, group, Label{"type", "xor"})
 		out = appendNum(out, "ecs_replication_group_rpo_timestamp_seconds", rg.ReplicationRpoTimestamp, group)
 		out = appendNum(out, "ecs_replication_group_rpo_lag_seconds", rg.ReplicationRpoLag, group)
 		out = appendNum(out, "ecs_replication_group_zones", rg.NumZones, group)
