@@ -49,9 +49,18 @@ func newNodeMapper(ctx context.Context, c ecsclient.Client) (*nodeMapper, error)
 			continue
 		}
 		for _, key := range []string{n.Nodename, shortHost(n.Nodename), n.MgmtIP, n.DataIP} {
-			if key != "" {
-				m.byKey[strings.ToLower(key)] = label
+			if key == "" {
+				continue
 			}
+			k := strings.ToLower(key)
+			// A key two different nodes both claim cannot identify either of them.
+			// Blanking it makes lookup fail, so the row is dropped and counted,
+			// rather than silently attributed to whichever node was indexed last.
+			if prior, seen := m.byKey[k]; seen && prior != label {
+				m.byKey[k] = ""
+				continue
+			}
+			m.byKey[k] = label
 		}
 	}
 	return m, nil
@@ -61,10 +70,10 @@ func newNodeMapper(ctx context.Context, c ecsclient.Client) (*nodeMapper, error)
 // first dot, so a qualified name joins a bare nodename.
 func (m *nodeMapper) lookup(host string) (string, bool) {
 	h := strings.ToLower(strings.TrimSpace(host))
-	if n, ok := m.byKey[h]; ok {
+	if n, ok := m.byKey[h]; ok && n != "" {
 		return n, true
 	}
-	if n, ok := m.byKey[shortHost(h)]; ok {
+	if n, ok := m.byKey[shortHost(h)]; ok && n != "" {
 		return n, true
 	}
 	return "", false
