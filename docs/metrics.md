@@ -255,6 +255,24 @@ pre-rated:
     this name" a runtime fact instead of a fixed one, which is the invariant
     this note exists to protect.
 
+!!! note "Two names, one measurement: cluster throughput"
+    `ecs_cluster_request_bytes_per_second{op}` (Flux, `monitoring_vdc`) and the
+    pre-existing `ecs_cluster_transaction_bandwidth_mb_per_second{op}`
+    (dashboard API) measure the same thing — cluster-wide read/write
+    throughput, same `op` dimension — from two different sources, in two
+    different units (bytes/s vs. MB/s: compare them without converting and
+    one will look broken). Both are exported whenever `collectFlux` is on;
+    the arbitration above does not apply here, because arbitration stops two
+    *sources* sharing one *name* — these are two different names describing
+    one measurement, and nothing suppresses either. Prefer
+    `ecs_cluster_transaction_bandwidth_mb_per_second`: it is the
+    long-standing metric and the only one of the two available when
+    `collectFlux` is off. Reach for the Flux-sourced one on a cluster whose
+    dashboard payload omits the transaction fields — the gap this collector
+    exists to cover. A disagreement between the two is not a bug to chase in
+    the exporter; it means the dashboard and Flux sources have diverged on
+    that cluster, which is worth investigating in its own right.
+
 All per-node rows carry the `node` label, resolved from the Flux `host` tag
 against the same `/vdc/nodes` inventory every other collector joins on. A row
 whose `host` matches no inventory node emits no sample and increments
