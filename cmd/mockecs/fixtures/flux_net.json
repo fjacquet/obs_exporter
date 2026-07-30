@@ -1,0 +1,12 @@
+{
+  "Series": [
+    {
+      "Columns": ["_value", "_field", "_measurement", "host", "interface", "node_id", "tag"],
+      "Values": [
+        ["994013184", "bytes_recv", "net", "supr01-r01.example.com", "eth0", "28cd473e-ca45-4623-b30d-0481c548a650", "dashboard"],
+        ["551944704", "bytes_sent", "net", "supr01-r01.example.com", "eth0", "28cd473e-ca45-4623-b30d-0481c548a650", "dashboard"],
+        ["77", "bytes_recv", "net", "not-in-this-cluster.example.com", "eth0", "ffffffff-0000-0000-0000-000000000000", "dashboard"]
+      ]
+    }
+  ]
+}

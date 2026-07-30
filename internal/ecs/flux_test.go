@@ -1,7 +1,14 @@
 package ecs
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
 	"testing"
+
+	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 )
 
 func TestNodeMapperResolvesFluxHosts(t *testing.T) {
@@ -89,5 +96,114 @@ func TestNodeMapperResolvesFlatNetworkNode(t *testing.T) {
 		if got, ok := m.lookup(host); !ok || got != "supr01-r01" {
 			t.Errorf("lookup(%q) = %q,%v; want %q,true", host, got, ok, "supr01-r01")
 		}
+	}
+}
+
+// fluxMock answers every Flux POST with the fixture chosen by the measurement
+// named in the query body. The Mock keys responses by path alone, and all eight
+// queries share one path, so the collector's request bodies drive the routing.
+func fluxMock(t *testing.T, byMeasurement map[string]string) ecsclient.Client {
+	t.Helper()
+	return &fluxClient{Client: mockClient(t), bodies: byMeasurement, t: t}
+}
+
+type fluxClient struct {
+	ecsclient.Client
+	bodies map[string]string
+	t      *testing.T
+}
+
+func (f *fluxClient) Post(_ context.Context, path string, body, out any) error {
+	if path != fluxPath {
+		return fmt.Errorf("unexpected POST to %s", path)
+	}
+	q, ok := body.(map[string]string)
+	if !ok {
+		f.t.Fatalf("query body is %T, want map[string]string", body)
+	}
+	for measurement, fixtureName := range f.bodies {
+		if strings.Contains(q["query"], `"`+measurement+`"`) {
+			return json.Unmarshal([]byte(fixture(f.t, fixtureName)), out)
+		}
+	}
+	// A measurement the cluster does not carry answers 200 with no rows.
+	return json.Unmarshal([]byte(`{"Series":[]}`), out)
+}
+
+func collectFlux(t *testing.T, byMeasurement map[string]string) []Sample {
+	t.Helper()
+	samples, err := Flux{}.Collect(t.Context(), fluxMock(t, byMeasurement))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return samples
+}
+
+func TestFluxCollectPerNodeGauges(t *testing.T) {
+	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 31.5, Label{"node", "supr01-r01"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 12.25, Label{"node", "supr01-r02"})
+	s, _ := findSample(samples, "ecs_node_cpu_utilization_percent", Label{"node", "supr01-r01"})
+	if s.Type != Gauge {
+		t.Error("cpu utilization must be a gauge")
+	}
+}
+
+func TestFluxCollectNetworkCounters(t *testing.T) {
+	samples := collectFlux(t, map[string]string{"net": "flux_net.json"})
+	n1 := Label{"node", "supr01-r01"}
+	mustSample(t, samples, "ecs_node_network_bytes_total", 994013184, n1, Label{"interface", "eth0"}, Label{"direction", "received"})
+	mustSample(t, samples, "ecs_node_network_bytes_total", 551944704, n1, Label{"interface", "eth0"}, Label{"direction", "transmitted"})
+
+	s, _ := findSample(samples, "ecs_node_network_bytes_total", n1, Label{"direction", "received"})
+	if s.Type != Counter {
+		t.Error("network bytes must be a counter: the guide documents these fields as resetting on datahead restart")
+	}
+	// Label order is part of the metric's schema (ADR-0006).
+	wantKeys := []string{"node", "interface", "direction"}
+	gotKeys := make([]string, len(s.Labels))
+	for i, l := range s.Labels {
+		gotKeys[i] = l.Key
+	}
+	if !slices.Equal(gotKeys, wantKeys) {
+		t.Errorf("label keys = %v, want %v", gotKeys, wantKeys)
+	}
+}
+
+func TestFluxCollectClusterScopedDT(t *testing.T) {
+	// dtquery_dt_status is tagged {process, tag} only — it is cluster-wide, and
+	// must not pretend to be per-node.
+	samples := collectFlux(t, map[string]string{"dtquery_dt_status": "flux_dt_status.json"})
+	mustSample(t, samples, "ecs_cluster_dt_total", 128)
+	mustSample(t, samples, "ecs_cluster_dt_unready", 2)
+	mustSample(t, samples, "ecs_cluster_dt_unknown", 1)
+	s, _ := findSample(samples, "ecs_cluster_dt_total")
+	if len(s.Labels) != 0 {
+		t.Errorf("cluster DT carries labels %v, want none", s.Labels)
+	}
+}
+
+func TestFluxQueryScriptShape(t *testing.T) {
+	var cpu fluxQuery
+	for _, q := range fluxQueries {
+		if q.measurement == "cpu" {
+			cpu = q
+		}
+	}
+	script := cpu.script()
+	for _, want := range []string{
+		`from(bucket:"monitoring_op")`,
+		`range(start: -15m)`,
+		`r._measurement == "cpu"`,
+		`r.cpu == "cpu-total"`,
+		`|> last()`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("cpu script missing %q:\n%s", want, script)
+		}
+	}
+	// A host filter would turn one cluster-wide request into N+1 per node.
+	if strings.Contains(script, "r.host ==") {
+		t.Errorf("script filters by host:\n%s", script)
 	}
 }

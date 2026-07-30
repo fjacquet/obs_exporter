@@ -1,0 +1,12 @@
+{
+  "Series": [
+    {
+      "Columns": ["_value", "_field", "_measurement", "process", "tag"],
+      "Values": [
+        ["128", "total", "dtquery_dt_status", "dtquery", "dashboard"],
+        ["2", "unready", "dtquery_dt_status", "dtquery", "dashboard"],
+        ["1", "unknown", "dtquery_dt_status", "dtquery", "dashboard"]
+      ]
+    }
+  ]
+}
