@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -85,6 +86,35 @@ func TestCollectClusterPartialFailure(t *testing.T) {
 	mustSample(t, cs.Samples, "ecs_collector_up", 1, cluster, Label{"collector", "cluster"})
 }
 
+// assertLabelKeySchema enforces the family label-key invariant (ADR-0006):
+// every sample of a given metric name must carry the same ordered label-key
+// set. Shared by TestLabelKeyConsistency and TestLabelKeyConsistencyFlux so a
+// violation anywhere in either fixture set fails the same way.
+func assertLabelKeySchema(t *testing.T, samples []Sample) {
+	t.Helper()
+	schema := map[string][]string{}
+	for _, s := range samples {
+		keys := make([]string, len(s.Labels))
+		for i, l := range s.Labels {
+			keys[i] = l.Key
+		}
+		if want, ok := schema[s.Name]; ok {
+			if len(want) != len(keys) {
+				t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
+				continue
+			}
+			for i := range want {
+				if want[i] != keys[i] {
+					t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
+					break
+				}
+			}
+		} else {
+			schema[s.Name] = keys
+		}
+	}
+}
+
 // TestLabelKeyConsistency enforces the family label-key invariant: every sample of
 // a given metric name must carry the same ordered label-key set, across all
 // collectors and clusters, so dashboards never see mixed series schemas.
@@ -93,28 +123,55 @@ func TestLabelKeyConsistency(t *testing.T) {
 	col := NewCollector(testTargets(t), store, time.Minute, 10*time.Second)
 	snap := col.CollectOnce(context.Background())
 
-	schema := map[string][]string{}
+	var samples []Sample
 	for _, cs := range snap.Clusters {
-		for _, s := range cs.Samples {
-			keys := make([]string, len(s.Labels))
-			for i, l := range s.Labels {
-				keys[i] = l.Key
-			}
-			if want, ok := schema[s.Name]; ok {
-				if len(want) != len(keys) {
-					t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
-					continue
-				}
-				for i := range want {
-					if want[i] != keys[i] {
-						t.Errorf("metric %s has inconsistent label keys: %v vs %v", s.Name, want, keys)
-						break
-					}
-				}
-			} else {
-				schema[s.Name] = keys
-			}
-		}
+		samples = append(samples, cs.Samples...)
+	}
+	assertLabelKeySchema(t, samples)
+}
+
+// TestLabelKeyConsistencyFlux extends the same guard to the Flux collector.
+// testTargets (above) builds its cluster with CollectFlux left at its zero
+// value, so Registry never appends Flux{} there and none of its samples are
+// ever checked. This test wires a cluster with CollectFlux: true through the
+// same Registry/Collector path, using flux_test.go's measurement-routing mock
+// to feed the multi-key net measurement — ecs_node_network_bytes_total carries
+// {node, interface, direction} in that order from a static query table today;
+// nothing else in the suite would catch an edit that made the order depend on
+// row data instead.
+func TestLabelKeyConsistencyFlux(t *testing.T) {
+	cl := config.Cluster{Name: "test-cluster", CollectFlux: true, CollectMetering: boolPtr(false)}
+	client := fluxMock(t, map[string]string{
+		"cpu":               "flux_cpu.json",
+		"net":               "flux_net.json",
+		"dtquery_dt_status": "flux_dt_status.json",
+	})
+	store := NewSnapshotStore()
+	col := NewCollector([]Target{{Client: client, Collectors: Registry(cl)}}, store, time.Minute, 10*time.Second)
+	snap := col.CollectOnce(context.Background())
+
+	cs := snap.Clusters[0]
+	if !cs.OK {
+		t.Fatalf("cluster not OK: %s", cs.Err)
+	}
+	assertLabelKeySchema(t, cs.Samples)
+
+	// Guard against the schema check passing vacuously because Flux's samples
+	// never made it into cs.Samples. collectCluster stamps every domain sample
+	// with the cluster identity label first (Sample.WithCluster), so it leads
+	// the key order here too.
+	s, ok := findSample(cs.Samples, "ecs_node_network_bytes_total",
+		Label{"cluster", "test-cluster"}, Label{"node", "supr01-r01"}, Label{"interface", "eth0"}, Label{"direction", "received"})
+	if !ok {
+		t.Fatal("ecs_node_network_bytes_total not collected; schema check ran on nothing from Flux")
+	}
+	wantKeys := []string{"cluster", "node", "interface", "direction"}
+	gotKeys := make([]string, len(s.Labels))
+	for i, l := range s.Labels {
+		gotKeys[i] = l.Key
+	}
+	if !slices.Equal(gotKeys, wantKeys) {
+		t.Errorf("label keys = %v, want %v", gotKeys, wantKeys)
 	}
 }
 
