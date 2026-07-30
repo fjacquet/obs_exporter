@@ -1627,7 +1627,9 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add internal/ecs/flux.go internal/ecs/flux_test.go internal/ecs/testdata/flux_cpu.json internal/ecs/testdata/flux_net.json internal/ecs/testdata/flux_dt_status.json
+git add internal/ecs/flux.go internal/ecs/flux_test.go \
+  internal/ecs/testdata/flux_cpu.json internal/ecs/testdata/flux_net.json internal/ecs/testdata/flux_dt_status.json \
+  cmd/mockecs/fixtures/flux_cpu.json cmd/mockecs/fixtures/flux_net.json cmd/mockecs/fixtures/flux_dt_status.json
 git commit -m "feat(ecs): add the Flux collector's query table and emission
 
 One request per measurement, closed with last() and no host filter, so a cycle
