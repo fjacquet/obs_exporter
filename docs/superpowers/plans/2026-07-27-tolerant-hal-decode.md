@@ -34,10 +34,12 @@ Both discovered by reading the merged tree; the spec was written before these we
 ### Task 1: `halList[T]` decoder
 
 **Files:**
+
 - Create: `internal/ecs/hal.go`
 - Test: `internal/ecs/hal_test.go`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `type halList[T any] struct { Instances []T; KeySeen bool }` with method `func (h *halList[T]) UnmarshalJSON(b []byte) error`, plus `func warnUnknownHalShape(cluster, path string, keySeen bool)`. Tasks 2 and 3 embed the type and call the helper.
 
@@ -49,120 +51,120 @@ Create `internal/ecs/hal_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 // halTestItem is a minimal element type: halList must not care what T is.
 type halTestItem struct {
-	Name string `json:"name"`
+ Name string `json:"name"`
 }
 
 func TestHalListUnmarshal(t *testing.T) {
-	tests := []struct {
-		name      string
-		payload   string
-		wantNames []string
-		wantSeen  bool
-	}{
-		{
-			name:      "underscore key, as real clusters emit",
-			payload:   `{"_instances":[{"name":"a"},{"name":"b"}]}`,
-			wantNames: []string{"a", "b"},
-			wantSeen:  true,
-		},
-		{
-			name:      "documented key without underscore",
-			payload:   `{"instances":[{"name":"a"},{"name":"b"}]}`,
-			wantNames: []string{"a", "b"},
-			wantSeen:  true,
-		},
-		{
-			// An empty list is a legitimately empty cluster, not shape drift:
-			// the key was seen, so no warning must be triggered downstream.
-			name:      "empty underscore list still counts as a key sighting",
-			payload:   `{"_instances":[]}`,
-			wantNames: nil,
-			wantSeen:  true,
-		},
-		{
-			name:      "neither key present",
-			payload:   `{"_links":{"self":{"href":"/x"}}}`,
-			wantNames: nil,
-			wantSeen:  false,
-		},
-		{
-			name:      "both keys present, underscore wins",
-			payload:   `{"_instances":[{"name":"real"}],"instances":[{"name":"doc"}]}`,
-			wantNames: []string{"real"},
-			wantSeen:  true,
-		},
-	}
+ tests := []struct {
+  name      string
+  payload   string
+  wantNames []string
+  wantSeen  bool
+ }{
+  {
+   name:      "underscore key, as real clusters emit",
+   payload:   `{"_instances":[{"name":"a"},{"name":"b"}]}`,
+   wantNames: []string{"a", "b"},
+   wantSeen:  true,
+  },
+  {
+   name:      "documented key without underscore",
+   payload:   `{"instances":[{"name":"a"},{"name":"b"}]}`,
+   wantNames: []string{"a", "b"},
+   wantSeen:  true,
+  },
+  {
+   // An empty list is a legitimately empty cluster, not shape drift:
+   // the key was seen, so no warning must be triggered downstream.
+   name:      "empty underscore list still counts as a key sighting",
+   payload:   `{"_instances":[]}`,
+   wantNames: nil,
+   wantSeen:  true,
+  },
+  {
+   name:      "neither key present",
+   payload:   `{"_links":{"self":{"href":"/x"}}}`,
+   wantNames: nil,
+   wantSeen:  false,
+  },
+  {
+   name:      "both keys present, underscore wins",
+   payload:   `{"_instances":[{"name":"real"}],"instances":[{"name":"doc"}]}`,
+   wantNames: []string{"real"},
+   wantSeen:  true,
+  },
+ }
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var got halList[halTestItem]
-			if err := json.Unmarshal([]byte(tc.payload), &got); err != nil {
-				t.Fatalf("unmarshal: %v", err)
-			}
-			if got.KeySeen != tc.wantSeen {
-				t.Errorf("KeySeen = %v, want %v", got.KeySeen, tc.wantSeen)
-			}
-			if len(got.Instances) != len(tc.wantNames) {
-				t.Fatalf("got %d instances, want %d", len(got.Instances), len(tc.wantNames))
-			}
-			for i, want := range tc.wantNames {
-				if got.Instances[i].Name != want {
-					t.Errorf("instance %d name = %q, want %q", i, got.Instances[i].Name, want)
-				}
-			}
-		})
-	}
+ for _, tc := range tests {
+  t.Run(tc.name, func(t *testing.T) {
+   var got halList[halTestItem]
+   if err := json.Unmarshal([]byte(tc.payload), &got); err != nil {
+    t.Fatalf("unmarshal: %v", err)
+   }
+   if got.KeySeen != tc.wantSeen {
+    t.Errorf("KeySeen = %v, want %v", got.KeySeen, tc.wantSeen)
+   }
+   if len(got.Instances) != len(tc.wantNames) {
+    t.Fatalf("got %d instances, want %d", len(got.Instances), len(tc.wantNames))
+   }
+   for i, want := range tc.wantNames {
+    if got.Instances[i].Name != want {
+     t.Errorf("instance %d name = %q, want %q", i, got.Instances[i].Name, want)
+    }
+   }
+  })
+ }
 }
 
 func TestHalListRejectsMalformedList(t *testing.T) {
-	var got halList[halTestItem]
-	err := json.Unmarshal([]byte(`{"_instances":"not-a-list"}`), &got)
-	if err == nil {
-		t.Fatal("want a decode error when _instances is not an array, got nil")
-	}
+ var got halList[halTestItem]
+ err := json.Unmarshal([]byte(`{"_instances":"not-a-list"}`), &got)
+ if err == nil {
+  t.Fatal("want a decode error when _instances is not an array, got nil")
+ }
 }
 
 func TestWarnUnknownHalShape(t *testing.T) {
-	tests := []struct {
-		name     string
-		keySeen  bool
-		wantLogs int
-	}{
-		{name: "key seen stays silent", keySeen: true, wantLogs: 0},
-		{name: "key missing warns once", keySeen: false, wantLogs: 1},
-	}
+ tests := []struct {
+  name     string
+  keySeen  bool
+  wantLogs int
+ }{
+  {name: "key seen stays silent", keySeen: true, wantLogs: 0},
+  {name: "key missing warns once", keySeen: false, wantLogs: 1},
+ }
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			hook := test.NewGlobal()
-			defer hook.Reset()
+ for _, tc := range tests {
+  t.Run(tc.name, func(t *testing.T) {
+   hook := test.NewGlobal()
+   defer hook.Reset()
 
-			warnUnknownHalShape("test-cluster", "/dashboard/zones/localzone/nodes", tc.keySeen)
+   warnUnknownHalShape("test-cluster", "/dashboard/zones/localzone/nodes", tc.keySeen)
 
-			if got := len(hook.Entries); got != tc.wantLogs {
-				t.Fatalf("got %d log entries, want %d", got, tc.wantLogs)
-			}
-			if tc.wantLogs == 0 {
-				return
-			}
-			entry := hook.LastEntry()
-			if entry.Level != logrus.WarnLevel {
-				t.Errorf("level = %v, want warning", entry.Level)
-			}
-			if entry.Data["path"] != "/dashboard/zones/localzone/nodes" {
-				t.Errorf("path field = %v, want the endpoint path", entry.Data["path"])
-			}
-			if entry.Data["cluster"] != "test-cluster" {
-				t.Errorf("cluster field = %v, want the cluster name", entry.Data["cluster"])
-			}
-		})
-	}
+   if got := len(hook.Entries); got != tc.wantLogs {
+    t.Fatalf("got %d log entries, want %d", got, tc.wantLogs)
+   }
+   if tc.wantLogs == 0 {
+    return
+   }
+   entry := hook.LastEntry()
+   if entry.Level != logrus.WarnLevel {
+    t.Errorf("level = %v, want warning", entry.Level)
+   }
+   if entry.Data["path"] != "/dashboard/zones/localzone/nodes" {
+    t.Errorf("path field = %v, want the endpoint path", entry.Data["path"])
+   }
+   if entry.Data["cluster"] != "test-cluster" {
+    t.Errorf("cluster field = %v, want the cluster name", entry.Data["cluster"])
+   }
+  })
+ }
 }
 ```
 
@@ -170,11 +172,11 @@ The import block for this file is:
 
 ```go
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 
-	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
+ "github.com/sirupsen/logrus"
+ "github.com/sirupsen/logrus/hooks/test"
 )
 ```
 
@@ -197,9 +199,9 @@ Create `internal/ecs/hal.go`:
 package ecs
 
 import (
-	"encoding/json"
+ "encoding/json"
 
-	log "github.com/sirupsen/logrus"
+ log "github.com/sirupsen/logrus"
 )
 
 // halList decodes a HAL "_embedded" instance list.
@@ -215,33 +217,33 @@ import (
 // emits no samples while ecs_collector_up still reports 1 — the worst failure
 // mode this exporter has, and the bug fixed in v2.7.0.
 type halList[T any] struct {
-	// Instances holds the decoded array, empty when the payload carried none.
-	Instances []T
-	// KeySeen reports whether either spelling of the array key was present.
-	// False means the payload shape is unrecognised, which callers surface as
-	// a warning; it is distinct from a present-but-empty list.
-	KeySeen bool
+ // Instances holds the decoded array, empty when the payload carried none.
+ Instances []T
+ // KeySeen reports whether either spelling of the array key was present.
+ // False means the payload shape is unrecognised, which callers surface as
+ // a warning; it is distinct from a present-but-empty list.
+ KeySeen bool
 }
 
 // UnmarshalJSON accepts either spelling of the instance-array key, preferring
 // the "_instances" form that real clusters emit when both are present.
 func (h *halList[T]) UnmarshalJSON(b []byte) error {
-	var raw struct {
-		Underscore []T `json:"_instances"`
-		Documented []T `json:"instances"`
-	}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	// Presence is tested against nil rather than length: an empty array is a
-	// legitimately empty cluster and must still count as a key sighting.
-	switch {
-	case raw.Underscore != nil:
-		h.Instances, h.KeySeen = raw.Underscore, true
-	case raw.Documented != nil:
-		h.Instances, h.KeySeen = raw.Documented, true
-	}
-	return nil
+ var raw struct {
+  Underscore []T `json:"_instances"`
+  Documented []T `json:"instances"`
+ }
+ if err := json.Unmarshal(b, &raw); err != nil {
+  return err
+ }
+ // Presence is tested against nil rather than length: an empty array is a
+ // legitimately empty cluster and must still count as a key sighting.
+ switch {
+ case raw.Underscore != nil:
+  h.Instances, h.KeySeen = raw.Underscore, true
+ case raw.Documented != nil:
+  h.Instances, h.KeySeen = raw.Documented, true
+ }
+ return nil
 }
 
 // warnUnknownHalShape logs when a HAL payload carried neither spelling of the
@@ -256,11 +258,11 @@ func (h *halList[T]) UnmarshalJSON(b []byte) error {
 // The cluster is included because the exporter polls many clusters per cycle; a
 // warning naming only the endpoint cannot tell an operator which one drifted.
 func warnUnknownHalShape(cluster, path string, keySeen bool) {
-	if keySeen {
-		return
-	}
-	log.WithFields(log.Fields{"cluster": cluster, "path": path}).
-		Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
+ if keySeen {
+  return
+ }
+ log.WithFields(log.Fields{"cluster": cluster, "path": path}).
+  Warn("HAL instance list key not found (_instances/instances); payload shape may have changed")
 }
 ```
 
@@ -287,10 +289,12 @@ either key was seen."
 ### Task 2: Wire the nodes collector to `halList`
 
 **Files:**
+
 - Modify: `internal/ecs/nodes.go:12-68`
 - Test: `internal/ecs/nodes_test.go`
 
 **Interfaces:**
+
 - Consumes: `halList[T]` from Task 1 (`Instances []T`, `KeySeen bool`).
 - Produces: `type nodeInstance struct{…}` — the named per-node payload struct, previously anonymous. `localZoneNodesResp.Embedded` becomes `halList[nodeInstance]`. No exported surface changes.
 
@@ -307,26 +311,26 @@ Append to `internal/ecs/nodes_test.go`:
 // fixture file could drift from the first, and cmd/mockecs/fixtures/ would
 // have to mirror it.
 func TestNodesCollectDocumentedInstancesKey(t *testing.T) {
-	mc := mockClient(t)
-	mc.Responses[pathLocalZoneNodes] = strings.ReplaceAll(
-		mc.Responses[pathLocalZoneNodes], `"_instances"`, `"instances"`)
+ mc := mockClient(t)
+ mc.Responses[pathLocalZoneNodes] = strings.ReplaceAll(
+  mc.Responses[pathLocalZoneNodes], `"_instances"`, `"instances"`)
 
-	samples, err := Nodes{}.Collect(context.Background(), mc)
-	if err != nil {
-		t.Fatal(err)
-	}
+ samples, err := Nodes{}.Collect(context.Background(), mc)
+ if err != nil {
+  t.Fatal(err)
+ }
 
-	n1 := Label{"node", "supr01-r01"}
-	mustSample(t, samples, "ecs_node_healthy", 1, n1)
-	mustSample(t, samples, "ecs_node_health_state", 1, n1, Label{"state", "good"})
-	mustSample(t, samples, "ecs_node_disks", 40, n1)
-	mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
-	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 43, n1)
+ n1 := Label{"node", "supr01-r01"}
+ mustSample(t, samples, "ecs_node_healthy", 1, n1)
+ mustSample(t, samples, "ecs_node_health_state", 1, n1, Label{"state", "good"})
+ mustSample(t, samples, "ecs_node_disks", 40, n1)
+ mustSample(t, samples, "ecs_node_disk_space_total_bytes", 510, n1)
+ mustSample(t, samples, "ecs_node_cpu_utilization_percent", 43, n1)
 
-	n2 := Label{"node", "supr01-r02"}
-	mustSample(t, samples, "ecs_node_healthy", 0, n2)
-	mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
-	mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
+ n2 := Label{"node", "supr01-r02"}
+ mustSample(t, samples, "ecs_node_healthy", 0, n2)
+ mustSample(t, samples, "ecs_node_health_state", 1, n2, Label{"state", "bad"})
+ mustSample(t, samples, "ecs_node_bad_disks", 1, n2)
 }
 ```
 
@@ -334,9 +338,9 @@ Add `"strings"` to the import block at `internal/ecs/nodes_test.go:3-6`, so it r
 
 ```go
 import (
-	"context"
-	"strings"
-	"testing"
+ "context"
+ "strings"
+ "testing"
 )
 ```
 
@@ -355,38 +359,38 @@ In `internal/ecs/nodes.go`, replace the type block at lines 12-51 with a named e
 // HAL-style list of per-node dashboard instances. See halList for why both
 // spellings of the array key are accepted.
 type localZoneNodesResp struct {
-	Embedded halList[nodeInstance] `json:"_embedded"`
+ Embedded halList[nodeInstance] `json:"_embedded"`
 }
 
 // nodeInstance is one per-node entry of the local-zone dashboard payload.
 type nodeInstance struct {
-	DisplayName  string `json:"displayName"`
-	HealthStatus string `json:"healthStatus"`
+ DisplayName  string `json:"displayName"`
+ HealthStatus string `json:"healthStatus"`
 
-	NumDisks               Num `json:"numDisks"`
-	NumGoodDisks           Num `json:"numGoodDisks"`
-	NumBadDisks            Num `json:"numBadDisks"`
-	NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
-	NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
+ NumDisks               Num `json:"numDisks"`
+ NumGoodDisks           Num `json:"numGoodDisks"`
+ NumBadDisks            Num `json:"numBadDisks"`
+ NumMaintenanceDisks    Num `json:"numMaintenanceDisks"`
+ NumReadyToReplaceDisks Num `json:"numReadyToReplaceDisks"`
 
-	DiskSpaceTotal     Series `json:"diskSpaceTotal"`
-	DiskSpaceFree      Series `json:"diskSpaceFree"`
-	DiskSpaceAllocated Series `json:"diskSpaceAllocated"`
+ DiskSpaceTotal     Series `json:"diskSpaceTotal"`
+ DiskSpaceFree      Series `json:"diskSpaceFree"`
+ DiskSpaceAllocated Series `json:"diskSpaceAllocated"`
 
-	NodeCPUUtilization         Series `json:"nodeCpuUtilization"`
-	NodeMemoryUtilization      Series `json:"nodeMemoryUtilization"`
-	NodeMemoryUtilizationBytes Series `json:"nodeMemoryUtilizationBytes"`
+ NodeCPUUtilization         Series `json:"nodeCpuUtilization"`
+ NodeMemoryUtilization      Series `json:"nodeMemoryUtilization"`
+ NodeMemoryUtilizationBytes Series `json:"nodeMemoryUtilizationBytes"`
 
-	NodeNicReceivedBandwidth    Series `json:"nodeNicReceivedBandwidth"`
-	NodeNicTransmittedBandwidth Series `json:"nodeNicTransmittedBandwidth"`
-	NodeNicUtilization          Series `json:"nodeNicUtilization"`
+ NodeNicReceivedBandwidth    Series `json:"nodeNicReceivedBandwidth"`
+ NodeNicTransmittedBandwidth Series `json:"nodeNicTransmittedBandwidth"`
+ NodeNicUtilization          Series `json:"nodeNicUtilization"`
 
-	TransactionReadLatency             Series `json:"transactionReadLatency"`
-	TransactionWriteLatency            Series `json:"transactionWriteLatency"`
-	TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
-	TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
-	TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
-	TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
+ TransactionReadLatency             Series `json:"transactionReadLatency"`
+ TransactionWriteLatency            Series `json:"transactionWriteLatency"`
+ TransactionReadBandwidth           Series `json:"transactionReadBandwidth"`
+ TransactionWriteBandwidth          Series `json:"transactionWriteBandwidth"`
+ TransactionReadTransactionsPerSec  Series `json:"transactionReadTransactionsPerSec"`
+ TransactionWriteTransactionsPerSec Series `json:"transactionWriteTransactionsPerSec"`
 }
 ```
 
@@ -397,7 +401,7 @@ Inside `Collect`, insert the shape check immediately after the `c.Get` error
 check (currently `nodes.go:64-66`) and before `var out []Sample`:
 
 ```go
-	warnUnknownHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.KeySeen)
+ warnUnknownHalShape(c.Name(), pathLocalZoneNodes, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched — `r.Embedded.Instances` still resolves, now through the wrapper.
@@ -423,10 +427,12 @@ instead of silently emptying the collector."
 ### Task 3: Wire the replication collector to `halList`
 
 **Files:**
+
 - Modify: `internal/ecs/replication.go:11-44`
 - Test: `internal/ecs/replication_test.go`
 
 **Interfaces:**
+
 - Consumes: `halList[T]` from Task 1.
 - Produces: `type replicationGroupInstance struct{…}` — the named per-group payload struct, previously anonymous. `replicationGroupsResp.Embedded` becomes `halList[replicationGroupInstance]`.
 
@@ -439,24 +445,24 @@ Append to `internal/ecs/replication_test.go`:
 // HAL array key rewritten to the spelling the Dell reference documents. The
 // decoder must tolerate both, so the resulting samples are identical.
 func TestReplicationCollectDocumentedInstancesKey(t *testing.T) {
-	mc := mockClient(t)
-	mc.Responses[pathReplicationGroups] = strings.ReplaceAll(
-		mc.Responses[pathReplicationGroups], `"_instances"`, `"instances"`)
+ mc := mockClient(t)
+ mc.Responses[pathReplicationGroups] = strings.ReplaceAll(
+  mc.Responses[pathReplicationGroups], `"_instances"`, `"instances"`)
 
-	samples, err := Replication{}.Collect(context.Background(), mc)
-	if err != nil {
-		t.Fatal(err)
-	}
+ samples, err := Replication{}.Collect(context.Background(), mc)
+ if err != nil {
+  t.Fatal(err)
+ }
 
-	rg1 := Label{"rg", "rg_name1"}
-	mustSample(t, samples, "ecs_replication_group_ingress_traffic", 12000, rg1)
-	mustSample(t, samples, "ecs_replication_group_egress_traffic", 9500, rg1)
-	mustSample(t, samples, "ecs_replication_group_rpo_lag_seconds", 7200, rg1)
-	mustSample(t, samples, "ecs_replication_group_zones", 3, rg1)
+ rg1 := Label{"rg", "rg_name1"}
+ mustSample(t, samples, "ecs_replication_group_ingress_traffic", 12000, rg1)
+ mustSample(t, samples, "ecs_replication_group_egress_traffic", 9500, rg1)
+ mustSample(t, samples, "ecs_replication_group_rpo_lag_seconds", 7200, rg1)
+ mustSample(t, samples, "ecs_replication_group_zones", 3, rg1)
 
-	rg2 := Label{"rg", "rg_name2"}
-	mustSample(t, samples, "ecs_replication_group_ingress_traffic", 100, rg2)
-	mustSample(t, samples, "ecs_replication_group_zones", 2, rg2)
+ rg2 := Label{"rg", "rg_name2"}
+ mustSample(t, samples, "ecs_replication_group_ingress_traffic", 100, rg2)
+ mustSample(t, samples, "ecs_replication_group_zones", 2, rg2)
 }
 ```
 
@@ -464,9 +470,9 @@ Add `"strings"` to the import block at `internal/ecs/replication_test.go:3-6`, s
 
 ```go
 import (
-	"context"
-	"strings"
-	"testing"
+ "context"
+ "strings"
+ "testing"
 )
 ```
 
@@ -485,20 +491,20 @@ In `internal/ecs/replication.go`, replace the type block at lines 11-29 with:
 // (OBS 4.1): a HAL-style list of per-replication-group instances. See halList
 // for why both spellings of the array key are accepted.
 type replicationGroupsResp struct {
-	Embedded halList[replicationGroupInstance] `json:"_embedded"`
+ Embedded halList[replicationGroupInstance] `json:"_embedded"`
 }
 
 // replicationGroupInstance is one per-group entry of the dashboard payload.
 type replicationGroupInstance struct {
-	Name                                     string `json:"name"`
-	NumZones                                 Num    `json:"numZones"`
-	ReplicationIngressTraffic                Series `json:"replicationIngressTraffic"`
-	ReplicationEgressTraffic                 Series `json:"replicationEgressTraffic"`
-	ChunksRepoPendingReplicationTotalSize    Num    `json:"chunksRepoPendingReplicationTotalSize"`
-	ChunksJournalPendingReplicationTotalSize Num    `json:"chunksJournalPendingReplicationTotalSize"`
-	ChunksPendingXorTotalSize                Num    `json:"chunksPendingXorTotalSize"`
-	ReplicationRpoTimestamp                  Num    `json:"replicationRpoTimestamp"`
-	ReplicationRpoLag                        Num    `json:"replicationRpoLag"`
+ Name                                     string `json:"name"`
+ NumZones                                 Num    `json:"numZones"`
+ ReplicationIngressTraffic                Series `json:"replicationIngressTraffic"`
+ ReplicationEgressTraffic                 Series `json:"replicationEgressTraffic"`
+ ChunksRepoPendingReplicationTotalSize    Num    `json:"chunksRepoPendingReplicationTotalSize"`
+ ChunksJournalPendingReplicationTotalSize Num    `json:"chunksJournalPendingReplicationTotalSize"`
+ ChunksPendingXorTotalSize                Num    `json:"chunksPendingXorTotalSize"`
+ ReplicationRpoTimestamp                  Num    `json:"replicationRpoTimestamp"`
+ ReplicationRpoLag                        Num    `json:"replicationRpoLag"`
 }
 ```
 
@@ -508,7 +514,7 @@ file does not import logrus.
 Insert the shape check inside `Collect`, immediately after the `c.Get` error check (currently `replication.go:40-42`) and before `var out []Sample`:
 
 ```go
-	warnUnknownHalShape(c.Name(), pathReplicationGroups, r.Embedded.KeySeen)
+ warnUnknownHalShape(c.Name(), pathReplicationGroups, r.Embedded.KeySeen)
 ```
 
 Leave the loop body untouched.
@@ -531,6 +537,7 @@ git commit -m "fix(ecs): decode replication-group HAL list under either instance
 ### Task 4: Correct and extend the ADRs
 
 **Files:**
+
 - Modify: `docs/adr/0007-obs-4-1-api-alignment.md:22-25`, `:29-34`, `:42-43`
 - Modify: `docs/adr/0008-swagger-4.2-validation-findings.md:10-17`, `:69-73`
 
@@ -610,6 +617,7 @@ in ADR-0008 that a live cluster is now reachable for the frozen F1/F2/F3 items."
 ### Task 5: Changelog and metric-availability note
 
 **Files:**
+
 - Modify: `CHANGELOG.md:7`
 - Modify: `docs/metrics.md:65-66`
 
@@ -682,6 +690,7 @@ Also promotes the stale [Unreleased] heading to [2.7.0], which was tagged on
 ### Task 6: Draft the reply to the PR #18 contributor
 
 **Files:**
+
 - Create: `<scratchpad>/pr18-reply.md` (the session scratchpad directory; the file is deliberately outside the repository)
 
 Written to the scratchpad, not the repo: it is a GitHub comment, not project content. The maintainer posts it.

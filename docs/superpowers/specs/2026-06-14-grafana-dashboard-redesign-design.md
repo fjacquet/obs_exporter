@@ -42,7 +42,7 @@ Grafana file provisioning loads any JSON in `/var/lib/grafana/dashboards`, so ne
 are picked up with no config change.
 
 | Dashboard | uid | Purpose | Variables |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Overview** | `obs-overview` (kept) | On-call triage, single screen | `cluster` |
 | **Performance** | `obs-performance` | Transaction RED + per-node breakdown | `cluster`, `node` |
 | **Nodes** | `obs-nodes` | USE per node | `cluster`, `node` |

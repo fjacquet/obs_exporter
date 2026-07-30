@@ -26,7 +26,7 @@ in the same cycle (disable per cluster with `collectMetering: false`).
 ## Metric rename table
 
 | v1 | v2 |
-|---|---|
+| --- | --- |
 | `emcecs_collection_success` | `ecs_up{cluster}` |
 | `emcecs_collector_build_info` | `obs_exporter_build_info` |
 | `emcecs_request_errors_total` | removed — use `ecs_collector_up{collector}` |

@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 | ADR | Decision |
-|---|---|
+| --- | --- |
 | [0001](0001-ci-supply-chain-hardening.md) | CI/CD supply-chain hardening: SHA-pinned actions, GoReleaser, SBOM, Semgrep |
 | [0002](0002-prometheus-snapshot-model.md) | Background snapshot collection model with dual Prometheus + OTLP export |
 | [0003](0003-hand-rolled-client-over-goobjectscale.md) | Hand-rolled resty/v2 client instead of the goobjectscale SDK |

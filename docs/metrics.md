@@ -14,7 +14,7 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 ## Exporter / meta
 
 | Metric | Labels | Description |
-|---|---|---|
+| --- | --- | --- |
 | `obs_exporter_build_info` | `version`, `goversion` | constant `1`, build identity |
 | `ecs_up` | `cluster` | `1` when the last cycle produced domain samples for the cluster |
 | `ecs_collector_up` | `cluster`, `collector` | per-collector success (`cluster`, `replication`, `nodes`, `info`, `metering`, `dt`) |
@@ -22,7 +22,7 @@ Sources: `/dashboard/zones/localzone` (cluster), `…/replicationgroups`
 ## Cluster (VDC-wide)
 
 | Metric | Labels | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ecs_cluster_info` | `version` | constant `1`, ECS software version |
 | `ecs_cluster_nodes` / `_good_nodes` / `_bad_nodes` / `_maintenance_nodes` | | node counts |
 | `ecs_cluster_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | | disk counts |
@@ -43,7 +43,7 @@ From the same local-zone dashboard response as the cluster metrics above — no
 additional API call.
 
 | Metric | Labels | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ecs_cluster_gc_pending_bytes` | `scope` (`user`/`system`) | space detected as reclaimable but not yet reclaimed |
 | `ecs_cluster_gc_reclaimed_bytes_total` | `scope` | space reclaimed since the cluster was built — a lifetime counter, not a backlog |
 | `ecs_cluster_gc_unreclaimable_bytes` | `scope` | space detected but not reclaimable |
@@ -78,7 +78,7 @@ additional API call.
 ## Replication groups
 
 | Metric | Labels | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ecs_replication_group_ingress_traffic` / `_egress_traffic` | `rg` | per-group replication traffic |
 | `ecs_replication_group_chunks_repo_pending_replication_bytes` | `rg` | repo data awaiting replication |
 | `ecs_replication_group_chunks_journal_pending_replication_bytes` | `rg` | journal data awaiting replication |
@@ -92,7 +92,7 @@ additional API call.
 All with the `node` label (the node's display name).
 
 | Metric | Description |
-|---|---|
+| --- | --- |
 | `ecs_node_healthy` | `1` when `healthStatus` is `Good` |
 | `ecs_node_health_state` (extra label `state`) | `1` for the node's current `healthStatus`; `state` is one of `good` / `suspect` / `bad` / `notaccessible` / `maintenance` (the five values the API documents), keeping e.g. bad vs maintenance distinguishable |
 | `ecs_node_disks` / `_good_disks` / `_bad_disks` / `_maintenance_disks` / `_ready_to_replace_disks` | per-node disk counts |
@@ -117,7 +117,7 @@ All with the `node` label (the node's display name).
 All with the `namespace` label.
 
 | Metric | Description |
-|---|---|
+| --- | --- |
 | `ecs_namespace_quota_hard_bytes` | hard (block) quota; absent when unset. ECS stores quota in GiB; exported as bytes |
 | `ecs_namespace_quota_soft_bytes` | soft (notification) quota; absent when unset |
 | `ecs_namespace_used_bytes` | total namespace usage (from bulk billing) |
@@ -126,11 +126,24 @@ All with the `namespace` label.
 
 ## Node DT (opt-in, `collectDT: true`)
 
-Legacy scraping of undocumented node-local endpoints (ports 9101/9021), labeled by
-`node` (management IP).
+Legacy scraping of undocumented node-local endpoints, labeled by `node` — the
+inventory's `nodename`, so these series join with the [node metrics](#nodes-dashboard) on
+`{node=…}`. The two ports are scraped at **different addresses**, taken from
+`/vdc/nodes`: the DT stats port at `mgmt_ip`, the object port at `data_ip`
+(falling back to `mgmt_ip` when the inventory publishes no data address).
+
+!!! warning "Reachability on a network-segmented cluster"
+    Dell's recommended production layout separates management, data, replication
+    and a private fabric. On it the DT stats port (9101) listens on a private
+    link-local VLAN (169.254.0.0/16), reachable only from the node itself or
+    across the fabric — never from a routed network. An exporter running outside
+    the cluster therefore gets `ecs_node_dt_up=0` and no DT counts, while
+    `ecs_node_active_connections` still works over the data network. Covering
+    those counts from outside the cluster needs a different source; see
+    [ADR-0011](adr/0011-flux-collector-for-unreachable-metrics.md).
 
 | Metric | Description |
-|---|---|
-| `ecs_node_dt_up` | node-local scrape success |
+| --- | --- |
+| `ecs_node_dt_up` | node-local DT stats scrape success (port 9101, `mgmt_ip`) |
 | `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts |
-| `ecs_node_active_connections` | active connections (object-port ping) |
+| `ecs_node_active_connections` | active connections (object-port ping, port 9021, `data_ip`) |
