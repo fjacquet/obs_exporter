@@ -45,7 +45,7 @@ removed or renamed, and the existing Grafana panel keeps working.
 ### Answers to ADR-0011's open questions
 
 | # | Question | Answer | Source |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | Auth and config surface | Same 4443, same `X-SDS-AUTH-TOKEN` from `/login`, role `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. One bool flag, no `flux:` block. | reporter + admin guide, "Flux API" |
 | 2 | Bucket/measurement mapping | Table below. Three buckets, not two. | admin guide, "Flux API field descriptions" |
 | 3 | Version skew | Warning plus absent series, never a hard collector failure. | reporter; the 4.3 guide confirms `net` has no `utilization` field. Its presence in 3.8 is the reporter's recollection, unverified either way — which is itself the argument for tolerating absence rather than asserting a schema |
@@ -120,20 +120,20 @@ The Flux collector. Entirely additive and opt-in.
 
 ```go
 type pingItem struct {
-	Name   string `xml:"Name"`
-	Value  string `xml:"Value"`
-	Status string `xml:"Status"`
+ Name   string `xml:"Name"`
+ Value  string `xml:"Value"`
+ Status string `xml:"Status"`
 }
 
 type pingResp struct {
-	Items []pingItem `xml:"PingItem"`
+ Items []pingItem `xml:"PingItem"`
 }
 ```
 
 Emitted:
 
 | Metric | Source | Absent when |
-|---|---|---|
+| --- | --- | --- |
 | `ecs_node_active_connections{node}` | item `Name=LOAD_FACTOR`, `Value` | item missing, or `Value` unparseable |
 | `ecs_node_maintenance_mode{node}` | item `Name=MAINTENANCE_MODE`, `Status`: `OFF`→0, `ON`→1 | item missing, or `Status` is `UNKNOWN` or any other string |
 | `ecs_node_scrape_up{node,endpoint="object"}` | unchanged | never |
@@ -178,15 +178,15 @@ Tests in `dt_test.go`, against the reporter's verbatim 4.3 payload:
 type SampleType uint8
 
 const (
-	Gauge SampleType = iota // zero value: every existing sample is unchanged
-	Counter
+ Gauge SampleType = iota // zero value: every existing sample is unchanged
+ Counter
 )
 
 type Sample struct {
-	Name   string
-	Labels []Label
-	Value  float64
-	Type   SampleType
+ Name   string
+ Labels []Label
+ Value  float64
+ Type   SampleType
 }
 ```
 
@@ -256,7 +256,7 @@ counters, `monitoring_vdc` VDC-wide values already expressed as rates.
 **`monitoring_op` — per node**
 
 | Measurement / field | Metric | Type | Note |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `cpu` / `usage_user` | `ecs_node_cpu_utilization_percent{node}` | gauge | filtered to `cpu == "cpu-total"` |
 | `mem` / `used_percent` | `ecs_node_memory_utilization_percent{node}` | gauge | |
 | `mem` / `used` | `ecs_node_memory_used_bytes{node}` | gauge | |
@@ -266,7 +266,7 @@ counters, `monitoring_vdc` VDC-wide values already expressed as rates.
 **`monitoring_op` — cluster-scoped**
 
 | Measurement / field | Metric | Type |
-|---|---|---|
+| --- | --- | --- |
 | `dtquery_dt_status` / `total` | `ecs_cluster_dt_total` | gauge |
 | `dtquery_dt_status` / `unready` | `ecs_cluster_dt_unready` | gauge |
 | `dtquery_dt_status` / `unknown` | `ecs_cluster_dt_unknown` | gauge |
@@ -274,7 +274,7 @@ counters, `monitoring_vdc` VDC-wide values already expressed as rates.
 **`monitoring_main` — per node, cumulative**
 
 | Measurement / field | Metric | Type |
-|---|---|---|
+| --- | --- | --- |
 | `statDataHead_performance_internal_transactions` / `succeed_request_counter` | `ecs_node_requests_total{node,outcome="success"}` | counter |
 | `statDataHead_performance_internal_transactions` / `failed_request_counter` | `ecs_node_requests_total{node,outcome="failed"}` | counter |
 | `statDataHead_performance_internal_throughput` / `total_read_requests_size` | `ecs_node_request_bytes_total{node,op="read"}` | counter |
@@ -283,7 +283,7 @@ counters, `monitoring_vdc` VDC-wide values already expressed as rates.
 **`monitoring_vdc` — cluster-wide, already per-second**
 
 | Measurement / field | Metric | Type |
-|---|---|---|
+| --- | --- | --- |
 | `cq_performance_transaction` / `succeed_request_counter` | `ecs_cluster_requests_per_second{outcome="success"}` | gauge |
 | `cq_performance_transaction` / `failed_request_counter` | `ecs_cluster_requests_per_second{outcome="failed"}` | gauge |
 | `cq_performance_throughput` / `total_read_requests_size` | `ecs_cluster_request_bytes_per_second{op="read"}` | gauge |
@@ -354,7 +354,7 @@ the one assumption no document settles.
 ### Degradation
 
 | Condition | Behaviour |
-|---|---|
+| --- | --- |
 | Endpoint unreachable, 401, 403 | `ecs_collector_up{collector="flux"}=0`, no samples, every other collector unaffected |
 | One measurement absent or renamed | warning logged once per cycle, samples absent, collector stays up |
 | Column missing, or a cell that will not parse | that sample absent (ADR-0007) |
