@@ -110,3 +110,56 @@ func TestSeriesTreatsNullAsAbsent(t *testing.T) {
 		})
 	}
 }
+
+// "Current" means the newest point, not the newest point that happens to parse.
+// Falling back to an older reading publishes stale data under a live gauge, which
+// is the time-axis form of the absent-never-zero rule (ADR-0007): a value we
+// cannot read now must be absent, not quietly replaced by one from before.
+func TestLatestDoesNotFallBackToAnOlderPoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		series  Series
+		wantVal float64
+		wantOK  bool
+	}{
+		{
+			name:    "newest parses",
+			series:  Series{{"t": "100", "Space": "5"}, {"t": "200", "Space": "9"}},
+			wantVal: 9, wantOK: true,
+		},
+		{
+			name:   "newest unparseable, older valid: absent rather than stale",
+			series: Series{{"t": "100", "Space": "500"}, {"t": "200", "Space": "N/A"}},
+			wantOK: false,
+		},
+		{
+			name:   "newest is null, older valid: still absent",
+			series: Series{{"t": "100", "Space": "500"}, {"t": "200", "Space": "null"}},
+			wantOK: false,
+		},
+		{
+			// Order in the payload must not matter — only t does.
+			name:   "unparseable newest listed first",
+			series: Series{{"t": "200", "Space": "N/A"}, {"t": "100", "Space": "500"}},
+			wantOK: false,
+		},
+		{
+			name:    "single valid point",
+			series:  Series{{"t": "1", "Capacity": "42"}},
+			wantVal: 42, wantOK: true,
+		},
+		{name: "empty series", series: Series{}, wantOK: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := tc.series.Latest()
+			if ok != tc.wantOK {
+				t.Fatalf("present = %v, want %v (value %v)", ok, tc.wantOK, got)
+			}
+			if ok && got != tc.wantVal {
+				t.Errorf("value = %v, want %v", got, tc.wantVal)
+			}
+		})
+	}
+}

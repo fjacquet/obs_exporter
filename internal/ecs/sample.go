@@ -35,6 +35,20 @@ func (s Sample) WithCluster(name string) Sample {
 	return Sample{Name: s.Name, Labels: labels, Value: s.Value}
 }
 
+// copyLabels detaches a sample from the caller's label slice, as WithCluster
+// already does. Callers commonly build one label set per loop iteration and pass
+// it to several appends; without this they would all share a backing array, and a
+// later edit that mutated or reused it would silently rewrite samples already
+// emitted.
+func copyLabels(labels []Label) []Label {
+	if len(labels) == 0 {
+		return nil
+	}
+	out := make([]Label, len(labels))
+	copy(out, labels)
+	return out
+}
+
 // appendSeries appends the newest point of s to out. A series with no parseable
 // value appends nothing: unparseable and missing values yield absent samples,
 // never zeros (ADR-0007). Passing no labels yields a sample with none.
@@ -43,7 +57,7 @@ func appendSeries(out []Sample, name string, s Series, labels ...Label) []Sample
 	if !ok {
 		return out
 	}
-	return append(out, Sample{Name: name, Labels: labels, Value: v})
+	return append(out, Sample{Name: name, Labels: copyLabels(labels), Value: v})
 }
 
 // appendNum appends n to out when it parsed. An unset Num appends nothing —
@@ -53,7 +67,7 @@ func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample {
 	if !n.Set {
 		return out
 	}
-	return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
+	return append(out, Sample{Name: name, Labels: copyLabels(labels), Value: n.Val})
 }
 
 // appendBool appends b to out as 1 or 0 when the cluster reported it. An unset
@@ -68,5 +82,5 @@ func appendBool(out []Sample, name string, b Bool, labels ...Label) []Sample {
 	if b.Val {
 		v = 1
 	}
-	return append(out, Sample{Name: name, Labels: labels, Value: v})
+	return append(out, Sample{Name: name, Labels: copyLabels(labels), Value: v})
 }

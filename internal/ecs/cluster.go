@@ -86,49 +86,38 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 	}
 
 	var out []Sample
-	num := func(name string, n Num) {
-		if n.Set {
-			out = append(out, Sample{Name: name, Value: n.Val})
-		}
-	}
-	series := func(name string, s Series, labels ...Label) {
-		if v, ok := s.Latest(); ok {
-			out = append(out, Sample{Name: name, Labels: labels, Value: v})
-		}
-	}
+	out = appendNum(out, "ecs_cluster_nodes", z.NumNodes)
+	out = appendNum(out, "ecs_cluster_good_nodes", z.NumGoodNodes)
+	out = appendNum(out, "ecs_cluster_bad_nodes", z.NumBadNodes)
+	out = appendNum(out, "ecs_cluster_maintenance_nodes", z.NumMaintenanceNodes)
 
-	num("ecs_cluster_nodes", z.NumNodes)
-	num("ecs_cluster_good_nodes", z.NumGoodNodes)
-	num("ecs_cluster_bad_nodes", z.NumBadNodes)
-	num("ecs_cluster_maintenance_nodes", z.NumMaintenanceNodes)
+	out = appendNum(out, "ecs_cluster_disks", z.NumDisks)
+	out = appendNum(out, "ecs_cluster_good_disks", z.NumGoodDisks)
+	out = appendNum(out, "ecs_cluster_bad_disks", z.NumBadDisks)
+	out = appendNum(out, "ecs_cluster_maintenance_disks", z.NumMaintenanceDisks)
+	out = appendNum(out, "ecs_cluster_ready_to_replace_disks", z.NumReadyToReplaceDisks)
 
-	num("ecs_cluster_disks", z.NumDisks)
-	num("ecs_cluster_good_disks", z.NumGoodDisks)
-	num("ecs_cluster_bad_disks", z.NumBadDisks)
-	num("ecs_cluster_maintenance_disks", z.NumMaintenanceDisks)
-	num("ecs_cluster_ready_to_replace_disks", z.NumReadyToReplaceDisks)
+	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackCritical, Label{"severity", "critical"})
+	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackError, Label{"severity", "error"})
+	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackInfo, Label{"severity", "info"})
+	out = appendSeries(out, "ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackWarning, Label{"severity", "warning"})
 
-	series("ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackCritical, Label{"severity", "critical"})
-	series("ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackError, Label{"severity", "error"})
-	series("ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackInfo, Label{"severity", "info"})
-	series("ecs_cluster_alerts_unacknowledged", z.AlertsNumUnackWarning, Label{"severity", "warning"})
+	out = appendSeries(out, "ecs_cluster_disk_space_total_bytes", z.DiskSpaceTotalCurrent)
+	out = appendSeries(out, "ecs_cluster_disk_space_free_bytes", z.DiskSpaceFreeCurrent)
+	out = appendSeries(out, "ecs_cluster_disk_space_allocated_bytes", z.DiskSpaceAllocatedCurrent)
+	out = appendSeries(out, "ecs_cluster_disk_space_reserved_bytes", z.DiskSpaceReservedCurrent)
+	out = appendSeries(out, "ecs_cluster_disk_space_offline_total_bytes", z.DiskSpaceOfflineTotalCurrent)
 
-	series("ecs_cluster_disk_space_total_bytes", z.DiskSpaceTotalCurrent)
-	series("ecs_cluster_disk_space_free_bytes", z.DiskSpaceFreeCurrent)
-	series("ecs_cluster_disk_space_allocated_bytes", z.DiskSpaceAllocatedCurrent)
-	series("ecs_cluster_disk_space_reserved_bytes", z.DiskSpaceReservedCurrent)
-	series("ecs_cluster_disk_space_offline_total_bytes", z.DiskSpaceOfflineTotalCurrent)
-
-	series("ecs_cluster_transaction_read_latency_milliseconds", z.TransactionReadLatency)
-	series("ecs_cluster_transaction_write_latency_milliseconds", z.TransactionWriteLatency)
-	series("ecs_cluster_transaction_read_bandwidth_mb_per_second", z.TransactionReadBandwidth)
-	series("ecs_cluster_transaction_write_bandwidth_mb_per_second", z.TransactionWriteBandwidth)
-	series("ecs_cluster_transactions_read_per_second", z.TransactionReadTransactionsPerSec)
-	series("ecs_cluster_transactions_write_per_second", z.TransactionWriteTransactionsPerSec)
+	out = appendSeries(out, "ecs_cluster_transaction_read_latency_milliseconds", z.TransactionReadLatency)
+	out = appendSeries(out, "ecs_cluster_transaction_write_latency_milliseconds", z.TransactionWriteLatency)
+	out = appendSeries(out, "ecs_cluster_transaction_read_bandwidth_mb_per_second", z.TransactionReadBandwidth)
+	out = appendSeries(out, "ecs_cluster_transaction_write_bandwidth_mb_per_second", z.TransactionWriteBandwidth)
+	out = appendSeries(out, "ecs_cluster_transactions_read_per_second", z.TransactionReadTransactionsPerSec)
+	out = appendSeries(out, "ecs_cluster_transactions_write_per_second", z.TransactionWriteTransactionsPerSec)
 
 	if len(z.TransactionErrors.ErrorSuccessTotals) > 0 {
-		num("ecs_cluster_transaction_errors_total", z.TransactionErrors.ErrorSuccessTotals[0].ErrorTotal)
-		num("ecs_cluster_transaction_successes_total", z.TransactionErrors.ErrorSuccessTotals[0].SuccessTotal)
+		out = appendNum(out, "ecs_cluster_transaction_errors_total", z.TransactionErrors.ErrorSuccessTotals[0].ErrorTotal)
+		out = appendNum(out, "ecs_cluster_transaction_successes_total", z.TransactionErrors.ErrorSuccessTotals[0].SuccessTotal)
 	}
 	for _, te := range z.TransactionErrors.Types {
 		if !te.ErrorCount.Set {
@@ -146,11 +135,11 @@ func (Cluster) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error
 		})
 	}
 
-	series("ecs_cluster_replication_ingress_traffic", z.ReplicationIngressTrafficCurrent)
-	series("ecs_cluster_replication_egress_traffic", z.ReplicationEgressTrafficCurrent)
+	out = appendSeries(out, "ecs_cluster_replication_ingress_traffic", z.ReplicationIngressTrafficCurrent)
+	out = appendSeries(out, "ecs_cluster_replication_egress_traffic", z.ReplicationEgressTrafficCurrent)
 
-	num("ecs_cluster_replication_rpo_lag_seconds", z.ReplicationRpoLag)
-	num("ecs_cluster_replication_rpo_timestamp_seconds", z.ReplicationRpoTimestamp)
+	out = appendNum(out, "ecs_cluster_replication_rpo_lag_seconds", z.ReplicationRpoLag)
+	out = appendNum(out, "ecs_cluster_replication_rpo_timestamp_seconds", z.ReplicationRpoTimestamp)
 
 	out = append(out, z.gcFields.samples()...)
 	out = append(out, z.recoveryFields.samples()...)
