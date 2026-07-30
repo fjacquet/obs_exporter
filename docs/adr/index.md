@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 | ADR | Decision |
-|---|---|
+| --- | --- |
 | [0001](0001-ci-supply-chain-hardening.md) | CI/CD supply-chain hardening: SHA-pinned actions, GoReleaser, SBOM, Semgrep |
 | [0002](0002-prometheus-snapshot-model.md) | Background snapshot collection model with dual Prometheus + OTLP export |
 | [0003](0003-hand-rolled-client-over-goobjectscale.md) | Hand-rolled resty/v2 client instead of the goobjectscale SDK |
@@ -12,3 +12,5 @@
 | [0008](0008-swagger-4.2-validation-findings.md) | Swagger 4.2 validation findings: billing body, `/vdc/nodes`, content-type — all three verified live on 4.3 and closed, no code change needed |
 | [0009](0009-modular-resource-collectors.md) | Modular `ResourceCollector` interface: one file per metric domain, per-cluster feature-flag wiring, per-collector degradation |
 | [0010](0010-mockecs-demo-harness.md) | mockecs fake-API demo harness (demo-only, never published) and the duplicated-fixtures sync constraint |
+| [0011](0011-flux-collector-for-unreachable-metrics.md) | Opt-in Flux collector accepted as direction for the performance fields the dashboard omits and the DT stats a segmented network hides; implementation deferred |
+| [0012](0012-label-consolidation-and-sum-safety.md) | Consolidate one-measurement-many-names families into one name plus a label, bounded by the sum-safety rule: a whole and its parts never share a metric name |

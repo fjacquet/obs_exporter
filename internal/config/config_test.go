@@ -181,6 +181,33 @@ clusters:
 	if !cfg.Clusters[0].CollectDT {
 		t.Error("DT should be enabled")
 	}
+	// Unset collectQuotas must not be dragged along by collectMetering: false.
+	if !cfg.Clusters[0].QuotasEnabled() {
+		t.Error("quotas should default to enabled when collectQuotas is unset")
+	}
+}
+
+func TestLoadQuotasDisable(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    username: monitor
+    password: x
+    collectQuotas: false
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Clusters[0].QuotasEnabled() {
+		t.Error("quotas should be disabled")
+	}
+	// Quotas are a knob inside metering, not a replacement for it: the bulk
+	// billing call must still run.
+	if !cfg.Clusters[0].MeteringEnabled() {
+		t.Error("metering should stay enabled")
+	}
 }
 
 func TestLoadInsecureSkipVerifyNativeBool(t *testing.T) {

@@ -2,8 +2,6 @@ package ecs
 
 import (
 	"context"
-	"fmt"
-	"net/url"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 )
@@ -24,15 +22,6 @@ type namespacesResp struct {
 	} `json:"namespace"`
 }
 
-// namespaceQuotaResp models GET /object/namespaces/namespace/{ns}/quota.
-// blockSize (hard quota) and notificationSize (soft notification threshold)
-// are in GiB; -1 means unset.
-type namespaceQuotaResp struct {
-	Namespace        string `json:"namespace"`
-	BlockSize        Num    `json:"blockSize"`
-	NotificationSize Num    `json:"notificationSize"`
-}
-
 type billingBulkReq struct {
 	ID []string `json:"id"`
 }
@@ -47,49 +36,26 @@ type billingBulkResp struct {
 	} `json:"namespace_billing_infos"`
 }
 
-// Metering collects per-namespace quota and billing (usage) stats.
+// Metering collects per-namespace billing (usage) stats. Quota limits are the
+// Quotas collector's job.
 type Metering struct{}
 
 // Name identifies this collector in ecs_collector_up.
 func (Metering) Name() string { return "metering" }
 
-// Collect lists namespaces, fetches each quota, and pulls usage for all
-// namespaces in one bulk billing call.
+// Collect lists namespaces and pulls usage for all of them in one bulk billing
+// call — one POST regardless of namespace count.
 func (Metering) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
-	var nss namespacesResp
-	if err := c.Get(ctx, pathNamespaces, &nss); err != nil {
+	names, err := namespaceNames(ctx, c)
+	if err != nil {
 		return nil, err
-	}
-	names := make([]string, 0, len(nss.Namespace))
-	for _, ns := range nss.Namespace {
-		if ns.Name != "" {
-			names = append(names, ns.Name)
-		}
-	}
-	if len(names) == 0 {
-		return nil, nil
-	}
-
-	var out []Sample
-	for _, name := range names {
-		var q namespaceQuotaResp
-		if err := c.Get(ctx, fmt.Sprintf("%s/namespace/%s/quota", pathNamespaces, url.PathEscape(name)), &q); err != nil {
-			// One namespace's quota failure shouldn't drop the whole domain.
-			continue
-		}
-		nsLabel := []Label{{Key: "namespace", Value: name}}
-		if q.BlockSize.Set && q.BlockSize.Val >= 0 {
-			out = append(out, Sample{Name: "ecs_namespace_quota_hard_bytes", Labels: nsLabel, Value: q.BlockSize.Val * gib})
-		}
-		if q.NotificationSize.Set && q.NotificationSize.Val >= 0 {
-			out = append(out, Sample{Name: "ecs_namespace_quota_soft_bytes", Labels: nsLabel, Value: q.NotificationSize.Val * gib})
-		}
 	}
 
 	var billing billingBulkResp
 	if err := c.Post(ctx, pathBillingBulk, billingBulkReq{ID: names}, &billing); err != nil {
-		return out, err
+		return nil, err
 	}
+	var out []Sample
 	for _, info := range billing.Infos {
 		nsLabel := []Label{{Key: "namespace", Value: info.Namespace}}
 		if info.TotalSize.Set {
@@ -106,4 +72,21 @@ func (Metering) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, erro
 		}
 	}
 	return out, nil
+}
+
+// namespaceNames lists the cluster's namespaces, dropping unnamed entries. Both
+// namespace collectors need it, and neither can cache it for the other:
+// collectors are independent by design (ADR-0009), so each pays one listing.
+func namespaceNames(ctx context.Context, c ecsclient.Client) ([]string, error) {
+	var nss namespacesResp
+	if err := c.Get(ctx, pathNamespaces, &nss); err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(nss.Namespace))
+	for _, ns := range nss.Namespace {
+		if ns.Name != "" {
+			names = append(names, ns.Name)
+		}
+	}
+	return names, nil
 }

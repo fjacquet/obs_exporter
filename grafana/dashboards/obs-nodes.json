@@ -204,7 +204,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_nic_received_bandwidth{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_nic_bandwidth{direction=\"received\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "rx {{cluster}} {{node}}",
           "refId": "A"
         },
@@ -213,7 +213,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_nic_transmitted_bandwidth{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_nic_bandwidth{direction=\"transmitted\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "tx {{cluster}} {{node}}",
           "refId": "B"
         }
@@ -258,7 +258,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_node_disk_space_free_bytes{cluster=~\"$cluster\",node=~\"$node\"}",
+          "expr": "ecs_node_disk_space_bytes{type=\"free\",cluster=~\"$cluster\",node=~\"$node\"}",
           "legendFormat": "{{cluster}} {{node}}",
           "refId": "A"
         }

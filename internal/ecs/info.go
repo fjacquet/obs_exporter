@@ -9,13 +9,14 @@ import (
 const pathVdcNodes = "/vdc/nodes"
 
 // vdcNodesResp models GET /vdc/nodes — the management node inventory. Only the
-// software version (and, for the DT collector, the per-node management IPs) are
-// consumed from it.
+// software version (and, for the DT collector, the per-node addressing and node
+// name) are consumed from it.
 type vdcNodesResp struct {
 	Node []struct {
-		Version string `json:"version"`
-		MgmtIP  string `json:"mgmt_ip"`
-		DataIP  string `json:"data_ip"`
+		Version  string `json:"version"`
+		Nodename string `json:"nodename"`
+		MgmtIP   string `json:"mgmt_ip"`
+		DataIP   string `json:"data_ip"`
 	} `json:"node"`
 }
 

@@ -26,7 +26,7 @@ to the family.
 Endpoints validated against the swagger (7 management paths used by the code):
 
 | Endpoint | Method | Swagger | Verdict |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `/login` | GET (basic auth → `X-SDS-AUTH-TOKEN`) | present, `basic` security | match |
 | `/dashboard/zones/localzone` | GET | present | match |
 | `/dashboard/zones/localzone/nodes` | GET | present | match |

@@ -43,12 +43,21 @@ type Config struct {
 	Trace bool
 }
 
+// MaxConcurrentRequests is the widest fan-out any collector may issue against a
+// single cluster. It sizes this client's idle-connection pool, so a collector
+// that exceeds it silently trades pooled connections for TLS handshakes — keep
+// the two in step by deriving the collector's limit from this constant.
+const MaxConcurrentRequests = 8
+
 // ClusterClient is the live per-cluster ECS management REST client.
 type ClusterClient struct {
-	cfg   Config
-	rc    *resty.Client
+	cfg Config
+	rc  *resty.Client
+	// mu guards token only, and is never held across a network call.
 	mu    sync.Mutex
 	token string
+	// loginMu serialises the login round-trip itself. See ensureToken.
+	loginMu sync.Mutex
 }
 
 // NewClusterClient builds a client. Auth is lazy (on first call).
@@ -61,6 +70,17 @@ func NewClusterClient(cfg Config) *ClusterClient {
 			InsecureSkipVerify: cfg.InsecureSkipVerify, // operator opt-in for self-signed ECS certs
 			MinVersion:         tls.VersionTLS12,
 		})
+	}
+	// resty's default transport keeps GOMAXPROCS+1 idle connections per host —
+	// three on a two-CPU container. Collectors fan out up to MaxConcurrentRequests
+	// GETs at one cluster, and every connection past the idle limit is closed
+	// instead of pooled, re-paying a TLS handshake on the next cycle. Size the
+	// pool to the widest fan-out we issue. Skipped when the caller supplied its
+	// own client: that transport is theirs to tune.
+	if cfg.HTTPClient == nil {
+		if tr, ok := rc.GetClient().Transport.(*http.Transport); ok {
+			tr.MaxIdleConnsPerHost = MaxConcurrentRequests
+		}
 	}
 	// Retry on transport errors and 5xx, but never on 4xx (do not retry
 	// auth/permission failures). resty passes r == nil on transport/TLS errors,

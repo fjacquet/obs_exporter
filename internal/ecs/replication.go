@@ -40,18 +40,21 @@ func (Replication) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, e
 	if err := c.Get(ctx, pathReplicationGroups, &r); err != nil {
 		return nil, err
 	}
-	warnUnknownHalShape(c.Name(), pathReplicationGroups, r.Embedded.KeySeen)
+	warnHalShape(c.Name(), pathReplicationGroups, r.Embedded.halShape)
 	var out []Sample
 	for _, rg := range r.Embedded.Instances {
-		rgLabel := []Label{{Key: "rg", Value: rg.Name}}
-		out = appendSeries(out, "ecs_replication_group_ingress_traffic", rg.ReplicationIngressTraffic, rgLabel...)
-		out = appendSeries(out, "ecs_replication_group_egress_traffic", rg.ReplicationEgressTraffic, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_chunks_repo_pending_replication_bytes", rg.ChunksRepoPendingReplicationTotalSize, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_chunks_journal_pending_replication_bytes", rg.ChunksJournalPendingReplicationTotalSize, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_chunks_pending_xor_bytes", rg.ChunksPendingXorTotalSize, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_rpo_timestamp_seconds", rg.ReplicationRpoTimestamp, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_rpo_lag_seconds", rg.ReplicationRpoLag, rgLabel...)
-		out = appendNum(out, "ecs_replication_group_zones", rg.NumZones, rgLabel...)
+		group := Label{Key: "rg", Value: rg.Name}
+		// The traffic pair mirrors the cluster-level one, and the three chunk
+		// backlogs are disjoint pools of the same measure in the same unit, so both
+		// collapse to one name plus a dimension (ADR-0012).
+		out = appendSeries(out, "ecs_replication_group_traffic", rg.ReplicationIngressTraffic, group, Label{"direction", "ingress"})
+		out = appendSeries(out, "ecs_replication_group_traffic", rg.ReplicationEgressTraffic, group, Label{"direction", "egress"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksRepoPendingReplicationTotalSize, group, Label{"type", "repo"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksJournalPendingReplicationTotalSize, group, Label{"type", "journal"})
+		out = appendNum(out, "ecs_replication_group_chunks_pending_bytes", rg.ChunksPendingXorTotalSize, group, Label{"type", "xor"})
+		out = appendNum(out, "ecs_replication_group_rpo_timestamp_seconds", rg.ReplicationRpoTimestamp, group)
+		out = appendNum(out, "ecs_replication_group_rpo_lag_seconds", rg.ReplicationRpoLag, group)
+		out = appendNum(out, "ecs_replication_group_zones", rg.NumZones, group)
 	}
 	return out, nil
 }

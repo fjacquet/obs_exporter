@@ -31,6 +31,14 @@ clusters:
     # collectMetering: namespace quota + billing usage (default true). Disable on
     # very large clusters if the billing query is too slow for the interval.
     # collectMetering: false
+    # collectQuotas: the quotas collector, per-namespace quota limits (default
+    # true, requires collectMetering). There is no bulk quota endpoint, so this
+    # is one request per namespace per cycle; turn it off on a cluster that sets
+    # no quotas — namespace usage, objects and MPU metrics come from the bulk
+    # billing POST and are unaffected.
+    # collectQuotas: false
     # collectDT: opt-in legacy node-local DT/connection scraping over ports
-    # 9101/9021 (undocumented ECS internals, kept for v1 parity).
+    # 9101/9021 (undocumented ECS internals, kept for v1 parity). On a
+    # network-segmented cluster port 9101 is not reachable from outside the
+    # cluster — see docs/metrics.md.
     # collectDT: true

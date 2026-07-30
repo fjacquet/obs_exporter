@@ -176,7 +176,7 @@ detection added.
 `internal/ecs/hal_test.go` — table-driven over `halList[struct{ Name string }]`:
 
 | input | expected |
-|---|---|
+| --- | --- |
 | `{"_instances":[{…},{…}]}` | 2 items, `KeySeen=true` |
 | `{"instances":[{…},{…}]}` | 2 items, `KeySeen=true` |
 | `{"_instances":[]}` | 0 items, `KeySeen=true` (legitimately empty cluster) |

@@ -18,16 +18,16 @@ func TestAllocationComponentFieldsSamples(t *testing.T) {
 	}
 	got := a.samples()
 
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
+	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"type", "user_data"})
+	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"type", "system_metadata"})
+	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"type", "local_protection"})
 
 	// geo_cache and geo_copy were not reported: they must be absent, not zero.
 	// Padding them with zeros would imply the breakdown is exhaustive, which it
 	// is not — on a live 4.3 cluster the components sum to 12.8% less than
 	// diskSpaceAllocatedCurrent.
 	for _, purpose := range []string{"geo_cache", "geo_copy"} {
-		if _, ok := findSample(got, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", purpose}); ok {
+		if _, ok := findSample(got, "ecs_cluster_disk_space_allocated_component_bytes", Label{"type", purpose}); ok {
 			t.Errorf("purpose=%s must be absent when the cluster does not report it", purpose)
 		}
 	}
@@ -59,7 +59,7 @@ func TestAllocationComponentFieldsSamplesAllPurposes(t *testing.T) {
 		{"user_data", 1}, {"system_metadata", 2}, {"geo_cache", 3},
 		{"geo_copy", 4}, {"local_protection", 5},
 	} {
-		mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", tc.want, Label{"purpose", tc.purpose})
+		mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", tc.want, Label{"type", tc.purpose})
 	}
 }
 

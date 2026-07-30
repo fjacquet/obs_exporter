@@ -140,7 +140,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_gc_pending_bytes{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_gc_bytes{state=\"pending\",cluster=~\"$cluster\"}",
           "legendFormat": "pending {{scope}}",
           "refId": "A"
         },
@@ -149,7 +149,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_cluster_gc_unreclaimable_bytes{cluster=~\"$cluster\"}",
+          "expr": "ecs_cluster_gc_bytes{state=\"unreclaimable\",cluster=~\"$cluster\"}",
           "legendFormat": "unreclaimable {{scope}}",
           "refId": "B"
         }
@@ -332,7 +332,7 @@
             "uid": "prometheus"
           },
           "expr": "ecs_cluster_disk_space_allocated_component_bytes{cluster=~\"$cluster\"}",
-          "legendFormat": "{{purpose}} {{cluster}}",
+          "legendFormat": "{{type}} {{cluster}}",
           "refId": "A"
         }
       ]

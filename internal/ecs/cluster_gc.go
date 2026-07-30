@@ -30,20 +30,29 @@ type gcFields struct {
 // backlogs: on a live 4.3 cluster detected equalled pending + unreclaimable +
 // reclaimed exactly, on both scopes. Pending and unreclaimable are the two that
 // can fall as well as rise, so they stay unsuffixed gauges.
+//
+// That identity is also why the two counters are NOT merged under one name with
+// a kind label: detected is the sum of the other three, so a single
+// gc_bytes_total{kind="reclaimed"|"detected"} family would double-count under
+// sum(). Pending and unreclaimable are disjoint, so those two do share a name.
+// The gauge/counter split is independent of that and load-bearing on its own —
+// rate() must never see a gauge series (ADR-0012).
 func (g gcFields) samples() []Sample {
 	var out []Sample
 
+	pending, unreclaimable := Label{"state", "pending"}, Label{"state", "unreclaimable"}
+
 	user := Label{Key: "scope", Value: "user"}
-	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCUserPending, user, pending)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCUserUnreclaimable, user, unreclaimable)
 	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCUserReclaimed, user)
-	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
 	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCUserTotalDetected, user)
 	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCUserDataIsEnabled, user)
 
 	system := Label{Key: "scope", Value: "system"}
-	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCSystemPending, system, pending)
+	out = appendSeries(out, "ecs_cluster_gc_bytes", g.GCSystemUnreclaimable, system, unreclaimable)
 	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCSystemReclaimed, system)
-	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
 	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCSystemTotalDetected, system)
 	out = appendBool(out, "ecs_cluster_gc_enabled", g.GCSystemMetadataIsEnabled, system)
 

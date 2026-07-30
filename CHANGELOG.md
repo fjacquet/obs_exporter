@@ -6,6 +6,129 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-30
+
+### Removed — BREAKING
+- **Around thirty metric names are gone**, consolidated into one name plus a
+  label wherever they were one measurement split across several names
+  (ADR-0012). `docs/migration-v3.md` carries the complete old→new table; the
+  short version:
+  - counts by state — `ecs_cluster_{good,bad,maintenance}_nodes`,
+    `ecs_cluster_{good,bad,maintenance,ready_to_replace}_disks` and the
+    `ecs_node_*` equivalents → `ecs_cluster_nodes{state}`,
+    `ecs_cluster_disks{state}`, `ecs_node_disks{state}`
+  - capacity — `disk_space_{allocated,free,reserved}_bytes` →
+    `ecs_cluster_disk_space_bytes{type}`, `ecs_node_disk_space_bytes{type}`
+  - transactions — the `read`/`write` name pairs for latency, bandwidth and TPS →
+    `{op="read"|"write"}`, cluster and node; `transaction_errors_total` and
+    `transaction_successes_total` → `ecs_cluster_transactions_total{outcome}`
+  - replication — `replication_{ingress,egress}_traffic` →
+    `…_traffic{direction}`, cluster and per group; the three
+    `chunks_*_pending_*_bytes` → `ecs_replication_group_chunks_pending_bytes{kind}`
+  - GC — `gc_pending_bytes` and `gc_unreclaimable_bytes` →
+    `ecs_cluster_gc_bytes{scope,state}`
+  - NIC — `nic_{received,transmitted}_bandwidth` → `ecs_node_nic_bandwidth{direction}`
+  - node-local scrapes — `ecs_node_dt_up` → `ecs_node_scrape_up{endpoint}`
+- **One label key per dimension.** `kind` and `purpose` both named the same
+  "which partition of these bytes" semantic as `type`, chosen independently at
+  each call site, so no query could group across the families. `type` is now the
+  one key: `ecs_replication_group_chunks_pending_bytes{kind}` →`{type}` and
+  `ecs_cluster_disk_space_allocated_component_bytes{purpose}` → `{type}`. The
+  metric names are unchanged; the label key is not. ADR-0012 records the key
+  vocabulary so the next consolidation picks from it instead of inventing a
+  synonym.
+
+### Changed — BREAKING
+- **`ecs_cluster_nodes`, `ecs_cluster_disks` and `ecs_node_disks` changed
+  meaning.** They still exist and still return data, but they are now the
+  per-state breakdown, not the total. The totals moved to
+  `ecs_cluster_nodes_installed`, `ecs_cluster_disks_installed` and
+  `ecs_node_disks_installed`. A dashboard or alert querying the old names keeps
+  working and silently starts answering a different question — grep for these
+  three before upgrading. Note the totals are deliberately **not** the sum of the
+  state series: ECS documents five node health states and publishes a count for
+  three, so `installed - sum(by state)` is a real "unaccounted for" signal.
+- All six bundled Grafana dashboards were rewritten against the new names (47
+  query references). Pull them together with the binary.
+- The consolidation moves series between names; it does not add or drop any. A
+  full `--once --debug` cycle against the reference payload still emits exactly
+  127 samples, the same count as 2.8.1.
+- **DT node labels now match the other collectors.** `ecs_node_dt_*` and
+  `ecs_node_active_connections` were labeled `node="<management IP>"` while every
+  other per-node metric used the dashboard's `displayName`, so the two sets could
+  not be joined in a query. They now use the `/vdc/nodes` `nodename`, which on a
+  live 4.3 cluster is exactly the dashboard's `displayName` for all five nodes.
+  Nodes whose inventory entry has no `nodename` still fall back to an IP.
+  **Breaking for `collectDT` users** who select or join on the old IP-valued
+  label; `collectDT` is off by default, so clusters that never enabled it are
+  unaffected.
+- Per-namespace quota requests now run concurrently (8 in flight) instead of one
+  after another. Emitted sample order still follows the namespace inventory, so
+  `--once --debug` output stays diffable between cycles.
+
+### Added
+- **`ecs_node_scrape_up{node,endpoint="dt"|"object"}`** replaces
+  `ecs_node_dt_up`. The DT collector scrapes two node-local ports that a
+  segmented network puts on different addresses, so one up-signal could not
+  describe both — and the object-port ping had **no** signal at all: its failure
+  showed only as an absent `ecs_node_active_connections`. Each endpoint now
+  reports its own reachability. On the recommended production layout you will see
+  `{endpoint="dt"}=0` beside `{endpoint="object"}=1`, which is the topology being
+  reported accurately rather than a new failure.
+- **A `quotas` collector**, split out of `metering`, so
+  `ecs_collector_up{collector="quotas"}` exists. Quota reads previously failed
+  silently inside metering: a cluster whose every quota GET was denied looked
+  identical to one with `collectQuotas: false` — no samples either way, metering
+  still reporting up. `collectQuotas` (default `true`, requires
+  `collectMetering`) now gates the collector. The split costs one extra namespace
+  listing per cycle and gives up the overlap between the quota fan-out and the
+  billing POST, since collectors run in sequence within a cluster; both are small
+  against the per-namespace GETs they guard.
+- ADR-0012 records the consolidation rule and the **sum-safety rule** that bounds
+  it — a whole and its parts never share a metric name — with the identities that
+  forced three exceptions, each verified on a live 4.3 payload:
+  `disk_space_total = allocated + free + reserved` (delta 0),
+  `gc_detected = pending + unreclaimable + reclaimed` (delta 0 on both scopes),
+  and `ec_coded ⊂ ec_applicable`. So `disk_space_total_bytes`, the two GC
+  counters, and the `ec_applicable`/`ec_coded` pair keep separate names —
+  the last being the one item of the proposal that was declined.
+- `docs/migration-v3.md`: full rename table, the three meaning changes called out
+  first, query-rewrite patterns, and the aggregations the consolidation makes
+  possible (`topk` across states, `state!="good"`, `sum without(kind)`).
+- `collectQuotas` (per cluster, default `true`) disables the per-namespace quota
+  fetch while keeping the rest of metering. The management API has no bulk quota
+  endpoint, so quotas are the only part of a collection cycle that scales with
+  namespace count — one GET per namespace. On a 55-namespace 4.3 cluster with no
+  quotas configured, those 55 requests produced zero samples every cycle.
+- A HAL payload carrying **both** `_instances` and `instances` with different
+  contents now logs a warning naming the cluster and path. The `_instances`
+  preference is unchanged and still correct; what changes is that discarding the
+  other array is no longer silent. Never observed in the field — from ECS 3.8 to
+  ObjectScale 4.3 only `_instances` has been seen — but it was the one remaining
+  way this decoder could drop data without saying so.
+
+### Fixed
+- The opt-in DT collector scraped both of its node-local ports at the node's
+  `mgmt_ip`. The object port (9021) answers on the **data** network, so on any
+  cluster that separates management from data traffic — the layout Dell
+  recommends for production, and the one a 4.3 site confirmed with `ss` and
+  `curl` — every `ecs_node_active_connections` scrape silently failed. The ping
+  now targets `data_ip` from `/vdc/nodes`, falling back to `mgmt_ip` when the
+  inventory publishes no data address; DT stats keep using `mgmt_ip`.
+
+### Documentation
+- ADR-0011 accepts an **opt-in Flux collector** as the direction for the metrics
+  the management API does not serve: the per-node CPU/memory/NIC and cluster
+  `transaction*` fields the dashboard documents but does not populate (re-confirmed
+  on 4.3.0.0.142978 — all twelve absent from a 40-key node instance, no
+  `transaction*` key in a 98-key cluster payload), and the DT counts that a
+  segmented network puts out of reach. Implementation is deferred; the ADR records
+  the constraints it must meet and the questions it must answer.
+- `docs/metrics.md` documents the DT reachability limit: on a segmented cluster
+  port 9101 listens on a private link-local VLAN, so an external exporter gets
+  `ecs_node_dt_up=0` while `ecs_node_active_connections` works over the data
+  network.
+
 ## [2.8.1] - 2026-07-30
 
 ### Fixed

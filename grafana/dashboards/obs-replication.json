@@ -60,7 +60,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(ecs_replication_group_ingress_traffic{cluster=~\"$cluster\"}, rg)",
+        "query": "label_values(ecs_replication_group_traffic{direction=\"ingress\",cluster=~\"$cluster\"}, rg)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
@@ -110,7 +110,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_ingress_traffic{cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_traffic{direction=\"ingress\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "in {{cluster}} {{rg}}",
           "refId": "A"
         },
@@ -119,7 +119,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_egress_traffic{cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_traffic{direction=\"egress\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "out {{cluster}} {{rg}}",
           "refId": "B"
         }
@@ -164,7 +164,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_repo_pending_replication_bytes{cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"repo\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "repo {{cluster}} {{rg}}",
           "refId": "A"
         },
@@ -173,7 +173,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_journal_pending_replication_bytes{cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"journal\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "journal {{cluster}} {{rg}}",
           "refId": "B"
         },
@@ -182,7 +182,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ecs_replication_group_chunks_pending_xor_bytes{cluster=~\"$cluster\",rg=~\"$group\"}",
+          "expr": "ecs_replication_group_chunks_pending_bytes{type=\"xor\",cluster=~\"$cluster\",rg=~\"$group\"}",
           "legendFormat": "xor {{cluster}} {{rg}}",
           "refId": "C"
         }

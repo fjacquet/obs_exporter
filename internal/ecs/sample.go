@@ -36,10 +36,15 @@ func (s Sample) WithCluster(name string) Sample {
 }
 
 // copyLabels detaches a sample from the caller's label slice, as WithCluster
-// already does. Callers commonly build one label set per loop iteration and pass
-// it to several appends; without this they would all share a backing array, and a
-// later edit that mutated or reused it would silently rewrite samples already
-// emitted.
+// already does.
+//
+// Every caller now passes discrete Label values, so the variadic slice is built
+// by the compiler per call and no caller can retain it — the copy defends
+// against nothing those call sites do today. It is kept because the hazard it
+// guards is real and returns the moment someone writes `labels...` again:
+// one label set built per loop iteration and spread into several appends would
+// have every sample sharing one backing array, and a later edit that reused it
+// would silently rewrite samples already emitted.
 func copyLabels(labels []Label) []Label {
 	if len(labels) == 0 {
 		return nil

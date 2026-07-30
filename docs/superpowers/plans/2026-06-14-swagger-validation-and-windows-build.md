@@ -17,7 +17,7 @@
 ## File structure
 
 | File | Workstream | Action |
-|---|---|---|
+| --- | --- | --- |
 | `docs/adr/0008-swagger-4.2-validation-findings.md` | WS1 | Create |
 | `docs/adr/index.md` | WS1 | Modify (add row) |
 | `docs/adr/0007-obs-4-1-api-alignment.md` | WS1 | Modify (cross-link) |
@@ -32,6 +32,7 @@
 ### Task 1: Create ADR-0008
 
 **Files:**
+
 - Create: `docs/adr/0008-swagger-4.2-validation-findings.md`
 
 - [ ] **Step 1: Inspect an existing ADR for the house format**
@@ -134,6 +135,7 @@ git commit -m "docs(adr): record swagger 4.2 validation findings (F1-F3)"
 ### Task 2: Wire ADR-0008 into the index and cross-link from ADR-0007
 
 **Files:**
+
 - Modify: `docs/adr/index.md`
 - Modify: `docs/adr/0007-obs-4-1-api-alignment.md`
 
@@ -194,7 +196,7 @@ row), `h: 8`; row markers are `h: 1`, full width.
 New panels (ids 31–42):
 
 | id | y | x | type | title | metric(s) | unit |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | 31 | 68 | 0 | timeseries | Namespace MPU usage | `ecs_namespace_mpu_used_bytes` | bytes |
 | 32 | 68 | 8 | timeseries | Namespace MPU parts | `ecs_namespace_mpu_parts` | — |
 | 33 | 76 | 0 | row | Node transactions | — | — |
@@ -211,14 +213,17 @@ New panels (ids 31–42):
 ### Task 3: Append the new panels
 
 **Files:**
+
 - Modify: `grafana/dashboards/obs-overview.json`
 
 - [ ] **Step 1: Confirm the append point and ids are still current**
 
 Run:
+
 ```bash
 jq '{maxBottom:([.panels[]|(.gridPos.y+.gridPos.h)]|max), maxId:([.panels[].id]|max), count:(.panels|length)}' grafana/dashboards/obs-overview.json
 ```
+
 Expected: `{"maxBottom":68,"maxId":30,"count":30}`. If different, adjust the `y` and
 `id` values below by the same offset before editing.
 
@@ -248,19 +253,23 @@ cd ../..
 - [ ] **Step 3: Verify the JSON is valid and the panels landed**
 
 Run:
+
 ```bash
 jq '{count:(.panels|length), newTitles:[.panels[]|select(.id>=31)|.title]}' grafana/dashboards/obs-overview.json
 ```
+
 Expected: `count` = 42, and `newTitles` lists the 12 titles from the table above.
 
 - [ ] **Step 4: Verify every new panel references an emitted metric**
 
 Run:
+
 ```bash
 for m in ecs_namespace_mpu_used_bytes ecs_namespace_mpu_parts ecs_node_transactions_read_per_second ecs_node_transactions_write_per_second ecs_node_transaction_read_bandwidth_mb_per_second ecs_node_transaction_write_bandwidth_mb_per_second ecs_cluster_maintenance_disks ecs_cluster_ready_to_replace_disks ecs_node_maintenance_disks ecs_node_ready_to_replace_disks ecs_node_dt_up ecs_node_dt_total ecs_node_dt_unready ecs_node_dt_unknown ecs_node_active_connections; do
   grep -rqlF "\"$m\"" $(find internal -name '*.go' ! -name '*_test.go') && echo "OK  $m" || echo "MISSING $m";
 done
 ```
+
 Expected: every line `OK` (all 15 metrics are emitted by the collectors).
 
 - [ ] **Step 5: Commit**
@@ -277,6 +286,7 @@ git commit -m "feat(grafana): chart namespace MPU, node transactions, disk atten
 ### Task 4: Update the family standard (cicd.md)
 
 **Files:**
+
 - Modify: `~/.claude/skills/exporter-standards/references/cicd.md` (around line 45)
 
 > This file is **outside** the repo. Editing it changes the family standard so sibling
@@ -286,6 +296,7 @@ git commit -m "feat(grafana): chart namespace MPU, node transactions, disk atten
 
 Run: `sed -n '45,47p' ~/.claude/skills/exporter-standards/references/cicd.md`
 Expected:
+
 ```
 - `builds`: `CGO_ENABLED=0`, `goos: [linux, darwin]`, `goarch: [amd64, arm64]`, `-trimpath`,
   `ldflags: -s -w -X main.version={{ .Version }}`, `mod_timestamp: {{ .CommitTimestamp }}` (reproducible).
@@ -296,12 +307,15 @@ Expected:
 
 Change the `goos` list to include `windows`, and note the zip override on `archives`.
 Replace:
+
 ```
 - `builds`: `CGO_ENABLED=0`, `goos: [linux, darwin]`, `goarch: [amd64, arm64]`, `-trimpath`,
   `ldflags: -s -w -X main.version={{ .Version }}`, `mod_timestamp: {{ .CommitTimestamp }}` (reproducible).
 - `archives`: `tar.gz`, include `LICENSE README.md config.yaml`.
 ```
+
 with:
+
 ```
 - `builds`: `CGO_ENABLED=0`, `goos: [linux, darwin, windows]`, `goarch: [amd64, arm64]`, `-trimpath`,
   `ldflags: -s -w -X main.version={{ .Version }}`, `mod_timestamp: {{ .CommitTimestamp }}` (reproducible).
@@ -322,16 +336,20 @@ This file lives outside the git repo; there is nothing to commit here. Proceed t
 ### Task 5: Add Windows to `.goreleaser.yaml`
 
 **Files:**
+
 - Modify: `.goreleaser.yaml` (the `builds` and `archives` blocks)
 
 - [ ] **Step 1: Add `windows` to the build `goos`**
 
 In `.goreleaser.yaml`, in the `builds:` entry (`id: obs_exporter`), replace:
+
 ```yaml
     goos: [linux, darwin]
     goarch: [amd64, arm64]
 ```
+
 with:
+
 ```yaml
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
@@ -340,6 +358,7 @@ with:
 - [ ] **Step 2: Add the Windows zip override to the tar.gz archive**
 
 In the `archives:` section, the `obs_exporter` archive currently reads:
+
 ```yaml
   - id: obs_exporter
     formats: [tar.gz]
@@ -349,7 +368,9 @@ In the `archives:` section, the `obs_exporter` archive currently reads:
       - README.md
       - config.yaml
 ```
+
 Add a `format_overrides` key so Windows ships a zip (place it directly under `formats`):
+
 ```yaml
   - id: obs_exporter
     formats: [tar.gz]
@@ -362,6 +383,7 @@ Add a `format_overrides` key so Windows ships a zip (place it directly under `fo
       - README.md
       - config.yaml
 ```
+
 Leave the `obs_exporter_bin` (`formats: [binary]`) archive unchanged — GoReleaser
 auto-appends `.exe` to the Windows binary.
 
@@ -376,9 +398,11 @@ Expected: `config is valid` (exit 0). `goreleaser` is called directly by the Mak
 
 Run: `make release-snapshot`
 Then:
+
 ```bash
 ls dist/ | grep -iE 'windows'
 ```
+
 Expected: Windows artifacts for both arches, e.g.
 `obs_exporter_<ver>_windows_amd64.zip`, `obs_exporter_<ver>_windows_arm64.zip`, and the
 matching raw `.exe` binaries.

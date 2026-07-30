@@ -32,12 +32,14 @@
 ### Task 1: `Bool` primitive and sample-append helpers
 
 **Files:**
+
 - Modify: `internal/ecs/points.go` (append after `Num.UnmarshalJSON`, which ends at line 68)
 - Modify: `internal/ecs/sample.go` (append after `WithCluster`, which ends at line 36)
 - Test: `internal/ecs/points_test.go`
 - Create: `internal/ecs/sample_test.go`
 
 **Interfaces:**
+
 - Consumes: `Series`, `Num`, `Sample`, `Label` — all in package `ecs`.
 - Produces:
   - `type Bool struct { Val bool; Set bool }` with `func (b *Bool) UnmarshalJSON(raw []byte) error`. Task 2 uses it for the two GC enable flags.
@@ -55,37 +57,37 @@ Append to `internal/ecs/points_test.go`:
 
 ```go
 func TestBoolUnmarshal(t *testing.T) {
-	tests := []struct {
-		name    string
-		payload string
-		wantVal bool
-		wantSet bool
-	}{
-		{name: "quoted true, as the dashboard sends it", payload: `"true"`, wantVal: true, wantSet: true},
-		{name: "quoted false", payload: `"false"`, wantVal: false, wantSet: true},
-		{name: "native JSON true", payload: `true`, wantVal: true, wantSet: true},
-		{name: "native JSON false", payload: `false`, wantVal: false, wantSet: true},
-		{name: "mixed case", payload: `"True"`, wantVal: true, wantSet: true},
-		{name: "N/A leaves it unset", payload: `"N/A"`, wantSet: false},
-		{name: "empty string leaves it unset", payload: `""`, wantSet: false},
-		{name: "null leaves it unset", payload: `null`, wantSet: false},
-		{name: "unrecognised word leaves it unset", payload: `"maybe"`, wantSet: false},
-	}
+ tests := []struct {
+  name    string
+  payload string
+  wantVal bool
+  wantSet bool
+ }{
+  {name: "quoted true, as the dashboard sends it", payload: `"true"`, wantVal: true, wantSet: true},
+  {name: "quoted false", payload: `"false"`, wantVal: false, wantSet: true},
+  {name: "native JSON true", payload: `true`, wantVal: true, wantSet: true},
+  {name: "native JSON false", payload: `false`, wantVal: false, wantSet: true},
+  {name: "mixed case", payload: `"True"`, wantVal: true, wantSet: true},
+  {name: "N/A leaves it unset", payload: `"N/A"`, wantSet: false},
+  {name: "empty string leaves it unset", payload: `""`, wantSet: false},
+  {name: "null leaves it unset", payload: `null`, wantSet: false},
+  {name: "unrecognised word leaves it unset", payload: `"maybe"`, wantSet: false},
+ }
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var got Bool
-			if err := json.Unmarshal([]byte(tc.payload), &got); err != nil {
-				t.Fatalf("unmarshal: %v", err)
-			}
-			if got.Set != tc.wantSet {
-				t.Fatalf("Set = %v, want %v", got.Set, tc.wantSet)
-			}
-			if got.Set && got.Val != tc.wantVal {
-				t.Errorf("Val = %v, want %v", got.Val, tc.wantVal)
-			}
-		})
-	}
+ for _, tc := range tests {
+  t.Run(tc.name, func(t *testing.T) {
+   var got Bool
+   if err := json.Unmarshal([]byte(tc.payload), &got); err != nil {
+    t.Fatalf("unmarshal: %v", err)
+   }
+   if got.Set != tc.wantSet {
+    t.Fatalf("Set = %v, want %v", got.Set, tc.wantSet)
+   }
+   if got.Set && got.Val != tc.wantVal {
+    t.Errorf("Val = %v, want %v", got.Val, tc.wantVal)
+   }
+  })
+ }
 }
 ```
 
@@ -108,22 +110,22 @@ Append to `internal/ecs/points.go`, after `Num.UnmarshalJSON` (which ends at lin
 // Set false rather than failing the whole decode, so a flag the cluster does not
 // report yields an absent sample rather than a misleading false.
 type Bool struct {
-	Val bool
-	Set bool
+ Val bool
+ Set bool
 }
 
 // UnmarshalJSON implements tolerant boolean decoding.
 func (b *Bool) UnmarshalJSON(raw []byte) error {
-	s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
-	if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
-		return nil
-	}
-	v, err := strconv.ParseBool(s)
-	if err != nil {
-		return nil
-	}
-	b.Val, b.Set = v, true
-	return nil
+ s := strings.TrimSpace(strings.Trim(strings.TrimSpace(string(raw)), `"`))
+ if s == "" || s == "null" || strings.EqualFold(s, "n/a") {
+  return nil
+ }
+ v, err := strconv.ParseBool(s)
+ if err != nil {
+  return nil
+ }
+ b.Val, b.Set = v, true
+ return nil
 }
 ```
 
@@ -145,73 +147,73 @@ package ecs
 import "testing"
 
 func TestAppendSeries(t *testing.T) {
-	var out []Sample
+ var out []Sample
 
-	// A parseable series appends one sample carrying the newest point.
-	out = appendSeries(out, "ecs_thing_bytes", Series{
-		{"t": "100", "Capacity": "5"},
-		{"t": "200", "Capacity": "9"},
-	})
-	if len(out) != 1 {
-		t.Fatalf("got %d samples, want 1", len(out))
-	}
-	if out[0].Name != "ecs_thing_bytes" || out[0].Value != 9 {
-		t.Errorf("got %s = %v, want ecs_thing_bytes = 9", out[0].Name, out[0].Value)
-	}
-	if len(out[0].Labels) != 0 {
-		t.Errorf("got %d labels, want none when no labels are passed", len(out[0].Labels))
-	}
+ // A parseable series appends one sample carrying the newest point.
+ out = appendSeries(out, "ecs_thing_bytes", Series{
+  {"t": "100", "Capacity": "5"},
+  {"t": "200", "Capacity": "9"},
+ })
+ if len(out) != 1 {
+  t.Fatalf("got %d samples, want 1", len(out))
+ }
+ if out[0].Name != "ecs_thing_bytes" || out[0].Value != 9 {
+  t.Errorf("got %s = %v, want ecs_thing_bytes = 9", out[0].Name, out[0].Value)
+ }
+ if len(out[0].Labels) != 0 {
+  t.Errorf("got %d labels, want none when no labels are passed", len(out[0].Labels))
+ }
 
-	// Labels are carried through in the order given.
-	out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "3"}},
-		Label{"scope", "user"})
-	if len(out) != 2 {
-		t.Fatalf("got %d samples, want 2", len(out))
-	}
-	if got := out[1].LabelValue("scope"); got != "user" {
-		t.Errorf("scope label = %q, want %q", got, "user")
-	}
+ // Labels are carried through in the order given.
+ out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "3"}},
+  Label{"scope", "user"})
+ if len(out) != 2 {
+  t.Fatalf("got %d samples, want 2", len(out))
+ }
+ if got := out[1].LabelValue("scope"); got != "user" {
+  t.Errorf("scope label = %q, want %q", got, "user")
+ }
 
-	// An empty series appends nothing — absent, never zero.
-	before := len(out)
-	out = appendSeries(out, "ecs_thing_bytes", Series{})
-	if len(out) != before {
-		t.Errorf("an empty series appended %d samples, want 0", len(out)-before)
-	}
+ // An empty series appends nothing — absent, never zero.
+ before := len(out)
+ out = appendSeries(out, "ecs_thing_bytes", Series{})
+ if len(out) != before {
+  t.Errorf("an empty series appended %d samples, want 0", len(out)-before)
+ }
 
-	// An unparseable value appends nothing either.
-	out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "N/A"}})
-	if len(out) != before {
-		t.Errorf("an unparseable series appended %d samples, want 0", len(out)-before)
-	}
+ // An unparseable value appends nothing either.
+ out = appendSeries(out, "ecs_thing_bytes", Series{{"t": "1", "Capacity": "N/A"}})
+ if len(out) != before {
+  t.Errorf("an unparseable series appended %d samples, want 0", len(out)-before)
+ }
 }
 
 func TestAppendNum(t *testing.T) {
-	var out []Sample
+ var out []Sample
 
-	out = appendNum(out, "ecs_thing_seconds", Num{Val: 45.5, Set: true})
-	if len(out) != 1 {
-		t.Fatalf("got %d samples, want 1", len(out))
-	}
-	if out[0].Value != 45.5 {
-		t.Errorf("value = %v, want 45.5", out[0].Value)
-	}
+ out = appendNum(out, "ecs_thing_seconds", Num{Val: 45.5, Set: true})
+ if len(out) != 1 {
+  t.Fatalf("got %d samples, want 1", len(out))
+ }
+ if out[0].Value != 45.5 {
+  t.Errorf("value = %v, want 45.5", out[0].Value)
+ }
 
-	out = appendNum(out, "ecs_thing_seconds", Num{Val: 0, Set: true}, Label{"purpose", "x"})
-	if len(out) != 2 {
-		t.Fatalf("got %d samples, want 2", len(out))
-	}
-	// A parsed zero is real data and must be emitted.
-	if out[1].Value != 0 || out[1].LabelValue("purpose") != "x" {
-		t.Errorf("got %v/%q, want 0 with purpose=x", out[1].Value, out[1].LabelValue("purpose"))
-	}
+ out = appendNum(out, "ecs_thing_seconds", Num{Val: 0, Set: true}, Label{"purpose", "x"})
+ if len(out) != 2 {
+  t.Fatalf("got %d samples, want 2", len(out))
+ }
+ // A parsed zero is real data and must be emitted.
+ if out[1].Value != 0 || out[1].LabelValue("purpose") != "x" {
+  t.Errorf("got %v/%q, want 0 with purpose=x", out[1].Value, out[1].LabelValue("purpose"))
+ }
 
-	// An unset Num appends nothing — absent, never zero.
-	before := len(out)
-	out = appendNum(out, "ecs_thing_seconds", Num{})
-	if len(out) != before {
-		t.Errorf("an unset Num appended %d samples, want 0", len(out)-before)
-	}
+ // An unset Num appends nothing — absent, never zero.
+ before := len(out)
+ out = appendNum(out, "ecs_thing_seconds", Num{})
+ if len(out) != before {
+  t.Errorf("an unset Num appended %d samples, want 0", len(out)-before)
+ }
 }
 ```
 
@@ -230,21 +232,21 @@ Append to `internal/ecs/sample.go`, after `WithCluster` (which ends at line 36):
 // value appends nothing: unparseable and missing values yield absent samples,
 // never zeros (ADR-0007). Passing no labels yields a sample with none.
 func appendSeries(out []Sample, name string, s Series, labels ...Label) []Sample {
-	v, ok := s.Latest()
-	if !ok {
-		return out
-	}
-	return append(out, Sample{Name: name, Labels: labels, Value: v})
+ v, ok := s.Latest()
+ if !ok {
+  return out
+ }
+ return append(out, Sample{Name: name, Labels: labels, Value: v})
 }
 
 // appendNum appends n to out when it parsed. An unset Num appends nothing —
 // absent, never zero (ADR-0007). A Num that parsed as 0 is real data and is
 // emitted.
 func appendNum(out []Sample, name string, n Num, labels ...Label) []Sample {
-	if !n.Set {
-		return out
-	}
-	return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
+ if !n.Set {
+  return out
+ }
+ return append(out, Sample{Name: name, Labels: labels, Value: n.Val})
 }
 ```
 
@@ -275,6 +277,7 @@ cannot drift apart between them."
 ### Task 2: Garbage-collection family
 
 **Files:**
+
 - Create: `internal/ecs/cluster_gc.go`
 - Create: `internal/ecs/cluster_gc_test.go`
 - Modify: `internal/ecs/cluster.go` (struct at lines 14-67, `Collect` at lines 77-151)
@@ -282,6 +285,7 @@ cannot drift apart between them."
 - Modify: `internal/ecs/cluster_test.go`
 
 **Interfaces:**
+
 - Consumes: `Series` and its `Latest() (float64, bool)`, `Bool` from Task 1, `Sample`, `Label` — all in package `ecs`.
 - Produces: `type gcFields struct{…}` with `func (g gcFields) samples() []Sample`, embedded in `localZoneResp`. Tasks 3-5 mirror this exact shape with their own types.
 
@@ -293,86 +297,86 @@ Create `internal/ecs/cluster_gc_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 func TestGCFieldsSamples(t *testing.T) {
-	const payload = `{
-		"gcUserPendingCurrent":        [{"t": "12345678", "Capacity": "700"}, {"t": "23456789", "Capacity": "900"}],
-		"gcUserReclaimedCurrent":      [{"t": "23456789", "Capacity": "8100"}],
-		"gcUserUnreclaimableCurrent":  [{"t": "23456789", "Capacity": "640"}],
-		"gcUserTotalDetectedCurrent":  [{"t": "23456789", "Capacity": "9700"}],
-		"gcUserDataIsEnabled":         "true",
-		"gcSystemPendingCurrent":      [{"t": "23456789", "Capacity": "130"}],
-		"gcSystemReclaimedCurrent":    [{"t": "23456789", "Capacity": "2500"}],
-		"gcSystemUnreclaimableCurrent":[{"t": "23456789", "Capacity": "70"}],
-		"gcSystemTotalDetectedCurrent":[{"t": "23456789", "Capacity": "2600"}]
-	}`
+ const payload = `{
+  "gcUserPendingCurrent":        [{"t": "12345678", "Capacity": "700"}, {"t": "23456789", "Capacity": "900"}],
+  "gcUserReclaimedCurrent":      [{"t": "23456789", "Capacity": "8100"}],
+  "gcUserUnreclaimableCurrent":  [{"t": "23456789", "Capacity": "640"}],
+  "gcUserTotalDetectedCurrent":  [{"t": "23456789", "Capacity": "9700"}],
+  "gcUserDataIsEnabled":         "true",
+  "gcSystemPendingCurrent":      [{"t": "23456789", "Capacity": "130"}],
+  "gcSystemReclaimedCurrent":    [{"t": "23456789", "Capacity": "2500"}],
+  "gcSystemUnreclaimableCurrent":[{"t": "23456789", "Capacity": "70"}],
+  "gcSystemTotalDetectedCurrent":[{"t": "23456789", "Capacity": "2600"}]
+ }`
 
-	var g gcFields
-	if err := json.Unmarshal([]byte(payload), &g); err != nil {
-		t.Fatal(err)
-	}
-	got := g.samples()
+ var g gcFields
+ if err := json.Unmarshal([]byte(payload), &g); err != nil {
+  t.Fatal(err)
+ }
+ got := g.samples()
 
-	user := Label{"scope", "user"}
-	system := Label{"scope", "system"}
+ user := Label{"scope", "user"}
+ system := Label{"scope", "system"}
 
-	// "Current" is the newest point by t, not the first.
-	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 900, user)
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
-	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 640, user)
-	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 9700, user)
-	mustSample(t, got, "ecs_cluster_gc_enabled", 1, user)
+ // "Current" is the newest point by t, not the first.
+ mustSample(t, got, "ecs_cluster_gc_pending_bytes", 900, user)
+ mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
+ mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 640, user)
+ mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 9700, user)
+ mustSample(t, got, "ecs_cluster_gc_enabled", 1, user)
 
-	mustSample(t, got, "ecs_cluster_gc_pending_bytes", 130, system)
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 2500, system)
-	mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 70, system)
-	mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 2600, system)
+ mustSample(t, got, "ecs_cluster_gc_pending_bytes", 130, system)
+ mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 2500, system)
+ mustSample(t, got, "ecs_cluster_gc_unreclaimable_bytes", 70, system)
+ mustSample(t, got, "ecs_cluster_gc_detected_bytes_total", 2600, system)
 
-	// gcSystemMetadataIsEnabled was absent: the sample must be absent, not 0.
-	if _, ok := findSample(got, "ecs_cluster_gc_enabled", system); ok {
-		t.Error("gc_enabled{scope=system} must be absent when the flag is not reported")
-	}
+ // gcSystemMetadataIsEnabled was absent: the sample must be absent, not 0.
+ if _, ok := findSample(got, "ecs_cluster_gc_enabled", system); ok {
+  t.Error("gc_enabled{scope=system} must be absent when the flag is not reported")
+ }
 }
 
 func TestGCFieldsSamplesDisabledFlagIsZeroNotAbsent(t *testing.T) {
-	var g gcFields
-	if err := json.Unmarshal([]byte(`{"gcUserDataIsEnabled": "false"}`), &g); err != nil {
-		t.Fatal(err)
-	}
-	// A reported "false" is real information and must be emitted as 0 — only an
-	// unreported flag is absent.
-	mustSample(t, g.samples(), "ecs_cluster_gc_enabled", 0, Label{"scope", "user"})
+ var g gcFields
+ if err := json.Unmarshal([]byte(`{"gcUserDataIsEnabled": "false"}`), &g); err != nil {
+  t.Fatal(err)
+ }
+ // A reported "false" is real information and must be emitted as 0 — only an
+ // unreported flag is absent.
+ mustSample(t, g.samples(), "ecs_cluster_gc_enabled", 0, Label{"scope", "user"})
 }
 
 func TestGCFieldsSamplesEmptyPayload(t *testing.T) {
-	var g gcFields
-	if err := json.Unmarshal([]byte(`{}`), &g); err != nil {
-		t.Fatal(err)
-	}
-	if got := g.samples(); len(got) != 0 {
-		t.Errorf("got %d samples from an empty payload, want 0", len(got))
-	}
+ var g gcFields
+ if err := json.Unmarshal([]byte(`{}`), &g); err != nil {
+  t.Fatal(err)
+ }
+ if got := g.samples(); len(got) != 0 {
+  t.Errorf("got %d samples from an empty payload, want 0", len(got))
+ }
 }
 
 func TestGCFieldsSamplesUnparseableValue(t *testing.T) {
-	const payload = `{
-		"gcUserPendingCurrent":   [{"t": "23456789", "Capacity": "N/A"}],
-		"gcUserReclaimedCurrent": [{"t": "23456789", "Capacity": "8100"}]
-	}`
-	var g gcFields
-	if err := json.Unmarshal([]byte(payload), &g); err != nil {
-		t.Fatal(err)
-	}
-	got := g.samples()
-	user := Label{"scope", "user"}
-	if _, ok := findSample(got, "ecs_cluster_gc_pending_bytes", user); ok {
-		t.Error("an unparseable value must yield an absent sample, not zero")
-	}
-	// The rest of the family still emits.
-	mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
+ const payload = `{
+  "gcUserPendingCurrent":   [{"t": "23456789", "Capacity": "N/A"}],
+  "gcUserReclaimedCurrent": [{"t": "23456789", "Capacity": "8100"}]
+ }`
+ var g gcFields
+ if err := json.Unmarshal([]byte(payload), &g); err != nil {
+  t.Fatal(err)
+ }
+ got := g.samples()
+ user := Label{"scope", "user"}
+ if _, ok := findSample(got, "ecs_cluster_gc_pending_bytes", user); ok {
+  t.Error("an unparseable value must yield an absent sample, not zero")
+ }
+ // The rest of the family still emits.
+ mustSample(t, got, "ecs_cluster_gc_reclaimed_bytes_total", 8100, user)
 }
 ```
 
@@ -399,56 +403,56 @@ package ecs
 // (verified to the byte against a live ObjectScale 4.3 cluster), so exporting it
 // would make sum() double-count. `sum without(scope)` reproduces it.
 type gcFields struct {
-	GCUserPending       Series `json:"gcUserPendingCurrent"`
-	GCUserReclaimed     Series `json:"gcUserReclaimedCurrent"`
-	GCUserUnreclaimable Series `json:"gcUserUnreclaimableCurrent"`
-	GCUserTotalDetected Series `json:"gcUserTotalDetectedCurrent"`
-	GCUserDataIsEnabled Bool   `json:"gcUserDataIsEnabled"`
+ GCUserPending       Series `json:"gcUserPendingCurrent"`
+ GCUserReclaimed     Series `json:"gcUserReclaimedCurrent"`
+ GCUserUnreclaimable Series `json:"gcUserUnreclaimableCurrent"`
+ GCUserTotalDetected Series `json:"gcUserTotalDetectedCurrent"`
+ GCUserDataIsEnabled Bool   `json:"gcUserDataIsEnabled"`
 
-	GCSystemPending           Series `json:"gcSystemPendingCurrent"`
-	GCSystemReclaimed         Series `json:"gcSystemReclaimedCurrent"`
-	GCSystemUnreclaimable     Series `json:"gcSystemUnreclaimableCurrent"`
-	GCSystemTotalDetected     Series `json:"gcSystemTotalDetectedCurrent"`
-	GCSystemMetadataIsEnabled Bool   `json:"gcSystemMetadataIsEnabled"`
+ GCSystemPending           Series `json:"gcSystemPendingCurrent"`
+ GCSystemReclaimed         Series `json:"gcSystemReclaimedCurrent"`
+ GCSystemUnreclaimable     Series `json:"gcSystemUnreclaimableCurrent"`
+ GCSystemTotalDetected     Series `json:"gcSystemTotalDetectedCurrent"`
+ GCSystemMetadataIsEnabled Bool   `json:"gcSystemMetadataIsEnabled"`
 }
 
 // samples maps the GC block to cluster-agnostic samples. Missing or unparseable
 // values yield absent samples, never zeros.
 func (g gcFields) samples() []Sample {
-	var out []Sample
+ var out []Sample
 
-	// A reported flag is emitted even when false — "GC is off" is exactly what an
-	// operator needs to see. Only an unreported flag is absent.
-	flag := func(scope string, b Bool) {
-		if !b.Set {
-			return
-		}
-		v := 0.0
-		if b.Val {
-			v = 1
-		}
-		out = append(out, Sample{
-			Name:   "ecs_cluster_gc_enabled",
-			Labels: []Label{{Key: "scope", Value: scope}},
-			Value:  v,
-		})
-	}
+ // A reported flag is emitted even when false — "GC is off" is exactly what an
+ // operator needs to see. Only an unreported flag is absent.
+ flag := func(scope string, b Bool) {
+  if !b.Set {
+   return
+  }
+  v := 0.0
+  if b.Val {
+   v = 1
+  }
+  out = append(out, Sample{
+   Name:   "ecs_cluster_gc_enabled",
+   Labels: []Label{{Key: "scope", Value: scope}},
+   Value:  v,
+  })
+ }
 
-	user := Label{Key: "scope", Value: "user"}
-	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
-	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCUserReclaimed, user)
-	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
-	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCUserTotalDetected, user)
-	flag("user", g.GCUserDataIsEnabled)
+ user := Label{Key: "scope", Value: "user"}
+ out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCUserPending, user)
+ out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCUserReclaimed, user)
+ out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCUserUnreclaimable, user)
+ out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCUserTotalDetected, user)
+ flag("user", g.GCUserDataIsEnabled)
 
-	system := Label{Key: "scope", Value: "system"}
-	out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
-	out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCSystemReclaimed, system)
-	out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
-	out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCSystemTotalDetected, system)
-	flag("system", g.GCSystemMetadataIsEnabled)
+ system := Label{Key: "scope", Value: "system"}
+ out = appendSeries(out, "ecs_cluster_gc_pending_bytes", g.GCSystemPending, system)
+ out = appendSeries(out, "ecs_cluster_gc_reclaimed_bytes_total", g.GCSystemReclaimed, system)
+ out = appendSeries(out, "ecs_cluster_gc_unreclaimable_bytes", g.GCSystemUnreclaimable, system)
+ out = appendSeries(out, "ecs_cluster_gc_detected_bytes_total", g.GCSystemTotalDetected, system)
+ flag("system", g.GCSystemMetadataIsEnabled)
 
-	return out
+ return out
 }
 ```
 
@@ -465,13 +469,13 @@ In `internal/ecs/cluster.go`, add the embedded struct as the last field of
 brace at line 67):
 
 ```go
-	gcFields
+ gcFields
 ```
 
 Then, in `Collect`, immediately before `return out, nil` (line 150):
 
 ```go
-	out = append(out, z.gcFields.samples()...)
+ out = append(out, z.gcFields.samples()...)
 ```
 
 - [ ] **Step 6: Add the family to the shared fixture**
@@ -501,18 +505,18 @@ Append inside `TestClusterCollect` in `internal/ecs/cluster_test.go`, after the
 existing `ecs_cluster_replication_rpo_timestamp_seconds` assertion (line 57):
 
 ```go
-	gcUser := Label{"scope", "user"}
-	gcSystem := Label{"scope", "system"}
-	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
-	mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
-	// The fixture omits gcSystemMetadataIsEnabled on purpose.
-	if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
-		t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")
-	}
+ gcUser := Label{"scope", "user"}
+ gcSystem := Label{"scope", "system"}
+ mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 900, gcUser)
+ mustSample(t, samples, "ecs_cluster_gc_reclaimed_bytes_total", 8100, gcUser)
+ mustSample(t, samples, "ecs_cluster_gc_unreclaimable_bytes", 640, gcUser)
+ mustSample(t, samples, "ecs_cluster_gc_detected_bytes_total", 9700, gcUser)
+ mustSample(t, samples, "ecs_cluster_gc_enabled", 1, gcUser)
+ mustSample(t, samples, "ecs_cluster_gc_pending_bytes", 130, gcSystem)
+ // The fixture omits gcSystemMetadataIsEnabled on purpose.
+ if _, ok := findSample(samples, "ecs_cluster_gc_enabled", gcSystem); ok {
+  t.Error("gc_enabled{scope=system} should be absent: the fixture omits the flag")
+ }
 ```
 
 - [ ] **Step 8: Run the package tests**
@@ -540,6 +544,7 @@ sum without(scope) reproduces it without double-counting."
 ### Task 3: Recovery family
 
 **Files:**
+
 - Create: `internal/ecs/cluster_recovery.go`
 - Create: `internal/ecs/cluster_recovery_test.go`
 - Modify: `internal/ecs/cluster.go` (`localZoneResp` struct, `Collect`)
@@ -547,6 +552,7 @@ sum without(scope) reproduces it without double-counting."
 - Modify: `internal/ecs/cluster_test.go`
 
 **Interfaces:**
+
 - Consumes: `Series`, `Num`, `Sample` from package `ecs`; the embedding pattern established in Task 2.
 - Produces: `type recoveryFields struct{…}` with `func (r recoveryFields) samples() []Sample`, embedded in `localZoneResp`.
 
@@ -558,54 +564,54 @@ Create `internal/ecs/cluster_recovery_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 func TestRecoveryFieldsSamples(t *testing.T) {
-	const payload = `{
-		"recoveryBadChunksTotalSizeCurrent": [{"t": "12345678", "Space": "20000"}, {"t": "23456789", "Space": "10992"}],
-		"recoveryRateCurrent":               [{"t": "23456789", "Rate": "17.5"}],
-		"recoveryCompleteTimeEstimate":      "45.5"
-	}`
+ const payload = `{
+  "recoveryBadChunksTotalSizeCurrent": [{"t": "12345678", "Space": "20000"}, {"t": "23456789", "Space": "10992"}],
+  "recoveryRateCurrent":               [{"t": "23456789", "Rate": "17.5"}],
+  "recoveryCompleteTimeEstimate":      "45.5"
+ }`
 
-	var r recoveryFields
-	if err := json.Unmarshal([]byte(payload), &r); err != nil {
-		t.Fatal(err)
-	}
-	got := r.samples()
+ var r recoveryFields
+ if err := json.Unmarshal([]byte(payload), &r); err != nil {
+  t.Fatal(err)
+ }
+ got := r.samples()
 
-	// "Current" is the newest point by t, not the largest or the first.
-	mustSample(t, got, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
-	mustSample(t, got, "ecs_cluster_recovery_rate", 17.5)
-	mustSample(t, got, "ecs_cluster_recovery_complete_time_estimate", 45.5)
+ // "Current" is the newest point by t, not the largest or the first.
+ mustSample(t, got, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
+ mustSample(t, got, "ecs_cluster_recovery_rate", 17.5)
+ mustSample(t, got, "ecs_cluster_recovery_complete_time_estimate", 45.5)
 }
 
 func TestRecoveryFieldsSamplesEmptyPayload(t *testing.T) {
-	var r recoveryFields
-	if err := json.Unmarshal([]byte(`{}`), &r); err != nil {
-		t.Fatal(err)
-	}
-	if got := r.samples(); len(got) != 0 {
-		t.Errorf("got %d samples from an empty payload, want 0", len(got))
-	}
+ var r recoveryFields
+ if err := json.Unmarshal([]byte(`{}`), &r); err != nil {
+  t.Fatal(err)
+ }
+ if got := r.samples(); len(got) != 0 {
+  t.Errorf("got %d samples from an empty payload, want 0", len(got))
+ }
 }
 
 func TestRecoveryFieldsSamplesUnparseableRate(t *testing.T) {
-	const payload = `{
-		"recoveryBadChunksTotalSizeCurrent": [{"t": "23456789", "Space": "10992"}],
-		"recoveryRateCurrent":               [{"t": "23456789", "Rate": "N/A"}]
-	}`
-	var r recoveryFields
-	if err := json.Unmarshal([]byte(payload), &r); err != nil {
-		t.Fatal(err)
-	}
-	got := r.samples()
-	if _, ok := findSample(got, "ecs_cluster_recovery_rate"); ok {
-		t.Error("an unparseable rate must yield an absent sample, not zero")
-	}
-	// A zero-byte bad-chunk total is meaningful and must still be emitted.
-	mustSample(t, got, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
+ const payload = `{
+  "recoveryBadChunksTotalSizeCurrent": [{"t": "23456789", "Space": "10992"}],
+  "recoveryRateCurrent":               [{"t": "23456789", "Rate": "N/A"}]
+ }`
+ var r recoveryFields
+ if err := json.Unmarshal([]byte(payload), &r); err != nil {
+  t.Fatal(err)
+ }
+ got := r.samples()
+ if _, ok := findSample(got, "ecs_cluster_recovery_rate"); ok {
+  t.Error("an unparseable rate must yield an absent sample, not zero")
+ }
+ // A zero-byte bad-chunk total is meaningful and must still be emitted.
+ mustSample(t, got, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
 }
 ```
 
@@ -629,19 +635,19 @@ package ecs
 // recoveryRate and recoveryCompleteTimeEstimate carry no unit in the API
 // reference, so their metric names carry no unit suffix (ADR-0006).
 type recoveryFields struct {
-	RecoveryBadChunksTotalSize   Series `json:"recoveryBadChunksTotalSizeCurrent"`
-	RecoveryRate                 Series `json:"recoveryRateCurrent"`
-	RecoveryCompleteTimeEstimate Num    `json:"recoveryCompleteTimeEstimate"`
+ RecoveryBadChunksTotalSize   Series `json:"recoveryBadChunksTotalSizeCurrent"`
+ RecoveryRate                 Series `json:"recoveryRateCurrent"`
+ RecoveryCompleteTimeEstimate Num    `json:"recoveryCompleteTimeEstimate"`
 }
 
 // samples maps the recovery block to cluster-agnostic samples. Missing or
 // unparseable values yield absent samples, never zeros.
 func (r recoveryFields) samples() []Sample {
-	var out []Sample
-	out = appendSeries(out, "ecs_cluster_recovery_bad_chunks_bytes", r.RecoveryBadChunksTotalSize)
-	out = appendSeries(out, "ecs_cluster_recovery_rate", r.RecoveryRate)
-	out = appendNum(out, "ecs_cluster_recovery_complete_time_estimate", r.RecoveryCompleteTimeEstimate)
-	return out
+ var out []Sample
+ out = appendSeries(out, "ecs_cluster_recovery_bad_chunks_bytes", r.RecoveryBadChunksTotalSize)
+ out = appendSeries(out, "ecs_cluster_recovery_rate", r.RecoveryRate)
+ out = appendNum(out, "ecs_cluster_recovery_complete_time_estimate", r.RecoveryCompleteTimeEstimate)
+ return out
 }
 ```
 
@@ -657,13 +663,13 @@ In `internal/ecs/cluster.go`, add to `localZoneResp` immediately after the
 `gcFields` line added in Task 2:
 
 ```go
-	recoveryFields
+ recoveryFields
 ```
 
 Then in `Collect`, immediately after the `z.gcFields.samples()` append:
 
 ```go
-	out = append(out, z.recoveryFields.samples()...)
+ out = append(out, z.recoveryFields.samples()...)
 ```
 
 - [ ] **Step 6: Add the family to the shared fixture**
@@ -685,12 +691,12 @@ unparseable value yields an absent sample while its siblings still emit.
 Append inside `TestClusterCollect`, after the GC assertions from Task 2:
 
 ```go
-	mustSample(t, samples, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
-	mustSample(t, samples, "ecs_cluster_recovery_complete_time_estimate", 45.5)
-	// The fixture sets recoveryRateCurrent to "N/A" on purpose.
-	if _, ok := findSample(samples, "ecs_cluster_recovery_rate"); ok {
-		t.Error("recovery_rate should be absent: the fixture value is unparseable")
-	}
+ mustSample(t, samples, "ecs_cluster_recovery_bad_chunks_bytes", 10992)
+ mustSample(t, samples, "ecs_cluster_recovery_complete_time_estimate", 45.5)
+ // The fixture sets recoveryRateCurrent to "N/A" on purpose.
+ if _, ok := findSample(samples, "ecs_cluster_recovery_rate"); ok {
+  t.Error("recovery_rate should be absent: the fixture value is unparseable")
+ }
 ```
 
 - [ ] **Step 8: Run the package tests**
@@ -716,6 +722,7 @@ invisible. Rate and time estimate carry no documented unit, so no unit suffix."
 ### Task 4: Erasure-coding family
 
 **Files:**
+
 - Create: `internal/ecs/cluster_ec.go`
 - Create: `internal/ecs/cluster_ec_test.go`
 - Modify: `internal/ecs/cluster.go` (`localZoneResp` struct, `Collect`)
@@ -723,6 +730,7 @@ invisible. Rate and time estimate carry no documented unit, so no unit suffix."
 - Modify: `internal/ecs/cluster_test.go`
 
 **Interfaces:**
+
 - Consumes: `Series`, `Num`, `Sample`; the embedding pattern from Task 2.
 - Produces: `type erasureCodingFields struct{…}` with `func (e erasureCodingFields) samples() []Sample`, embedded in `localZoneResp`.
 
@@ -734,55 +742,55 @@ Create `internal/ecs/cluster_ec_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 func TestErasureCodingFieldsSamples(t *testing.T) {
-	const payload = `{
-		"chunksEcApplicableTotalSealSizeCurrent": [{"t": "23456789", "Space": "59000"}],
-		"chunksEcCodedTotalSealSizeCurrent":      [{"t": "23456789", "Space": "58000"}],
-		"chunksEcCodedRatioCurrent":              [{"t": "12345678", "Percent": "97.5"}, {"t": "23456789", "Percent": "98.3"}],
-		"chunksEcRateCurrent":                    [{"t": "23456789", "Rate": "12.5"}],
-		"chunksEcCompleteTimeEstimate":           "3.25"
-	}`
+ const payload = `{
+  "chunksEcApplicableTotalSealSizeCurrent": [{"t": "23456789", "Space": "59000"}],
+  "chunksEcCodedTotalSealSizeCurrent":      [{"t": "23456789", "Space": "58000"}],
+  "chunksEcCodedRatioCurrent":              [{"t": "12345678", "Percent": "97.5"}, {"t": "23456789", "Percent": "98.3"}],
+  "chunksEcRateCurrent":                    [{"t": "23456789", "Rate": "12.5"}],
+  "chunksEcCompleteTimeEstimate":           "3.25"
+ }`
 
-	var e erasureCodingFields
-	if err := json.Unmarshal([]byte(payload), &e); err != nil {
-		t.Fatal(err)
-	}
-	got := e.samples()
+ var e erasureCodingFields
+ if err := json.Unmarshal([]byte(payload), &e); err != nil {
+  t.Fatal(err)
+ }
+ got := e.samples()
 
-	mustSample(t, got, "ecs_cluster_ec_applicable_bytes", 59000)
-	mustSample(t, got, "ecs_cluster_ec_coded_bytes", 58000)
-	// Newest point by t wins.
-	mustSample(t, got, "ecs_cluster_ec_coded_ratio_percent", 98.3)
-	mustSample(t, got, "ecs_cluster_ec_rate", 12.5)
-	mustSample(t, got, "ecs_cluster_ec_complete_time_estimate", 3.25)
+ mustSample(t, got, "ecs_cluster_ec_applicable_bytes", 59000)
+ mustSample(t, got, "ecs_cluster_ec_coded_bytes", 58000)
+ // Newest point by t wins.
+ mustSample(t, got, "ecs_cluster_ec_coded_ratio_percent", 98.3)
+ mustSample(t, got, "ecs_cluster_ec_rate", 12.5)
+ mustSample(t, got, "ecs_cluster_ec_complete_time_estimate", 3.25)
 }
 
 func TestErasureCodingFieldsSamplesEmptyPayload(t *testing.T) {
-	var e erasureCodingFields
-	if err := json.Unmarshal([]byte(`{}`), &e); err != nil {
-		t.Fatal(err)
-	}
-	if got := e.samples(); len(got) != 0 {
-		t.Errorf("got %d samples from an empty payload, want 0", len(got))
-	}
+ var e erasureCodingFields
+ if err := json.Unmarshal([]byte(`{}`), &e); err != nil {
+  t.Fatal(err)
+ }
+ if got := e.samples(); len(got) != 0 {
+  t.Errorf("got %d samples from an empty payload, want 0", len(got))
+ }
 }
 
 func TestErasureCodingFieldsSamplesPartialPayload(t *testing.T) {
-	// A cluster reporting only the ratio must still yield that one sample.
-	const payload = `{"chunksEcCodedRatioCurrent": [{"t": "23456789", "Percent": "98.3"}]}`
-	var e erasureCodingFields
-	if err := json.Unmarshal([]byte(payload), &e); err != nil {
-		t.Fatal(err)
-	}
-	got := e.samples()
-	if len(got) != 1 {
-		t.Fatalf("got %d samples, want exactly 1", len(got))
-	}
-	mustSample(t, got, "ecs_cluster_ec_coded_ratio_percent", 98.3)
+ // A cluster reporting only the ratio must still yield that one sample.
+ const payload = `{"chunksEcCodedRatioCurrent": [{"t": "23456789", "Percent": "98.3"}]}`
+ var e erasureCodingFields
+ if err := json.Unmarshal([]byte(payload), &e); err != nil {
+  t.Fatal(err)
+ }
+ got := e.samples()
+ if len(got) != 1 {
+  t.Fatalf("got %d samples, want exactly 1", len(got))
+ }
+ mustSample(t, got, "ecs_cluster_ec_coded_ratio_percent", 98.3)
 }
 ```
 
@@ -806,23 +814,23 @@ package ecs
 // chunksEcRate and chunksEcCompleteTimeEstimate carry no unit in the API
 // reference, so their metric names carry no unit suffix (ADR-0006).
 type erasureCodingFields struct {
-	ChunksEcApplicableTotalSealSize Series `json:"chunksEcApplicableTotalSealSizeCurrent"`
-	ChunksEcCodedTotalSealSize      Series `json:"chunksEcCodedTotalSealSizeCurrent"`
-	ChunksEcCodedRatio              Series `json:"chunksEcCodedRatioCurrent"`
-	ChunksEcRate                    Series `json:"chunksEcRateCurrent"`
-	ChunksEcCompleteTimeEstimate    Num    `json:"chunksEcCompleteTimeEstimate"`
+ ChunksEcApplicableTotalSealSize Series `json:"chunksEcApplicableTotalSealSizeCurrent"`
+ ChunksEcCodedTotalSealSize      Series `json:"chunksEcCodedTotalSealSizeCurrent"`
+ ChunksEcCodedRatio              Series `json:"chunksEcCodedRatioCurrent"`
+ ChunksEcRate                    Series `json:"chunksEcRateCurrent"`
+ ChunksEcCompleteTimeEstimate    Num    `json:"chunksEcCompleteTimeEstimate"`
 }
 
 // samples maps the erasure-coding block to cluster-agnostic samples. Missing or
 // unparseable values yield absent samples, never zeros.
 func (e erasureCodingFields) samples() []Sample {
-	var out []Sample
-	out = appendSeries(out, "ecs_cluster_ec_applicable_bytes", e.ChunksEcApplicableTotalSealSize)
-	out = appendSeries(out, "ecs_cluster_ec_coded_bytes", e.ChunksEcCodedTotalSealSize)
-	out = appendSeries(out, "ecs_cluster_ec_coded_ratio_percent", e.ChunksEcCodedRatio)
-	out = appendSeries(out, "ecs_cluster_ec_rate", e.ChunksEcRate)
-	out = appendNum(out, "ecs_cluster_ec_complete_time_estimate", e.ChunksEcCompleteTimeEstimate)
-	return out
+ var out []Sample
+ out = appendSeries(out, "ecs_cluster_ec_applicable_bytes", e.ChunksEcApplicableTotalSealSize)
+ out = appendSeries(out, "ecs_cluster_ec_coded_bytes", e.ChunksEcCodedTotalSealSize)
+ out = appendSeries(out, "ecs_cluster_ec_coded_ratio_percent", e.ChunksEcCodedRatio)
+ out = appendSeries(out, "ecs_cluster_ec_rate", e.ChunksEcRate)
+ out = appendNum(out, "ecs_cluster_ec_complete_time_estimate", e.ChunksEcCompleteTimeEstimate)
+ return out
 }
 ```
 
@@ -838,13 +846,13 @@ In `internal/ecs/cluster.go`, add to `localZoneResp` immediately after the
 `recoveryFields` line added in Task 3:
 
 ```go
-	erasureCodingFields
+ erasureCodingFields
 ```
 
 Then in `Collect`, immediately after the `z.recoveryFields.samples()` append:
 
 ```go
-	out = append(out, z.erasureCodingFields.samples()...)
+ out = append(out, z.erasureCodingFields.samples()...)
 ```
 
 - [ ] **Step 6: Add the family to the shared fixture**
@@ -865,11 +873,11 @@ In **both** `internal/ecs/testdata/localzone.json` and
 Append inside `TestClusterCollect`, after the recovery assertions from Task 3:
 
 ```go
-	mustSample(t, samples, "ecs_cluster_ec_applicable_bytes", 59000)
-	mustSample(t, samples, "ecs_cluster_ec_coded_bytes", 58000)
-	mustSample(t, samples, "ecs_cluster_ec_coded_ratio_percent", 98.3)
-	mustSample(t, samples, "ecs_cluster_ec_rate", 12.5)
-	mustSample(t, samples, "ecs_cluster_ec_complete_time_estimate", 3.25)
+ mustSample(t, samples, "ecs_cluster_ec_applicable_bytes", 59000)
+ mustSample(t, samples, "ecs_cluster_ec_coded_bytes", 58000)
+ mustSample(t, samples, "ecs_cluster_ec_coded_ratio_percent", 98.3)
+ mustSample(t, samples, "ecs_cluster_ec_rate", 12.5)
+ mustSample(t, samples, "ecs_cluster_ec_complete_time_estimate", 3.25)
 ```
 
 - [ ] **Step 8: Run the package tests**
@@ -894,6 +902,7 @@ Applicable and coded seal sizes, coded ratio, rate and completion estimate."
 ### Task 5: Allocation-breakdown family
 
 **Files:**
+
 - Create: `internal/ecs/cluster_allocation.go`
 - Create: `internal/ecs/cluster_allocation_test.go`
 - Modify: `internal/ecs/cluster.go` (`localZoneResp` struct, `Collect`)
@@ -901,6 +910,7 @@ Applicable and coded seal sizes, coded ratio, rate and completion estimate."
 - Modify: `internal/ecs/cluster_test.go`
 
 **Interfaces:**
+
 - Consumes: `Series`, `Sample`, `Label`; the embedding pattern from Task 2.
 - Produces: `type allocationComponentFields struct{…}` with `func (a allocationComponentFields) samples() []Sample`, embedded in `localZoneResp`.
 
@@ -912,76 +922,76 @@ Create `internal/ecs/cluster_allocation_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 func TestAllocationComponentFieldsSamples(t *testing.T) {
-	const payload = `{
-		"diskSpaceAllocatedUserDataCurrent":        [{"t": "23456789", "Capacity": "3100"}],
-		"diskSpaceAllocatedSystemMetadataCurrent":  [{"t": "23456789", "Capacity": "1200"}],
-		"diskSpaceAllocatedLocalProtectionCurrent": [{"t": "23456789", "Capacity": "600"}]
-	}`
+ const payload = `{
+  "diskSpaceAllocatedUserDataCurrent":        [{"t": "23456789", "Capacity": "3100"}],
+  "diskSpaceAllocatedSystemMetadataCurrent":  [{"t": "23456789", "Capacity": "1200"}],
+  "diskSpaceAllocatedLocalProtectionCurrent": [{"t": "23456789", "Capacity": "600"}]
+ }`
 
-	var a allocationComponentFields
-	if err := json.Unmarshal([]byte(payload), &a); err != nil {
-		t.Fatal(err)
-	}
-	got := a.samples()
+ var a allocationComponentFields
+ if err := json.Unmarshal([]byte(payload), &a); err != nil {
+  t.Fatal(err)
+ }
+ got := a.samples()
 
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
-	mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
+ mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
+ mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
+ mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
 
-	// geo_cache and geo_copy were not reported: they must be absent, not zero.
-	// Padding them with zeros would imply the breakdown is exhaustive, which it
-	// is not — on a live 4.3 cluster the components sum to 12.8% less than
-	// diskSpaceAllocatedCurrent.
-	for _, purpose := range []string{"geo_cache", "geo_copy"} {
-		if _, ok := findSample(got, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", purpose}); ok {
-			t.Errorf("purpose=%s must be absent when the cluster does not report it", purpose)
-		}
-	}
-	if len(got) != 3 {
-		t.Errorf("got %d samples, want exactly 3", len(got))
-	}
+ // geo_cache and geo_copy were not reported: they must be absent, not zero.
+ // Padding them with zeros would imply the breakdown is exhaustive, which it
+ // is not — on a live 4.3 cluster the components sum to 12.8% less than
+ // diskSpaceAllocatedCurrent.
+ for _, purpose := range []string{"geo_cache", "geo_copy"} {
+  if _, ok := findSample(got, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", purpose}); ok {
+   t.Errorf("purpose=%s must be absent when the cluster does not report it", purpose)
+  }
+ }
+ if len(got) != 3 {
+  t.Errorf("got %d samples, want exactly 3", len(got))
+ }
 }
 
 func TestAllocationComponentFieldsSamplesAllPurposes(t *testing.T) {
-	const payload = `{
-		"diskSpaceAllocatedUserDataCurrent":        [{"t": "1", "Capacity": "1"}],
-		"diskSpaceAllocatedSystemMetadataCurrent":  [{"t": "1", "Capacity": "2"}],
-		"diskSpaceAllocatedGeoCacheCurrent":        [{"t": "1", "Capacity": "3"}],
-		"diskSpaceAllocatedGeoCopyCurrent":         [{"t": "1", "Capacity": "4"}],
-		"diskSpaceAllocatedLocalProtectionCurrent": [{"t": "1", "Capacity": "5"}]
-	}`
-	var a allocationComponentFields
-	if err := json.Unmarshal([]byte(payload), &a); err != nil {
-		t.Fatal(err)
-	}
-	got := a.samples()
-	if len(got) != 5 {
-		t.Fatalf("got %d samples, want 5 (one per purpose)", len(got))
-	}
-	for _, tc := range []struct {
-		purpose string
-		want    float64
-	}{
-		{"user_data", 1}, {"system_metadata", 2}, {"geo_cache", 3},
-		{"geo_copy", 4}, {"local_protection", 5},
-	} {
-		mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", tc.want, Label{"purpose", tc.purpose})
-	}
+ const payload = `{
+  "diskSpaceAllocatedUserDataCurrent":        [{"t": "1", "Capacity": "1"}],
+  "diskSpaceAllocatedSystemMetadataCurrent":  [{"t": "1", "Capacity": "2"}],
+  "diskSpaceAllocatedGeoCacheCurrent":        [{"t": "1", "Capacity": "3"}],
+  "diskSpaceAllocatedGeoCopyCurrent":         [{"t": "1", "Capacity": "4"}],
+  "diskSpaceAllocatedLocalProtectionCurrent": [{"t": "1", "Capacity": "5"}]
+ }`
+ var a allocationComponentFields
+ if err := json.Unmarshal([]byte(payload), &a); err != nil {
+  t.Fatal(err)
+ }
+ got := a.samples()
+ if len(got) != 5 {
+  t.Fatalf("got %d samples, want 5 (one per purpose)", len(got))
+ }
+ for _, tc := range []struct {
+  purpose string
+  want    float64
+ }{
+  {"user_data", 1}, {"system_metadata", 2}, {"geo_cache", 3},
+  {"geo_copy", 4}, {"local_protection", 5},
+ } {
+  mustSample(t, got, "ecs_cluster_disk_space_allocated_component_bytes", tc.want, Label{"purpose", tc.purpose})
+ }
 }
 
 func TestAllocationComponentFieldsSamplesEmptyPayload(t *testing.T) {
-	var a allocationComponentFields
-	if err := json.Unmarshal([]byte(`{}`), &a); err != nil {
-		t.Fatal(err)
-	}
-	if got := a.samples(); len(got) != 0 {
-		t.Errorf("got %d samples from an empty payload, want 0", len(got))
-	}
+ var a allocationComponentFields
+ if err := json.Unmarshal([]byte(`{}`), &a); err != nil {
+  t.Fatal(err)
+ }
+ if got := a.samples(); len(got) != 0 {
+  t.Errorf("got %d samples from an empty payload, want 0", len(got))
+ }
 }
 ```
 
@@ -1008,32 +1018,32 @@ package ecs
 // components summed to 12.8% less than diskSpaceAllocatedCurrent. Never pad a
 // missing component with zero — that would imply the parts account for the whole.
 type allocationComponentFields struct {
-	UserData        Series `json:"diskSpaceAllocatedUserDataCurrent"`
-	SystemMetadata  Series `json:"diskSpaceAllocatedSystemMetadataCurrent"`
-	GeoCache        Series `json:"diskSpaceAllocatedGeoCacheCurrent"`
-	GeoCopy         Series `json:"diskSpaceAllocatedGeoCopyCurrent"`
-	LocalProtection Series `json:"diskSpaceAllocatedLocalProtectionCurrent"`
+ UserData        Series `json:"diskSpaceAllocatedUserDataCurrent"`
+ SystemMetadata  Series `json:"diskSpaceAllocatedSystemMetadataCurrent"`
+ GeoCache        Series `json:"diskSpaceAllocatedGeoCacheCurrent"`
+ GeoCopy         Series `json:"diskSpaceAllocatedGeoCopyCurrent"`
+ LocalProtection Series `json:"diskSpaceAllocatedLocalProtectionCurrent"`
 }
 
 // samples maps the allocation breakdown to cluster-agnostic samples. Missing or
 // unparseable components yield absent samples, never zeros.
 func (a allocationComponentFields) samples() []Sample {
-	const name = "ecs_cluster_disk_space_allocated_component_bytes"
+ const name = "ecs_cluster_disk_space_allocated_component_bytes"
 
-	var out []Sample
-	for _, c := range []struct {
-		purpose string
-		series  Series
-	}{
-		{"user_data", a.UserData},
-		{"system_metadata", a.SystemMetadata},
-		{"geo_cache", a.GeoCache},
-		{"geo_copy", a.GeoCopy},
-		{"local_protection", a.LocalProtection},
-	} {
-		out = appendSeries(out, name, c.series, Label{Key: "purpose", Value: c.purpose})
-	}
-	return out
+ var out []Sample
+ for _, c := range []struct {
+  purpose string
+  series  Series
+ }{
+  {"user_data", a.UserData},
+  {"system_metadata", a.SystemMetadata},
+  {"geo_cache", a.GeoCache},
+  {"geo_copy", a.GeoCopy},
+  {"local_protection", a.LocalProtection},
+ } {
+  out = appendSeries(out, name, c.series, Label{Key: "purpose", Value: c.purpose})
+ }
+ return out
 }
 ```
 
@@ -1049,13 +1059,13 @@ In `internal/ecs/cluster.go`, add to `localZoneResp` immediately after the
 `erasureCodingFields` line added in Task 4:
 
 ```go
-	allocationComponentFields
+ allocationComponentFields
 ```
 
 Then in `Collect`, immediately after the `z.erasureCodingFields.samples()` append:
 
 ```go
-	out = append(out, z.allocationComponentFields.samples()...)
+ out = append(out, z.allocationComponentFields.samples()...)
 ```
 
 - [ ] **Step 6: Add the family to the shared fixture**
@@ -1079,14 +1089,14 @@ non-exhaustiveness measured on the real cluster.
 Append inside `TestClusterCollect`, after the erasure-coding assertions from Task 4:
 
 ```go
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
-	mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
-	// The fixture omits the geo components on purpose: the breakdown is not
-	// exhaustive, and 3100+1200+600 = 4900 against an allocated total of 5000.
-	if _, ok := findSample(samples, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", "geo_cache"}); ok {
-		t.Error("purpose=geo_cache should be absent: the fixture omits it")
-	}
+ mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 3100, Label{"purpose", "user_data"})
+ mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 1200, Label{"purpose", "system_metadata"})
+ mustSample(t, samples, "ecs_cluster_disk_space_allocated_component_bytes", 600, Label{"purpose", "local_protection"})
+ // The fixture omits the geo components on purpose: the breakdown is not
+ // exhaustive, and 3100+1200+600 = 4900 against an allocated total of 5000.
+ if _, ok := findSample(samples, "ecs_cluster_disk_space_allocated_component_bytes", Label{"purpose", "geo_cache"}); ok {
+  t.Error("purpose=geo_cache should be absent: the fixture omits it")
+ }
 ```
 
 - [ ] **Step 8: Run the package tests**
@@ -1114,11 +1124,13 @@ the total (12.8% gap measured on a live 4.3 cluster)."
 ### Task 6: Real-payload shape test
 
 **Files:**
+
 - Create: `internal/ecs/testdata/localzone-live-4.3.json`
 - Create: `internal/ecs/testdata/README.md`
 - Create: `internal/ecs/cluster_livepayload_test.go`
 
 **Interfaces:**
+
 - Consumes: `localZoneResp` with all four families embedded (Tasks 2-5), `fixture(t, name)` from `internal/ecs/fixtures_test.go:12`.
 - Produces: nothing consumed by later tasks.
 
@@ -1202,8 +1214,8 @@ Create `internal/ecs/cluster_livepayload_test.go`:
 package ecs
 
 import (
-	"encoding/json"
-	"testing"
+ "encoding/json"
+ "testing"
 )
 
 // TestLocalZoneLivePayloadShape decodes an unedited capture from a real
@@ -1215,56 +1227,56 @@ import (
 // misspelled tag passes hand-written fixtures, because those carry the same
 // misspelling as the code, but it cannot pass this.
 func TestLocalZoneLivePayloadShape(t *testing.T) {
-	var z localZoneResp
-	if err := json.Unmarshal([]byte(fixture(t, "localzone-live-4.3.json")), &z); err != nil {
-		t.Fatalf("decoding the live payload failed: %v", err)
-	}
+ var z localZoneResp
+ if err := json.Unmarshal([]byte(fixture(t, "localzone-live-4.3.json")), &z); err != nil {
+  t.Fatalf("decoding the live payload failed: %v", err)
+ }
 
-	families := []struct {
-		name    string
-		samples []Sample
-	}{
-		{"gc", z.gcFields.samples()},
-		{"recovery", z.recoveryFields.samples()},
-		{"erasure coding", z.erasureCodingFields.samples()},
-		{"allocation components", z.allocationComponentFields.samples()},
-	}
-	for _, f := range families {
-		if len(f.samples) == 0 {
-			t.Errorf("%s family produced no samples from the live payload: a JSON tag is probably misspelled", f.name)
-		}
-	}
+ families := []struct {
+  name    string
+  samples []Sample
+ }{
+  {"gc", z.gcFields.samples()},
+  {"recovery", z.recoveryFields.samples()},
+  {"erasure coding", z.erasureCodingFields.samples()},
+  {"allocation components", z.allocationComponentFields.samples()},
+ }
+ for _, f := range families {
+  if len(f.samples) == 0 {
+   t.Errorf("%s family produced no samples from the live payload: a JSON tag is probably misspelled", f.name)
+  }
+ }
 
-	// Every emitted series must carry the label keys its metric name declares,
-	// or the Prometheus collector drops it at scrape time (ADR-0006).
-	wantKeys := map[string][]string{
-		"ecs_cluster_gc_pending_bytes":                      {"scope"},
-		"ecs_cluster_gc_reclaimed_bytes_total":                    {"scope"},
-		"ecs_cluster_gc_unreclaimable_bytes":                {"scope"},
-		"ecs_cluster_gc_detected_bytes_total":                     {"scope"},
-		"ecs_cluster_gc_enabled":                            {"scope"},
-		"ecs_cluster_disk_space_allocated_component_bytes":  {"purpose"},
-	}
-	for _, f := range families {
-		for _, s := range f.samples {
-			want, ok := wantKeys[s.Name]
-			if !ok {
-				if len(s.Labels) != 0 {
-					t.Errorf("%s: expected no labels, got %v", s.Name, s.Labels)
-				}
-				continue
-			}
-			if len(s.Labels) != len(want) {
-				t.Errorf("%s: got %d labels, want %d", s.Name, len(s.Labels), len(want))
-				continue
-			}
-			for i, key := range want {
-				if s.Labels[i].Key != key {
-					t.Errorf("%s: label %d key = %q, want %q", s.Name, i, s.Labels[i].Key, key)
-				}
-			}
-		}
-	}
+ // Every emitted series must carry the label keys its metric name declares,
+ // or the Prometheus collector drops it at scrape time (ADR-0006).
+ wantKeys := map[string][]string{
+  "ecs_cluster_gc_pending_bytes":                      {"scope"},
+  "ecs_cluster_gc_reclaimed_bytes_total":                    {"scope"},
+  "ecs_cluster_gc_unreclaimable_bytes":                {"scope"},
+  "ecs_cluster_gc_detected_bytes_total":                     {"scope"},
+  "ecs_cluster_gc_enabled":                            {"scope"},
+  "ecs_cluster_disk_space_allocated_component_bytes":  {"purpose"},
+ }
+ for _, f := range families {
+  for _, s := range f.samples {
+   want, ok := wantKeys[s.Name]
+   if !ok {
+    if len(s.Labels) != 0 {
+     t.Errorf("%s: expected no labels, got %v", s.Name, s.Labels)
+    }
+    continue
+   }
+   if len(s.Labels) != len(want) {
+    t.Errorf("%s: got %d labels, want %d", s.Name, len(s.Labels), len(want))
+    continue
+   }
+   for i, key := range want {
+    if s.Labels[i].Key != key {
+     t.Errorf("%s: label %d key = %q, want %q", s.Name, i, s.Labels[i].Key, key)
+    }
+   }
+  }
+ }
 }
 ```
 
@@ -1291,10 +1303,12 @@ unedited capture, so a misspelled JSON tag cannot survive it."
 ### Task 7: Export-path coverage
 
 **Files:**
+
 - Modify: `internal/ecs/prometheus_test.go:31-49`
 - Modify: `internal/ecs/otlp_test.go`
 
 **Interfaces:**
+
 - Consumes: the metric names emitted by Tasks 2-5, reaching the export paths via `mockClient` and the fixture edits from those tasks.
 - Produces: nothing consumed by later tasks.
 
@@ -1307,29 +1321,29 @@ In `internal/ecs/prometheus_test.go`, add these entries to the string slice in
 `TestPromCollectorGather` (currently lines 31-45), after `"ecs_cluster_info"`:
 
 ```go
-		"ecs_cluster_gc_pending_bytes",
-		"ecs_cluster_gc_enabled",
-		"ecs_cluster_recovery_bad_chunks_bytes",
-		"ecs_cluster_ec_coded_ratio_percent",
-		"ecs_cluster_disk_space_allocated_component_bytes",
+  "ecs_cluster_gc_pending_bytes",
+  "ecs_cluster_gc_enabled",
+  "ecs_cluster_recovery_bad_chunks_bytes",
+  "ecs_cluster_ec_coded_ratio_percent",
+  "ecs_cluster_disk_space_allocated_component_bytes",
 ```
 
 Then add these series-count assertions after the existing `ecs_node_healthy`
 check (currently lines 53-55):
 
 ```go
-	// scope=user and scope=system both report pending bytes.
-	if got := families["ecs_cluster_gc_pending_bytes"]; got != 2 {
-		t.Errorf("gc pending series = %d, want 2 (one per scope)", got)
-	}
-	// The fixture omits gcSystemMetadataIsEnabled, so only scope=user is enabled.
-	if got := families["ecs_cluster_gc_enabled"]; got != 1 {
-		t.Errorf("gc enabled series = %d, want 1 (the fixture omits the system flag)", got)
-	}
-	// The fixture omits the two geo components.
-	if got := families["ecs_cluster_disk_space_allocated_component_bytes"]; got != 3 {
-		t.Errorf("allocation component series = %d, want 3 (the fixture omits the geo purposes)", got)
-	}
+ // scope=user and scope=system both report pending bytes.
+ if got := families["ecs_cluster_gc_pending_bytes"]; got != 2 {
+  t.Errorf("gc pending series = %d, want 2 (one per scope)", got)
+ }
+ // The fixture omits gcSystemMetadataIsEnabled, so only scope=user is enabled.
+ if got := families["ecs_cluster_gc_enabled"]; got != 1 {
+  t.Errorf("gc enabled series = %d, want 1 (the fixture omits the system flag)", got)
+ }
+ // The fixture omits the two geo components.
+ if got := families["ecs_cluster_disk_space_allocated_component_bytes"]; got != 3 {
+  t.Errorf("allocation component series = %d, want 3 (the fixture omits the geo purposes)", got)
+ }
 ```
 
 - [ ] **Step 2: Run the Prometheus test**
@@ -1346,12 +1360,12 @@ Expected: PASS — all three counts match the fixture built in Tasks 2-5.
 assertions alongside them, matching that file's existing style:
 
 ```go
-	if got["ecs_cluster_recovery_bad_chunks_bytes"] != 10992 {
-		t.Errorf("ecs_cluster_recovery_bad_chunks_bytes = %v, want 10992", got["ecs_cluster_recovery_bad_chunks_bytes"])
-	}
-	if got["ecs_cluster_ec_coded_ratio_percent"] != 98.3 {
-		t.Errorf("ecs_cluster_ec_coded_ratio_percent = %v, want 98.3", got["ecs_cluster_ec_coded_ratio_percent"])
-	}
+ if got["ecs_cluster_recovery_bad_chunks_bytes"] != 10992 {
+  t.Errorf("ecs_cluster_recovery_bad_chunks_bytes = %v, want 10992", got["ecs_cluster_recovery_bad_chunks_bytes"])
+ }
+ if got["ecs_cluster_ec_coded_ratio_percent"] != 98.3 {
+  t.Errorf("ecs_cluster_ec_coded_ratio_percent = %v, want 98.3", got["ecs_cluster_ec_coded_ratio_percent"])
+ }
 ```
 
 Read the file first: if `got` is keyed by metric name only, a labelled metric such
@@ -1378,11 +1392,13 @@ git commit -m "test(ecs): cover the four new families on both export paths"
 ### Task 8: Documentation and Grafana dashboard
 
 **Files:**
+
 - Modify: `docs/metrics.md`
 - Modify: `CHANGELOG.md`
 - Create: `grafana/dashboards/obs-storage-internals.json`
 
 **Interfaces:**
+
 - Consumes: the metric names from Tasks 2-5.
 - Produces: nothing consumed by later tasks.
 
@@ -1508,7 +1524,7 @@ The remaining five panels, in order, with `gridPos` laid out two per row
 (`w: 12`, `x: 0` then `x: 12`, `y` increasing by 8):
 
 | id | Title | Type | Unit | Expressions (legend) |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 2 | GC backlog by scope | `timeseries` | `bytes` | `ecs_cluster_gc_pending_bytes{cluster=~"$cluster"}` (`pending {{scope}}`), `ecs_cluster_gc_unreclaimable_bytes{cluster=~"$cluster"}` (`unreclaimable {{scope}}`) |
 | 3 | GC reclaimed vs detected | `timeseries` | `bytes` | `ecs_cluster_gc_detected_bytes_total{cluster=~"$cluster"}` (`detected {{scope}}`), `ecs_cluster_gc_reclaimed_bytes_total{cluster=~"$cluster"}` (`reclaimed {{scope}}`) |
 | 4 | Erasure-coded share | `stat` | `percent` | `ecs_cluster_ec_coded_ratio_percent{cluster=~"$cluster"}` (`{{cluster}}`) |

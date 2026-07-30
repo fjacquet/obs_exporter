@@ -45,7 +45,7 @@ func TestCollectOnce(t *testing.T) {
 		mustSample(t, cs.Samples, "ecs_collector_up", 1, cluster, Label{"collector", rc})
 	}
 	// Domain samples are stamped with the cluster identity label.
-	mustSample(t, cs.Samples, "ecs_cluster_good_nodes", 4, cluster)
+	mustSample(t, cs.Samples, "ecs_cluster_nodes", 4, cluster, Label{"state", "good"})
 	mustSample(t, cs.Samples, "ecs_namespace_objects", 8, cluster, Label{"namespace", "s3"})
 }
 
