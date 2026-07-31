@@ -50,3 +50,4 @@ The full set, in order:
 | [0010](0010-mockecs-demo-harness.md) | mockecs fake-API demo harness (demo-only, never published) and the duplicated-fixtures sync constraint |
 | [0011](0011-flux-collector-for-unreachable-metrics.md) | Opt-in Flux collector accepted as direction for the performance fields the dashboard omits and the DT stats a segmented network hides; shipped, opt-in, in 3.2.0 |
 | [0012](0012-label-consolidation-and-sum-safety.md) | Consolidate one-measurement-many-names families into one name plus a label, bounded by the sum-safety rule: a whole and its parts never share a metric name |
+| [0013](0013-static-liveness-readiness-probes.md) | `/livez` and `/readyz`, always-200 probe endpoints decoupled from cluster state; chart defaults repointed away from `/health` |
