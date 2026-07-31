@@ -381,6 +381,7 @@
           ]
         }
       },
+      "description": "Two mutually exclusive sources, disambiguated in the legend: clusters without collectFlux publish the gauge (\"gauge\" series); clusters with collectFlux publish it as a histogram instead, charted here as a p95 estimate (\"p95\" series). A cluster only ever contributes one or the other — see ADR for collectFlux.",
       "targets": [
         {
           "datasource": {
@@ -388,7 +389,7 @@
             "uid": "prometheus"
           },
           "expr": "ecs_node_transaction_latency_milliseconds{op=\"read\",cluster=~\"$cluster\",node=~\"$node\"}",
-          "legendFormat": "read {{cluster}} {{node}}",
+          "legendFormat": "gauge read {{cluster}} {{node}}",
           "refId": "A"
         },
         {
@@ -397,8 +398,26 @@
             "uid": "prometheus"
           },
           "expr": "ecs_node_transaction_latency_milliseconds{op=\"write\",cluster=~\"$cluster\",node=~\"$node\"}",
-          "legendFormat": "write {{cluster}} {{node}}",
+          "legendFormat": "gauge write {{cluster}} {{node}}",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, cluster, node) (rate(ecs_node_transaction_latency_milliseconds_bucket{op=\"read\",cluster=~\"$cluster\",node=~\"$node\"}[5m])))",
+          "legendFormat": "p95 read {{cluster}} {{node}}",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, cluster, node) (rate(ecs_node_transaction_latency_milliseconds_bucket{op=\"write\",cluster=~\"$cluster\",node=~\"$node\"}[5m])))",
+          "legendFormat": "p95 write {{cluster}} {{node}}",
+          "refId": "D"
         }
       ]
     },
