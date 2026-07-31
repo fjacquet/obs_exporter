@@ -152,6 +152,27 @@ func TestNodesGivesUpLatencyWhenFluxOwnsIt(t *testing.T) {
 	}
 }
 
+// TestNodesKeepsBandwidthAndTPSWhenFluxOwnsPerf pins the suppression's scope:
+// it must remove exactly ecs_node_transaction_latency_milliseconds and nothing
+// else from transactionFields.samples' output. Flux has no equivalent for
+// bandwidth or transactions-per-second, so those two names have no other
+// owner and must keep flowing even while FluxOwnsPerf suppresses the latency
+// gauge. An over-broad predicate (e.g. a prefix match on
+// "ecs_node_transaction") would pass every other test in this package while
+// silently dropping both names -- this is the test that catches it.
+func TestNodesKeepsBandwidthAndTPSWhenFluxOwnsPerf(t *testing.T) {
+	samples, err := Nodes{FluxOwnsPerf: true}.Collect(t.Context(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(samples, "ecs_node_transaction_bandwidth_mb_per_second"); !ok {
+		t.Error("Nodes suppressed the bandwidth family while Flux owns performance; Flux has no equivalent for it")
+	}
+	if _, ok := findSample(samples, "ecs_node_transactions_per_second"); !ok {
+		t.Error("Nodes suppressed the transactions-per-second family while Flux owns performance; Flux has no equivalent for it")
+	}
+}
+
 func TestInfoCollect(t *testing.T) {
 	samples, err := Info{}.Collect(context.Background(), mockClient(t))
 	if err != nil {

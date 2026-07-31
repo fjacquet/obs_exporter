@@ -362,7 +362,15 @@ const unmappedNodesMetric = "ecs_collector_unmapped_nodes"
 
 // samples maps one measurement's rows, returning the samples, how many rows were
 // dropped for an unresolvable host, and how many were dropped as stale.
+//
+// Bucket-mode queries (q.buckets != nil) are dispatched to bucketSamples, which
+// evaluates rows as groups rather than independently -- see its doc comment.
+// Every other query stays row-by-row exactly as before.
 func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64) {
+	if q.buckets != nil {
+		return q.bucketSamples(rows, mapper, now)
+	}
+
 	var out []Sample
 	var unmapped, stale float64
 	limit := q.maxAgeOrDefault()
@@ -411,34 +419,6 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([
 			continue
 		}
 
-		if q.buckets != nil {
-			op, ok := row.value("id")
-			if !ok {
-				continue
-			}
-			opLabel, ok := q.buckets.idLabels[op]
-			if !ok {
-				continue // an id the mapping does not cover
-			}
-			labels := append(slices.Clone(base), Label{"op", opLabel})
-			out = append(out, Sample{
-				Name:   q.buckets.name + "_bucket",
-				Labels: append(slices.Clone(labels), Label{"le", field}),
-				Value:  v,
-				Type:   Counter,
-			})
-			// _count is the +Inf bucket: every observation falls under it.
-			if field == "+Inf" {
-				out = append(out, Sample{
-					Name:   q.buckets.name + "_count",
-					Labels: labels,
-					Value:  v,
-					Type:   Counter,
-				})
-			}
-			continue
-		}
-
 		for _, f := range q.fields {
 			if f.field != field {
 				continue
@@ -448,6 +428,129 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([
 				Labels: append(slices.Clone(base), f.labels...),
 				Value:  v,
 				Type:   f.typ,
+			})
+		}
+	}
+	return out, unmapped, stale
+}
+
+// bucketGroupKey identifies one (host, id) series family within a bucket-mode
+// measurement -- the raw tag values, before host resolution or id mapping are
+// known to succeed, so a row that fails either still lands in the group its
+// siblings occupy.
+type bucketGroupKey struct{ host, id string }
+
+// bucketGroup accumulates every bucket-bound field row belonging to one
+// (host, id) family. bad is set the moment any row belonging to the group is
+// dropped for any reason, which suppresses the whole group at assembly time.
+type bucketGroup struct {
+	node string
+	op   string
+	vals map[string]float64 // le (the field name) -> cumulative count
+	bad  bool
+}
+
+// bucketSamples is the bucket-mode counterpart to samples.
+//
+// statDataHead_performance_internal_latency names its fields after histogram
+// bucket bounds, and each bound is its own Flux series -- its own _time,
+// subject to its own staleness and parse outcome -- even though every bound
+// for a given (node, op) must appear together for histogram_quantile to mean
+// anything. A partial bucket set is worse than an absent one: it returns a
+// wrong quantile silently instead of surfacing as missing data. So rows are
+// grouped by their raw (host, id) tags first, and a group is emitted in full
+// or not at all: a row lost to staleness, an unparseable value, an
+// unresolvable host, or a missing _field condemns every bound already
+// collected for that group -- the same instinct the row-by-row path already
+// applies to a tagLabels row that would otherwise publish a short label set.
+func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64) {
+	limit := q.maxAgeOrDefault()
+	hostTag := q.hostTag
+	if hostTag == "" {
+		hostTag = "host"
+	}
+
+	groups := map[bucketGroupKey]*bucketGroup{}
+	var order []bucketGroupKey // stable emission order, purely for readability
+	var unmapped, stale float64
+
+	for _, row := range rows {
+		id, idOK := row.value("id")
+		host, hostOK := "", true
+		if q.perNode {
+			host, hostOK = row.value(hostTag)
+		}
+		if !idOK || !hostOK {
+			continue // nothing to key a group on; nowhere to record a hole
+		}
+		key := bucketGroupKey{host: host, id: id}
+		g, seen := groups[key]
+		if !seen {
+			g = &bucketGroup{vals: map[string]float64{}}
+			groups[key] = g
+			order = append(order, key)
+		}
+
+		age, dated := row.age(now)
+		if !dated || age > limit {
+			stale++
+			g.bad = true
+			continue
+		}
+		field, ok := row.value("_field")
+		if !ok {
+			g.bad = true
+			continue
+		}
+		v, ok := row.num("_value")
+		if !ok {
+			g.bad = true // absent, never zero
+			continue
+		}
+		if q.perNode {
+			node, ok := mapper.lookup(host)
+			if !ok {
+				unmapped++
+				g.bad = true
+				continue
+			}
+			g.node = node
+		}
+		opLabel, ok := q.buckets.idLabels[id]
+		if !ok {
+			g.bad = true // an id the mapping does not cover
+			continue
+		}
+		g.op = opLabel
+		g.vals[field] = v
+	}
+
+	var out []Sample
+	for _, key := range order {
+		g := groups[key]
+		if g.bad {
+			continue // any row lost condemns the whole series
+		}
+		var base []Label
+		if q.perNode {
+			base = append(base, Label{"node", g.node})
+		}
+		labels := append(slices.Clone(base), Label{"op", g.op})
+		for field, v := range g.vals {
+			out = append(out, Sample{
+				Name:   q.buckets.name + "_bucket",
+				Labels: append(slices.Clone(labels), Label{"le", field}),
+				Value:  v,
+				Type:   Counter,
+			})
+		}
+		// _count is the +Inf bucket: every observation falls under it.
+		if v, ok := g.vals["+Inf"]; ok {
+			out = append(out, Sample{
+				Name:   q.buckets.name + "_count",
+				Labels: labels,
+				Value:  v,
+				Type:   Counter,
 			})
 		}
 	}

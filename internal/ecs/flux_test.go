@@ -593,6 +593,112 @@ func TestFluxLatencyIgnoresUnknownIDs(t *testing.T) {
 	}
 }
 
+// TestFluxLatencyGroupIsAllOrNothing proves the group-suppression ruling: a
+// (node, op) bucket family is emitted in full or not at all. Each bucket
+// bound is its own Flux series with its own _time, so nothing at the row
+// level otherwise stops one bound going stale, unparseable, or unmapped while
+// its siblings survive -- which would leave a silent hole a histogram_quantile
+// query cannot detect. Each subtest breaks the supr01-r01 group via exactly
+// one of the four independent drop causes and checks two things at once: the
+// broken group produces nothing, and an entirely intact sibling group
+// (supr01-r02) is unaffected and still emits every bound plus _count.
+func TestFluxLatencyGroupIsAllOrNothing(t *testing.T) {
+	fresh := captureInstant.Format(time.RFC3339)
+	stale := captureInstant.Add(-time.Hour).Format(time.RFC3339)
+	mapper := &nodeMapper{byKey: map[string]string{
+		"supr01-r01": "supr01-r01",
+		"supr01-r02": "supr01-r02",
+	}}
+	buckets := &fluxBuckets{
+		name:     "ecs_node_transaction_latency_milliseconds",
+		idLabels: map[string]string{"ttfb_read": "read"},
+	}
+	q := fluxQuery{
+		bucket: "monitoring_main", measurement: "statDataHead_performance_internal_latency",
+		perNode: true, buckets: buckets,
+	}
+	// healthyGroup is the intact sibling every subtest carries alongside its
+	// broken one, proving suppression is scoped to the offending group.
+	healthyGroup := []fluxRow{
+		{cols: map[string]string{"_field": "0.0", "_value": "1", "_time": fresh, "host": "supr01-r02", "id": "ttfb_read"}},
+		{cols: map[string]string{"_field": "+Inf", "_value": "9", "_time": fresh, "host": "supr01-r02", "id": "ttfb_read"}},
+	}
+
+	for _, tc := range []struct {
+		name                    string
+		host                    string // raw host tag shared by every row in the broken group
+		broken                  func(host string) fluxRow
+		wantStale, wantUnmapped float64
+	}{
+		{
+			name: "stale sibling row",
+			host: "supr01-r01",
+			broken: func(host string) fluxRow {
+				return fluxRow{cols: map[string]string{"_field": "+Inf", "_value": "9", "_time": stale, "host": host, "id": "ttfb_read"}}
+			},
+			wantStale: 1,
+		},
+		{
+			name: "unparseable value",
+			host: "supr01-r01",
+			broken: func(host string) fluxRow {
+				return fluxRow{cols: map[string]string{"_field": "+Inf", "_value": "not-a-number", "_time": fresh, "host": host, "id": "ttfb_read"}}
+			},
+		},
+		{
+			// Every row for this host fails to resolve, including the "0.0" row
+			// below built from the same host -- an unresolvable host is a property
+			// of the group's identity, not of one row within it.
+			name: "unresolvable host",
+			host: "unknown-host.example.com",
+			broken: func(host string) fluxRow {
+				return fluxRow{cols: map[string]string{"_field": "+Inf", "_value": "9", "_time": fresh, "host": host, "id": "ttfb_read"}}
+			},
+			wantUnmapped: 2,
+		},
+		{
+			name: "missing _field",
+			host: "supr01-r01",
+			broken: func(host string) fluxRow {
+				return fluxRow{cols: map[string]string{"_value": "9", "_time": fresh, "host": host, "id": "ttfb_read"}}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := append([]fluxRow{
+				{cols: map[string]string{"_field": "0.0", "_value": "1", "_time": fresh, "host": tc.host, "id": "ttfb_read"}},
+				tc.broken(tc.host),
+			}, healthyGroup...)
+
+			out, unmapped, stale := q.samples(rows, mapper, captureInstant)
+
+			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket", Label{"node", "supr01-r01"}); ok {
+				t.Error("the group with one broken row emitted samples; want it fully suppressed")
+			}
+			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_count", Label{"node", "supr01-r01"}); ok {
+				t.Error("the group with one broken row emitted _count; want it fully suppressed")
+			}
+			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket",
+				Label{"node", "supr01-r02"}, Label{"le", "0.0"}); !ok {
+				t.Error("the intact sibling group's 0.0 bucket is missing")
+			}
+			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket",
+				Label{"node", "supr01-r02"}, Label{"le", "+Inf"}); !ok {
+				t.Error("the intact sibling group's +Inf bucket is missing")
+			}
+			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_count", Label{"node", "supr01-r02"}); !ok {
+				t.Error("the intact sibling group's _count is missing")
+			}
+			if stale != tc.wantStale {
+				t.Errorf("stale = %v, want %v", stale, tc.wantStale)
+			}
+			if unmapped != tc.wantUnmapped {
+				t.Errorf("unmapped = %v, want %v", unmapped, tc.wantUnmapped)
+			}
+		})
+	}
+}
+
 func TestFluxDropsStaleFixtureRows(t *testing.T) {
 	// The same fixture, read an hour later: every row is older than fluxMaxAge,
 	// so the collector must publish nothing rather than an hour-old CPU reading
