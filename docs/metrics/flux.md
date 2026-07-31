@@ -25,6 +25,36 @@ pre-rated:
 - `monitoring_vdc` — VDC-wide values **already expressed as per-second
   rates**.
 
+Every query below issues once per cycle, cluster-wide, closed with `last()`
+and no host filter — one request per measurement, never per node and never
+narrower. That shape is forced, not chosen: the external Flux API enforces a
+whitelist of exactly six operations and refuses anything else, `mean`
+included:
+
+```
+operation 'mean' is not allowed. Allowed operations:
+influxDBFrom, filter, range, last, drop, keep
+```
+
+`last()` is the only terminal operator on offer, so a rate, an average or a
+grouped rollup computed by the store itself is off the table for every
+measurement here — each one is Prometheus's job, downstream of what this
+collector publishes. Confirmed live 2026-07-31.
+
+!!! note "Absent, never stale"
+    `last()` returns the newest point in the window regardless of its age, and
+    these samples carry no timestamp of their own — Prometheus stamps them at
+    scrape time. Without a separate check, a node or service that stopped
+    writing would keep a value that looks current for the full width of the
+    query window. Every measurement here writes points five minutes apart on a
+    live 4.3, so a row older than ten minutes is dropped even when it is the
+    newest one available — two missed writes of slack, not zero. A node that
+    stops emitting therefore goes absent within two cadence periods rather
+    than holding a stale reading indefinitely. Alert with
+    [`absent()`](reading.md#absent-never-zero), the same idiom this exporter's
+    absent-never-zero rule already uses elsewhere — never on a zero, since a
+    stale row is not zero, it is just old.
+
 !!! warning "Rate direction is not the same in every bucket"
     The `monitoring_vdc`-sourced metrics (`ecs_cluster_requests_per_second`,
     `ecs_cluster_request_bytes_per_second`) are already rates and must
@@ -105,13 +135,28 @@ whose `host` matches no inventory node emits no sample and increments
 | `dtquery_dt_status` / `unready` | `ecs_cluster_dt_unready` | gauge |
 | `dtquery_dt_status` / `unknown` | `ecs_cluster_dt_unknown` | gauge |
 
-!!! note "Cluster-wide, and not a replacement for `collectDT`"
+**`monitoring_op` — per node, directory table**
+
+| Measurement / field | Metric | Type | Note |
+| --- | --- | --- | --- |
+| `dtquery_dt_dist_host_dt_node_id` / `count_i` | `ecs_node_dt_total{node}` | gauge | joined on `dt_node_id` (the node's `data_ip`), not `host`; query skipped when `collectDT` is on |
+
+!!! note "Cluster-wide totals, plus a per-node count Flux can serve after all"
     `dtquery_dt_status` is tagged `process, tag` only — no `host`, no
-    `node_id` — so these three are cluster totals, not a per-node breakdown.
-    The per-node `ecs_node_dt_total` / `_unready` / `_unknown` from the
-    [opt-in DT collector](index.md#node-dt-opt-in-collectdt-true) are unaffected and
-    stay the only source of per-node DT counts. `collectFlux` and
-    `collectDT` are independent flags — either, both, or neither.
+    `node_id` — so the three rows above are cluster totals, not a per-node
+    breakdown; that much was always right. But
+    `dtquery_dt_dist_host_dt_node_id` **does** carry a per-node breakdown of
+    the same total, under `dt_node_id` rather than `host` — confirmed live
+    2026-07-31, where the five per-node `count_i` values summed to exactly
+    `dtquery_dt_status`'s cluster total. Flux emits it as
+    `ecs_node_dt_total{node}`, the identical name and shape the [opt-in DT
+    collector](index.md#node-dt-opt-in-collectdt-true) already serves — but
+    only when `collectDT` is off. `collectDT` keeps the name, plus per-node
+    `unready`/`unknown`, which Flux still has no per-node breakdown for,
+    wherever it is reachable: it is the richer source, so it wins (ADR-0006).
+    `collectFlux` and `collectDT` stay independent flags — either, both, or
+    neither — and turning `collectFlux` on where `collectDT` cannot reach
+    port 9101 is what newly makes `ecs_node_dt_total` available there at all.
 
 **`monitoring_main` — per node, cumulative**
 
@@ -122,11 +167,45 @@ whose `host` matches no inventory node emits no sample and increments
 | `statDataHead_performance_internal_throughput` / `total_read_requests_size` | `ecs_node_request_bytes_total{node,op="read"}` | counter |
 | `statDataHead_performance_internal_throughput` / `total_write_requests_size` | `ecs_node_request_bytes_total{node,op="write"}` | counter |
 
+**`monitoring_main` — per node, histogram**
+
+| Measurement / field | Metric | Type | Note |
+| --- | --- | --- | --- |
+| `statDataHead_performance_internal_latency` (bucket-bound fields, `id=ttfb_read`) | `ecs_node_transaction_latency_milliseconds_bucket{node,op="read",le}` | counter | `le` is the field name verbatim — a valid Prometheus bound, including `+Inf` |
+| `statDataHead_performance_internal_latency` (bucket-bound fields, `id=ttlb_write`) | `ecs_node_transaction_latency_milliseconds_bucket{node,op="write",le}` | counter | same |
+| `statDataHead_performance_internal_latency` (`+Inf` bound) | `ecs_node_transaction_latency_milliseconds_count{node,op}` | counter | the `+Inf` bucket, restated as `_count` |
+
+!!! note "No `_sum`, and the gauge it displaces"
+    This measurement's field *names* are bucket bounds (`0.0`, `1.0`,
+    `4.814963904455889`, … `59999.999999999985`, `+Inf`), not a fixed field
+    set — cumulative counts, confirmed live 2026-07-31. The store serves no
+    `_sum`, so `prometheus.MustNewConstHistogram` cannot be used; the buckets
+    are published as ordinary counters carrying an `le` label, which is
+    exactly what `histogram_quantile()` consumes. That gets you quantiles; it
+    does not get you an average — there is no `_sum` to divide by `_count`,
+    and none can be reconstructed from buckets alone.
+
+    `ecs_node_transaction_latency_milliseconds` — the per-node latency
+    **gauge** in [the reference](index.md#nodes-dashboard), sourced from the
+    dashboard — is suppressed when `collectFlux` is on: `Nodes` stops
+    emitting it, the same arbitration that already applies to CPU and memory
+    (see "Sole source for three names" above). Unlike those three, Flux does
+    not reproduce the gauge's shape — it replaces the name with the
+    bucket/count family above, so a query for the plain gauge name goes empty
+    on a `collectFlux` cluster rather than picking up a new source silently.
+
 **`monitoring_vdc` — cluster-wide, already per-second**
 
-| Measurement / field | Metric | Type |
-| --- | --- | --- |
-| `cq_performance_transaction` / `succeed_request_counter` | `ecs_cluster_requests_per_second{outcome="success"}` | gauge |
-| `cq_performance_transaction` / `failed_request_counter` | `ecs_cluster_requests_per_second{outcome="failed"}` | gauge |
-| `cq_performance_throughput` / `total_read_requests_size` | `ecs_cluster_request_bytes_per_second{op="read"}` | gauge |
-| `cq_performance_throughput` / `total_write_requests_size` | `ecs_cluster_request_bytes_per_second{op="write"}` | gauge |
+| Measurement / field | Metric | Type | Note |
+| --- | --- | --- | --- |
+| `cq_performance_transaction` / `succeed_request_counter` | `ecs_cluster_requests_per_second{outcome="success"}` | gauge | confirmed in prose only — no payload attached |
+| `cq_performance_transaction` / `failed_request_counter` | `ecs_cluster_requests_per_second{outcome="failed"}` | gauge | confirmed in prose only — no payload attached |
+| `cq_performance_throughput` / `total_read_requests_size` | `ecs_cluster_request_bytes_per_second{op="read"}` | gauge | confirmed in prose only — no payload attached |
+| `cq_performance_throughput` / `total_write_requests_size` | `ecs_cluster_request_bytes_per_second{op="write"}` | gauge | confirmed in prose only — no payload attached |
+
+!!! note "What live-confirmed means here"
+    Every measurement, field and tag across these tables is read directly
+    from a real ObjectScale 4.3.0.0.142978 capture dated 2026-07-31 — except
+    the two `cq_performance_*` rows just above, confirmed by the reporter in
+    prose, with no payload attached. Nothing in these tables is read off the
+    admin guide anymore.

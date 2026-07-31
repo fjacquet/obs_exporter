@@ -158,6 +158,8 @@ request per cluster per cycle, and namespace usage is a single bulk request
 whatever the namespace count — but `collectQuotas` has no bulk endpoint and
 issues one request per namespace per cycle. The opt-in collectors scale on their
 own dimensions as well: `collectDT` makes two requests per node per cycle, and
-`collectFlux` one query per measurement, eight of them. Halving the interval
+`collectFlux` one query per measurement — ten of them, or nine when
+`collectDT` is also on, since it then owns the per-node directory-table query
+and Flux skips it. Halving the interval
 doubles all of that, so it is worth counting first on a cluster with hundreds of
 namespaces or with the opt-in collectors on.
