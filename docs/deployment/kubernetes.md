@@ -131,35 +131,27 @@ shell and no `curl` — so a probe that runs a command inside the container has
 nothing to run. Every probe has to be an HTTP request, which the kubelet — the
 Kubernetes agent running on each node — makes from outside the container.
 
-Which endpoint each probe uses is a real decision, not a formality: use
-`/metrics` for liveness and `/health` for readiness. `/health` answers 503 while
-**any** configured cluster is failing, and a restart cannot make an unreachable
-cluster reachable — which holds with a single cluster just as much as with
-several, where the restart additionally drops the metrics for every cluster that
-was collecting perfectly well. `/metrics` answers 200 as long as the process is
-up and serving, which is what liveness is supposed to mean. [Verify and
-troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
-sets out the full argument and what the `/health` JSON body contains.
+The chart's default `livenessProbe` and `readinessProbe` point at `/livez` and
+`/readyz`. Both always answer 200 — neither depends on cluster state or on the
+collection cycle having run at all, so neither can restart or de-pool a pod
+over a cluster that happens to be unreachable, which no restart could fix
+anyway. [ADR-0013](../adr/0013-static-liveness-readiness-probes.md) has the
+full argument. No override is needed for a standard deployment.
 
-The chart ships with both probes pointing at `/health`, so override the liveness
-one:
+`/health` still exists, unchanged: it answers 503 while any configured cluster
+is failing, and 200 otherwise, with a JSON body naming every cluster's status.
+It is not what the chart's probes use, but it is still the right endpoint for
+a human checking in, or for a monitoring system that wants to know *which*
+cluster is degraded rather than just that the pod should stay in rotation.
+[Verify and troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
+covers it in full.
 
-```yaml
-livenessProbe:
-  httpGet:
-    path: /metrics
-    port: http
-```
+Because `/livez` and `/readyz` don't wait on the first collection cycle, there
+is no startup window to cover with `initialDelaySeconds` or a `startupProbe` —
+unlike `/health`, which answers 503 until that first cycle finishes (bounded
+by `collection.timeout`, 60 seconds by default).
 
-Cover the startup window as well, with `initialDelaySeconds` or a
-`startupProbe`. The exporter's HTTP server deliberately comes up before the
-first collection cycle finishes, so there is a real window in which `/health`
-answers 503 and `/metrics` carries only `obs_exporter_build_info` — long enough
-to fail a readiness probe and, without a delay, to restart a pod that is
-starting normally. Its length is bounded by `collection.timeout`, 60 seconds by
-default.
-
-Then alert on `ecs_up` and `ecs_collector_up` rather than on either probe. The
+Alert on `ecs_up` and `ecs_collector_up` rather than on any probe. The
 exporter is built to degrade per cluster and per collector instead of going
 dark, and those two metrics are the ones that say which part is degraded.
 

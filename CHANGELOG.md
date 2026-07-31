@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `/livez` and `/readyz`: probe endpoints that always answer 200, with no
+  dependency on cluster reachability or the collection cycle. `/health` is
+  unchanged. See ADR-0013.
+
+### Changed
+
+- The chart's default `livenessProbe` and `readinessProbe` now point at
+  `/livez` and `/readyz` instead of `/health`. A fresh install or an upgrade
+  without pinned probe overrides gets the fix automatically; anyone who
+  already overrode the probes by hand (per the prior `kubernetes.md` advice)
+  is unaffected.
+
 ## [3.3.0] - 2026-07-31
 
 This release confronts the Flux collector, shipped undated in 3.2.0, with a

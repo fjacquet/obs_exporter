@@ -306,6 +306,15 @@ The path `/health` is fixed. Only the metrics path is configurable, through
 `server.uri` in the config file, so on a deployment that has moved `/metrics`
 elsewhere `/health` has not moved with it.
 
+Two more fixed paths, `/livez` and `/readyz`, always answer 200 — no cluster
+state, no dependency on the collection cycle. The chart's default
+`livenessProbe` and `readinessProbe` use these, not `/health`
+([ADR-0013](../adr/0013-static-liveness-readiness-probes.md)). Probing either
+one to check on a cluster will never show a problem; that was never their
+job, and asking them the question `/health` or `ecs_up` answers is the
+mistake to look for if a probe stays green through an outage a dashboard is
+showing.
+
 ## Symptom index
 
 ```mermaid
@@ -519,8 +528,12 @@ curl -s localhost:9438/health | jq '.clusters[] | select(.ok == false)'
 ```
 
 If the first prints 200 and the second prints a cluster, your probe is hitting
-`/health`. Fix the probe, or fix the cluster it is complaining about. Remember
-that `/metrics` may have been moved by `server.uri` while `/health` has not.
+`/health`. Fix the probe, or fix the cluster it is complaining about — the
+chart's own probes no longer hit `/health` by default
+([ADR-0013](../adr/0013-static-liveness-readiness-probes.md)), so seeing this
+usually means a manual override predating that change. Remember that
+`/metrics` may have been moved by `server.uri` while `/health`, `/livez` and
+`/readyz` have not.
 
 ### `/metrics` returns 500
 
