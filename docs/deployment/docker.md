@@ -39,13 +39,19 @@ docker run -d --name obs_exporter \
 Pin the version tag in production. `latest` moves on every release, and a
 metric rename between majors would arrive unannounced on the next pull.
 
-To pass flags, append them — they go to the binary's entrypoint:
+To pass flags, put them after the image name — but they **replace** the image's
+default command rather than adding to it. That default command is the only thing
+supplying `--config /etc/obs_exporter/config.yaml`, so the moment you pass flags
+of your own you have to repeat it, or the exporter falls back to the flag's
+default of `config.yaml` relative to the container's root directory, fails to
+find it, and exits 1:
 
 ```bash
 docker run --rm \
   -v "$PWD/config.yaml:/etc/obs_exporter/config.yaml:ro" \
   -e OBS1_PASSWORD \
-  ghcr.io/fjacquet/obs_exporter:3.2.0 --once --debug
+  ghcr.io/fjacquet/obs_exporter:3.2.0 \
+  --config /etc/obs_exporter/config.yaml --once --debug
 ```
 
 That is the fastest connectivity check against a new cluster: one collection

@@ -94,9 +94,10 @@ is described below with what it is actually good for.
 
 Every example on this page invokes a local binary, because that is the shortest
 form. If your exporter runs as a container, run a second throwaway one with the
-same config mounted and put the flags after the image name — the image's
-entrypoint is the exporter itself, so anything you pass is appended to its
-command line:
+same config mounted and put the flags after the image name. Those flags
+*replace* the image's default command instead of adding to it, so repeat
+`--config` alongside them — that default command is the only thing that points
+the exporter at the mounted file:
 
 ```bash
 docker run --rm -v /etc/obs_exporter/config.yaml:/etc/obs_exporter/config.yaml:ro \
