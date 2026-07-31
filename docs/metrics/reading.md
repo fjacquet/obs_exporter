@@ -3,8 +3,9 @@
 This page covers the four things about this exporter's output that catch people
 out: which metrics you may read at face value and which need `rate()`, what
 happens to a graph when a counter restarts, why a metric you expect can be
-missing rather than zero, and why scraping more often does not get you fresher
-numbers. It assumes no prior Prometheus experience.
+missing rather than zero, and why scraping — Prometheus fetching `/metrics` over
+HTTP on its own timer — more often does not get you fresher numbers. It assumes
+no prior Prometheus experience.
 
 It is deliberately not a PromQL tutorial. The query language, recording rules
 and alerting syntax belong to Prometheus and change with Prometheus; the
@@ -55,8 +56,8 @@ produces an error. Both produce a panel that quietly says nothing.
 A `_total` suffix is a strong hint that a metric is a counter, but in this
 exporter it is not a promise — most of the names carrying it are served as
 gauges. `ecs_node_dt_total` is one: there `_total` means "all of the directory
-tables", a count you can take right now and one that falls as well as rises, not
-a tally that accumulates. Where the distinction matters it is stated explicitly
+tables", a count you can take right now rather than a tally that accumulates.
+Where the distinction matters it is stated explicitly
 — the [reference](index.md) names which `_total` metrics are counters and flags
 the values that are already rates, and the [Flux collector](flux.md) mapping
 tables give a type for every metric they publish. The exporter's own output is the final authority, since a
@@ -75,9 +76,9 @@ before the exporter saw it, so leave those alone.
 
 A counter counts from the moment the process producing it started, and that
 process can restart. These counters come from ObjectScale's own monitoring
-store, and ObjectScale restarts them from zero when the datahead service on a
-node restarts — a service restart, a node reboot, a rolling upgrade. The tally
-does not carry over; it begins again at zero.
+store, and they restart from zero when the service producing them restarts — a
+datahead restart, a node reboot, a rolling upgrade. The tally does not carry
+over; it begins again at zero.
 
 That is not a problem for `rate()`. Prometheus knows counters reset, so when it
 sees the value drop it treats the drop as a restart rather than as an enormous
@@ -132,7 +133,8 @@ The consequence is that scraping faster than the exporter collects returns the
 same numbers over and over. It costs ObjectScale nothing, so it will not hurt
 the cluster — but it does not make the data any fresher either. It only stores
 more copies of a reading that may already be five minutes old. So set the two
-to match:
+to match — one minute in the example below, and see the note after it for why
+not five:
 
 ```yaml
 # obs_exporter config.yaml
@@ -162,8 +164,11 @@ except how much Prometheus stores.
     five-minute default.
 
 Lowering `collection.interval` does have a price at the cluster end: every cycle
-re-polls every configured cluster. Most collectors cost one request per cluster
-per cycle, and namespace usage is a single bulk request whatever the namespace
-count — but `collectQuotas` has no bulk endpoint and issues one request per
-namespace per cycle. On a cluster with hundreds of namespaces, that is the
-number that grows when you halve the interval.
+re-polls every configured cluster. In the default set most collectors cost one
+request per cluster per cycle, and namespace usage is a single bulk request
+whatever the namespace count — but `collectQuotas` has no bulk endpoint and
+issues one request per namespace per cycle. The opt-in collectors scale on their
+own dimensions as well: `collectDT` makes two requests per node per cycle, and
+`collectFlux` one query per measurement, eight of them. Halving the interval
+doubles all of that, so it is worth counting first on a cluster with hundreds of
+namespaces or with the opt-in collectors on.
