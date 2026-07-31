@@ -4,7 +4,6 @@ package ecsclient
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"sync"
 
@@ -83,13 +82,19 @@ func NewClusterClient(cfg Config) *ClusterClient {
 		}
 	}
 	// Retry on transport errors and 5xx, but never on 4xx (do not retry
-	// auth/permission failures). resty passes r == nil on transport/TLS errors,
-	// so guard the dereference to avoid a panic.
+	// auth/permission failures), and never on a 5xx whose body says retrying
+	// cannot help. ObjectScale answers a permission refusal with HTTP 500 and
+	// {"code":6401,…,"retryable":false} (ADR-0004), so the status class alone
+	// would loop on an outcome that can never change. resty passes r == nil on
+	// transport/TLS errors, so guard the dereference to avoid a panic.
 	rc.SetRetryCount(2).AddRetryCondition(func(r *resty.Response, err error) bool {
 		if err != nil {
 			return true
 		}
-		return r != nil && r.StatusCode() >= 500
+		if r == nil || r.StatusCode() < 500 {
+			return false
+		}
+		return !parseAPIError(r.Request.Method, r.Request.URL, r.StatusCode(), r.Body()).Permanent()
 	})
 	if cfg.Trace {
 		// Deliberately not resty's SetDebug: that dumps request headers including
@@ -144,7 +149,7 @@ func (c *ClusterClient) call(ctx context.Context, method, path string, body, out
 		}
 	}
 	if resp.StatusCode() >= 300 {
-		return fmt.Errorf("%s %s: status %d", method, path, resp.StatusCode())
+		return parseAPIError(method, path, resp.StatusCode(), resp.Body())
 	}
 	return nil
 }
