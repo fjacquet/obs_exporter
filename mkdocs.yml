@@ -48,3 +48,12 @@ nav:
   # page to be in the nav — it reports the omission at INFO level, not as a
   # warning, so --strict still passes.
   - Design decisions: adr/index.md
+
+# --strict fails on a link to a missing *file*, but by default says nothing about
+# a link to a missing *heading* — so `page.md#renamed-heading` rots silently. The
+# 3.2.0 docs restructure moved and renamed headings across fifteen commits and
+# every dangling fragment was caught by a human reading the diff, not by this
+# gate. `warn` becomes fatal under --strict, which is how CI runs it, while
+# leaving `mkdocs serve` usable mid-edit.
+validation:
+  anchors: warn
