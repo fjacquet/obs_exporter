@@ -13,7 +13,7 @@ this repo's instances of those decisions.
 ## Commands
 
 ```bash
-make ci             # CI gate: fmt-check, vet, golangci-lint, go test -race, govulncheck, build
+make ci             # CI gate: golangci-lint, go test -race, build, govulncheck (fmt-check/vet are in `sure`, not `ci`)
 make sure           # quicker local gate (fmt-check, vet, test, build)
 make test           # go test ./...
 go test ./internal/ecs -run TestClusterCollect   # single test
@@ -92,8 +92,3 @@ Collector tests run against
 `ecsclient.Mock`; the client is tested against an httptest TLS server; export
 paths are asserted via **both** the Prometheus registry gather and the OTLP
 `ManualReader`.
-
-## Known repo state
-
-- Default branch is still `master`; the family standard is `main`. Workflows
-  trigger on both until the rename happens.
