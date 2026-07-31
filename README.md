@@ -49,10 +49,11 @@ in [Installation](docs/getting-started/installation.md#ecs-prerequisites).
 - **The exporter itself** — whether each cluster and each collector succeeded on
   the last cycle, and build information.
 - **Two opt-in collectors** — `collectDT` reads legacy node-local directory-table
-  and connection stats; `collectFlux` reads per-node CPU, memory, network and
-  request counters from the cluster's own monitoring store, over the same
-  management port and session as everything else. Flux covers fields the
-  dashboard API does not serve on ObjectScale 4.3, and needs the
+  and connection stats; `collectFlux` reads per-node CPU, memory, network,
+  request counters and a transaction-latency histogram, plus cluster-wide
+  request-rate and DT metrics, from the cluster's own monitoring store, over
+  the same management port and session as everything else. Flux covers fields
+  the dashboard API does not serve on ObjectScale 4.3, and needs the
   `SYSTEM_MONITOR` or `SYSTEM_ADMIN` role.
 
 Full catalog: [docs/metrics/index.md](docs/metrics/index.md).
