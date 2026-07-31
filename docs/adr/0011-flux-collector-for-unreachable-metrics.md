@@ -129,12 +129,13 @@ Constraints that follow from the existing ADRs and are not up for
 re-litigation in the implementation:
 
 - **One request per measurement per cycle, not per node.** Queries close with
-  `|> last()` and no host filter (ADR-0002's snapshot model; the same reasoning
-  that made billing a bulk POST). This is not a design preference: the
-  external Flux API's six-operation whitelist (Context, above) admits no
-  other query shape — no query can filter to one node, aggregate, or compute
-  a rate server-side, so there is nothing to "optimise" by pushing work onto
-  the store.
+  `|> last()` and no host filter — that shape is the exporter's own snapshot
+  and load policy (ADR-0002; the same reasoning that made billing a bulk
+  POST), not something the whitelist forces: `filter` is one of the six
+  whitelisted operations (Context, above), so a per-node query is possible.
+  What the whitelist does force is that no query, per-node or cluster-wide,
+  can aggregate or compute a rate server-side, so there is nothing to
+  "optimise" by pushing work onto the store either way.
 - **Absent, never zero** (ADR-0007). A measurement missing from the bucket, an
   unparseable column, or an empty result yields no sample. A Flux-sourced metric
   must not be distinguishable from a management-API one by having fake zeros.
