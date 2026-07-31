@@ -1,9 +1,9 @@
 // Command mockecs is a minimal fake Dell ECS management API for end-to-end demos.
 // It serves the same REST surface the exporter calls (basic-auth GET /login issuing
-// an X-SDS-AUTH-TOKEN, the dashboard/namespace GETs, and the bulk billing POST)
-// over self-signed TLS on :4443, returning canned JSON from embedded fixtures. It
-// is NOT a faithful ECS emulator — it exists so the Compose stack lights up a
-// Grafana dashboard without real hardware.
+// an X-SDS-AUTH-TOKEN, the dashboard/namespace GETs, the bulk billing POST, and the
+// Flux monitoring store query endpoint) over self-signed TLS on :4443, returning
+// canned JSON from embedded fixtures. It is NOT a faithful ECS emulator — it exists
+// so the Compose stack lights up a Grafana dashboard without real hardware.
 package main
 
 import (
@@ -56,6 +56,9 @@ func main() {
 	// Bulk namespace billing (OBS 4.1) is a POST; the request body is ignored and
 	// the canned response covers every demo namespace.
 	mux.HandleFunc("/object/billing/namespace/info", fixtureHandler(http.MethodPost, "fixtures/billing.json"))
+	// The Flux monitoring store (opt-in collectFlux). All queries share one
+	// path, so the handler routes on the measurement named in the body.
+	mux.HandleFunc("/flux/api/external/v2/query", fluxHandler())
 
 	srv := &http.Server{
 		Addr:              ":4443",
