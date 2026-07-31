@@ -83,6 +83,16 @@ the `ec_*` and `recovery_*` families, and everything under `ecs_namespace_*` are
 | `ecs_node_transactions_read_per_second` | `ecs_node_transactions_per_second{op="read"}` |
 | `ecs_node_transactions_write_per_second` | `ecs_node_transactions_per_second{op="write"}` |
 
+!!! note "The latency gauge disappears if you also turn on `collectFlux`"
+    Unrelated to this migration, but worth knowing if you touch this metric
+    while you are here: on the opt-in [Flux collector](metrics/flux.md),
+    `ecs_node_transaction_latency_milliseconds` is suppressed in favor of a
+    `_bucket`/`_count` histogram of the same base name. A v2-era query rewritten
+    to the v3 name above keeps working right up until `collectFlux` is enabled,
+    at which point it goes silently empty rather than switching source. See the
+    Flux page's "No `_sum`, and the gauge it displaces" note for the histogram
+    query shape.
+
 ### Node-local scrapes (opt-in `collectDT`)
 
 | v2 | v3 |

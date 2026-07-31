@@ -37,6 +37,7 @@ nav:
   - Operate:
       - Verify & troubleshoot: operate/troubleshooting.md
       - Upgrading: operate/upgrading.md
+      - Flux live-cluster validation: operate/flux-validation.md
   - Metrics:
       - Reading the metrics: metrics/reading.md
       - Reference: metrics/index.md

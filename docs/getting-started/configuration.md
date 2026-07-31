@@ -105,15 +105,20 @@ keeping the running config. Changes to `server.*` need a restart.
 | `collectMetering` | `true` | namespace usage via one bulk billing POST. Disable on very large clusters if the billing query is slow; this also disables `quotas`. |
 | `collectQuotas` | `true` | the `quotas` collector (per-namespace quota limits). Requires `collectMetering`. See below. |
 | `collectDT` | `false` | legacy node-local DT/connection stats over ports 9101/9021 (undocumented ECS internals, v1 parity). See the [DT reachability warning](../metrics/index.md#node-dt-opt-in-collectdt-true). |
-| `collectFlux` | `false` | per-node CPU/memory/network, per-node request counters, and cluster-wide DT and transaction metrics from the cluster's Flux monitoring store. Same management port and session as every other collector — **no extra network access** — but the account must hold `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. Adds eight requests per cycle. See the [Flux collector page](../metrics/flux.md). |
+| `collectFlux` | `false` | per-node CPU/memory/network, per-node request counters, a per-node request-latency histogram, and cluster-wide DT and transaction metrics from the cluster's Flux monitoring store; also a second, conditional source for the per-node DT count. Same management port and session as every other collector — **no extra network access** — but the account must hold `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. Adds ten requests per cycle, or nine when `collectDT` is also on. See the [Flux collector page](../metrics/flux.md). |
 
 Enabling `collectFlux` makes it the **sole source** of `ecs_node_cpu_utilization_percent`,
 `ecs_node_memory_utilization_percent` and `ecs_node_memory_used_bytes` — the dashboard
-path stops emitting those three, so exactly one collector produces each. Everything else
-it emits is additive. On a 4.3 cluster the dashboard payloads do not carry those fields
-at all, which is the gap this collector exists to close; on a cluster that *does* serve
-them, enabling Flux switches their source, so verify they still appear before relying on
-it. `collectFlux` and `collectDT` are independent — enable either, both, or neither.
+path stops emitting those three, so exactly one collector produces each. It also
+**displaces** `ecs_node_transaction_latency_milliseconds` (the per-node latency gauge)
+with a `_bucket`/`_count` histogram under the same base name, and **conditionally**
+takes over the per-node `ecs_node_dt_total` count whenever `collectDT` is off — see the
+[Flux collector page](../metrics/flux.md) for the exact arbitration rules. Everything
+else it emits is additive. On a 4.3 cluster the dashboard payloads do not carry the
+CPU/memory/latency fields at all, which is the gap this collector exists to close; on a
+cluster that *does* serve them, enabling Flux switches their source, so verify they still
+appear before relying on it. `collectFlux` and `collectDT` are independent — enable
+either, both, or neither.
 
 ### Quotas on clusters with many namespaces
 

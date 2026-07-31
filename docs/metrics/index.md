@@ -138,7 +138,7 @@ All with the `node` label (the node's display name).
 | `ecs_node_memory_utilization_percent` / `ecs_node_memory_used_bytes` | memory usage |
 | `ecs_node_nic_bandwidth` (extra label `direction`: `received` / `transmitted`) | NIC throughput (unit as reported by the dashboard API) |
 | `ecs_node_nic_utilization_percent` | NIC utilization |
-| `ecs_node_transaction_latency_milliseconds` (extra label `op`: `read` / `write`) | per-node latency |
+| `ecs_node_transaction_latency_milliseconds` (extra label `op`: `read` / `write`) | per-node latency; suppressed when `collectFlux` is on — replaced there by the `_bucket`/`_count` histogram family in the [Flux collector](flux.md) tables, which serves no `_sum` |
 | `ecs_node_transaction_bandwidth_mb_per_second` (extra label `op`) | per-node bandwidth |
 | `ecs_node_transactions_per_second` (extra label `op`) | per-node TPS |
 
@@ -205,13 +205,16 @@ The ping payload's items are matched by `Name`, because the API documents
 | Metric | Description |
 | --- | --- |
 | `ecs_node_scrape_up` (extra label `endpoint`: `dt` / `object`) | reachability of each node-local port, reported separately because they sit on different networks |
-| `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts (port 9101, `mgmt_ip`) |
+| `ecs_node_dt_total` / `_unready` / `_unknown` | directory-table counts (port 9101, `mgmt_ip`). `_total` alone has a second possible source: the [Flux collector](flux.md) serves it too, when `collectFlux` is on and `collectDT` is off — `_unready`/`_unknown` stay `collectDT`-only, since Flux has no per-node breakdown for either |
 | `ecs_node_active_connections` | active Jetty connections on the node, from the object-port ping's `LOAD_FACTOR` item (port 9021, `data_ip`) |
 | `ecs_node_maintenance_mode` | 1 when the node reports `MAINTENANCE_MODE` `ON`, 0 when `OFF`. Absent when the node reports `UNKNOWN` — the exporter does not guess a node out of maintenance. |
 
 ## Flux collector (opt-in, `collectFlux: true`)
 
-Per-node performance metrics the dashboard payload omits on some clusters, and
-cluster-wide DT and transaction counters, read from the cluster's own Flux
-monitoring store. See [the Flux collector](flux.md) for the full mapping
-tables and arbitration rules.
+Per-node performance metrics the dashboard payload omits on some clusters,
+per-node request/byte counters and a per-node request-latency histogram, plus
+cluster-wide DT and transaction-rate metrics — all read from the cluster's own
+Flux monitoring store. It is also, conditionally, a second source for the
+per-node `ecs_node_dt_total` count above (see the [Node DT
+section](#node-dt-opt-in-collectdt-true)). See [the Flux
+collector](flux.md) for the full mapping tables and arbitration rules.
