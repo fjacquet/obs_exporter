@@ -1,11 +1,72 @@
 {
   "Series": [
     {
-      "Datatypes": ["long", "dateTime:RFC3339", "dateTime:RFC3339", "dateTime:RFC3339", "long", "string", "string", "string", "string", "string", "string"],
-      "Columns": ["table", "_start", "_stop", "_time", "_value", "_field", "_measurement", "host", "node_id", "process", "tag"],
+      "Datatypes": [
+        "long",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "long",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
+      "Columns": [
+        "table",
+        "_start",
+        "_stop",
+        "_time",
+        "_value",
+        "_field",
+        "_measurement",
+        "host",
+        "node_id",
+        "process",
+        "tag"
+      ],
       "Values": [
-        ["0", "2020-03-10T09:54:31.207799855Z", "2020-03-10T10:24:31.207799855Z", "2020-03-10T09:56:43Z", "17", "failed_request_counter", "statDataHead_performance_internal_transactions", "supr01-r01.example.com", "28cd473e-ca45-4623-b30d-0481c548a650", "statDataHead", "dashboard"],
-        ["1", "2020-03-10T09:54:31.207799855Z", "2020-03-10T10:24:31.207799855Z", "2020-03-10T09:56:43Z", "9312", "succeed_request_counter", "statDataHead_performance_internal_transactions", "supr01-r01.example.com", "28cd473e-ca45-4623-b30d-0481c548a650", "statDataHead", "dashboard"]
+        [
+          "0",
+          "2026-07-31T08:08:26.535675098Z",
+          "2026-07-31T08:38:26.535675098Z",
+          "2026-07-31T08:36:56Z",
+          "3671325",
+          "failed_request_counter",
+          "statDataHead_performance_internal_transactions",
+          "supr01-r01",
+          "9e472c37-1b26-41bf-8cdb-6455afb2d78a",
+          "statDataHead",
+          "dashboard"
+        ],
+        [
+          "1",
+          "2026-07-31T08:08:26.535675098Z",
+          "2026-07-31T08:38:26.535675098Z",
+          "2026-07-31T08:36:56Z",
+          "100477802",
+          "succeed_request_counter",
+          "statDataHead_performance_internal_transactions",
+          "supr01-r01",
+          "9e472c37-1b26-41bf-8cdb-6455afb2d78a",
+          "statDataHead",
+          "dashboard"
+        ],
+        [
+          "2",
+          "2026-07-31T08:08:26.535675098Z",
+          "2026-07-31T08:38:26.535675098Z",
+          "2026-07-31T08:35:00Z",
+          "7069723",
+          "succeed_request_counter",
+          "statDataHead_performance_internal_transactions",
+          "supr01-r02",
+          "e0272bb6-7fa7-45fb-85fe-5762ba5eb8a8",
+          "statDataHead",
+          "dashboard"
+        ]
       ]
     }
   ]

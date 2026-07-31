@@ -1,10 +1,59 @@
 {
   "Series": [
     {
-      "Columns": ["_value", "_field", "_measurement", "cpu", "host", "node_id", "tag"],
+      "Datatypes": [
+        "long",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "double",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
+      "Columns": [
+        "table",
+        "_start",
+        "_stop",
+        "_time",
+        "_value",
+        "_field",
+        "_measurement",
+        "cpu",
+        "host",
+        "node_id",
+        "tag"
+      ],
       "Values": [
-        ["31.5", "usage_user", "cpu", "cpu-total", "supr01-r01.example.com", "28cd473e-ca45-4623-b30d-0481c548a650", "dashboard"],
-        ["12.25", "usage_user", "cpu", "cpu-total", "supr01-r02.example.com", "39de584f-db56-5734-c41e-1592d659b761", "dashboard"]
+        [
+          "0",
+          "2026-07-31T08:32:22.801998531Z",
+          "2026-07-31T08:38:22.801998531Z",
+          "2026-07-31T08:35:09Z",
+          "5.119769342229881",
+          "usage_user",
+          "cpu",
+          "cpu-total",
+          "supr01-r01",
+          "9e472c37-1b26-41bf-8cdb-6455afb2d78a",
+          "system"
+        ],
+        [
+          "1",
+          "2026-07-31T08:32:22.801998531Z",
+          "2026-07-31T08:38:22.801998531Z",
+          "2026-07-31T08:35:07Z",
+          "4.370401774443806",
+          "usage_user",
+          "cpu",
+          "cpu-total",
+          "supr01-r02",
+          "e0272bb6-7fa7-45fb-85fe-5762ba5eb8a8",
+          "system"
+        ]
       ]
     }
   ]

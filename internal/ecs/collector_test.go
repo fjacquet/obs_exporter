@@ -197,7 +197,7 @@ func TestLabelKeyConsistencyFlux(t *testing.T) {
 	// with the cluster identity label first (Sample.WithCluster), so it leads
 	// the key order here too.
 	s, ok := findSample(cs.Samples, "ecs_node_network_bytes_total",
-		Label{"cluster", "test-cluster"}, Label{"node", "supr01-r01"}, Label{"interface", "eth0"}, Label{"direction", "received"})
+		Label{"cluster", "test-cluster"}, Label{"node", "supr01-r01"}, Label{"interface", "public"}, Label{"direction", "received"})
 	if !ok {
 		t.Fatal("ecs_node_network_bytes_total not collected; schema check ran on nothing from Flux")
 	}

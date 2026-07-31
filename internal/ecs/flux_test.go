@@ -146,8 +146,8 @@ func collectFlux(t *testing.T, byMeasurement map[string]string) []Sample {
 
 func TestFluxCollectPerNodeGauges(t *testing.T) {
 	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
-	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 31.5, Label{"node", "supr01-r01"})
-	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 12.25, Label{"node", "supr01-r02"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 5.119769342229881, Label{"node", "supr01-r01"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 4.370401774443806, Label{"node", "supr01-r02"})
 	s, _ := findSample(samples, "ecs_node_cpu_utilization_percent", Label{"node", "supr01-r01"})
 	if s.Type != Gauge {
 		t.Error("cpu utilization must be a gauge")
@@ -157,8 +157,8 @@ func TestFluxCollectPerNodeGauges(t *testing.T) {
 func TestFluxCollectNetworkCounters(t *testing.T) {
 	samples := collectFlux(t, map[string]string{"net": "flux_net.json"})
 	n1 := Label{"node", "supr01-r01"}
-	mustSample(t, samples, "ecs_node_network_bytes_total", 994013184, n1, Label{"interface", "eth0"}, Label{"direction", "received"})
-	mustSample(t, samples, "ecs_node_network_bytes_total", 551944704, n1, Label{"interface", "eth0"}, Label{"direction", "transmitted"})
+	mustSample(t, samples, "ecs_node_network_bytes_total", 34804069544351, n1, Label{"interface", "public"}, Label{"direction", "received"})
+	mustSample(t, samples, "ecs_node_network_bytes_total", 49132581189845, n1, Label{"interface", "public"}, Label{"direction", "transmitted"})
 
 	s, _ := findSample(samples, "ecs_node_network_bytes_total", n1, Label{"direction", "received"})
 	if s.Type != Counter {
@@ -179,9 +179,9 @@ func TestFluxCollectClusterScopedDT(t *testing.T) {
 	// dtquery_dt_status is tagged {process, tag} only — it is cluster-wide, and
 	// must not pretend to be per-node.
 	samples := collectFlux(t, map[string]string{"dtquery_dt_status": "flux_dt_status.json"})
-	mustSample(t, samples, "ecs_cluster_dt_total", 128)
-	mustSample(t, samples, "ecs_cluster_dt_unready", 2)
-	mustSample(t, samples, "ecs_cluster_dt_unknown", 1)
+	mustSample(t, samples, "ecs_cluster_dt_total", 1936)
+	mustSample(t, samples, "ecs_cluster_dt_unready", 0)
+	mustSample(t, samples, "ecs_cluster_dt_unknown", 0)
 	s, _ := findSample(samples, "ecs_cluster_dt_total")
 	if len(s.Labels) != 0 {
 		t.Errorf("cluster DT carries labels %v, want none", s.Labels)
@@ -227,7 +227,7 @@ func TestFluxCollectSurvivesRenamedMeasurement(t *testing.T) {
 	// listed in 3.8 and gone in 4.3. One missing measurement must not take the
 	// other seven with it.
 	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
-	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 31.5, Label{"node", "supr01-r01"})
+	mustSample(t, samples, "ecs_node_cpu_utilization_percent", 5.119769342229881, Label{"node", "supr01-r01"})
 	for _, absent := range []string{"ecs_cluster_dt_total", "ecs_node_requests_total"} {
 		if _, ok := findSample(samples, absent); ok {
 			t.Errorf("%s emitted from an empty measurement", absent)

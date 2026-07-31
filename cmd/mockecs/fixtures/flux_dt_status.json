@@ -1,11 +1,84 @@
 {
   "Series": [
     {
-      "Columns": ["_value", "_field", "_measurement", "process", "tag"],
+      "Datatypes": [
+        "long",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "long",
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
+      "Columns": [
+        "table",
+        "_start",
+        "_stop",
+        "_time",
+        "_value",
+        "_field",
+        "_measurement",
+        "process",
+        "tag"
+      ],
       "Values": [
-        ["128", "total", "dtquery_dt_status", "dtquery", "dashboard"],
-        ["2", "unready", "dtquery_dt_status", "dtquery", "dashboard"],
-        ["1", "unknown", "dtquery_dt_status", "dtquery", "dashboard"]
+        [
+          "0",
+          "2026-07-31T08:32:24.833559104Z",
+          "2026-07-31T08:38:24.833559104Z",
+          "2026-07-31T08:35:57Z",
+          "0",
+          "RIS_failure",
+          "dtquery_dt_status",
+          "dtquery",
+          "dt"
+        ],
+        [
+          "1",
+          "2026-07-31T08:32:24.833559104Z",
+          "2026-07-31T08:38:24.833559104Z",
+          "2026-07-31T08:35:57Z",
+          "0",
+          "dump_failure",
+          "dtquery_dt_status",
+          "dtquery",
+          "dt"
+        ],
+        [
+          "2",
+          "2026-07-31T08:32:24.833559104Z",
+          "2026-07-31T08:38:24.833559104Z",
+          "2026-07-31T08:35:57Z",
+          "1936",
+          "total",
+          "dtquery_dt_status",
+          "dtquery",
+          "dt"
+        ],
+        [
+          "3",
+          "2026-07-31T08:32:24.833559104Z",
+          "2026-07-31T08:38:24.833559104Z",
+          "2026-07-31T08:35:57Z",
+          "0",
+          "unknown",
+          "dtquery_dt_status",
+          "dtquery",
+          "dt"
+        ],
+        [
+          "4",
+          "2026-07-31T08:32:24.833559104Z",
+          "2026-07-31T08:38:24.833559104Z",
+          "2026-07-31T08:35:57Z",
+          "0",
+          "unready",
+          "dtquery_dt_status",
+          "dtquery",
+          "dt"
+        ]
       ]
     }
   ]
