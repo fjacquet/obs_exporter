@@ -40,7 +40,7 @@ clusters:
     # collectDT: opt-in legacy node-local DT/connection scraping over ports
     # 9101/9021 (undocumented ECS internals, kept for v1 parity). On a
     # network-segmented cluster port 9101 is not reachable from outside the
-    # cluster — see docs/metrics.md.
+    # cluster — see docs/metrics/index.md#node-dt-opt-in-collectdt-true.
     # collectDT: true
     # collectFlux: query the cluster's Flux monitoring store for per-node
     # performance and cluster DT counters the management API does not serve.

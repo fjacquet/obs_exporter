@@ -135,7 +135,7 @@ func (q fluxQuery) script() string {
 }
 
 // fluxQueries is the measurement-to-metric mapping, documented in
-// docs/metrics.md. The three buckets divide by scope and by whether values
+// docs/metrics/flux.md. The three buckets divide by scope and by whether values
 // arrive pre-rated: monitoring_op is per-node system state, monitoring_main
 // per-node cumulative counters, monitoring_vdc VDC-wide values already expressed
 // as rates — which is why the last group are gauges and must never be rate()d.

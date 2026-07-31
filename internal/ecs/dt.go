@@ -59,7 +59,7 @@ func (p pingResp) item(name string) (pingItem, bool) {
 // layout Dell recommends for production since ECS 3.8, and the default from 4.x
 // on): the object port answers on the node's data network and the DT stats port
 // on a private link-local fabric VLAN. See dtNode for which address each scrape
-// uses and docs/metrics.md for the reachability caveat this leaves.
+// uses and docs/metrics/index.md for the reachability caveat this leaves.
 type DT struct {
 	httpClient *http.Client
 	// dtURL/pingURL build the node-local endpoint URLs from the host each port

@@ -258,7 +258,7 @@ func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 
 // dumpSamples prints every collected sample in Prometheus exposition style,
 // sorted, so a `--once --debug` run against a live cluster can be diffed against
-// docs/metrics.md to spot silently-absent metrics.
+// docs/metrics/index.md to spot silently-absent metrics.
 func dumpSamples(snap *ecs.Snapshot) {
 	var lines []string
 	for _, cs := range snap.Clusters {

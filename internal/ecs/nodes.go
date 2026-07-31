@@ -80,7 +80,7 @@ func (nc Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, erro
 		// series, so allocated + free falls short of the total by the reserve (10%
 		// of total on a live 4.3 cluster). The total therefore keeps its own name
 		// AND the labeled family is knowingly incomplete — documented in
-		// docs/metrics.md so nobody reads the difference as free space.
+		// docs/metrics/index.md so nobody reads the difference as free space.
 		out = appendSeries(out, "ecs_node_disk_space_total_bytes", n.DiskSpaceTotal, node)
 		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceAllocated, node, Label{"type", "allocated"})
 		out = appendSeries(out, "ecs_node_disk_space_bytes", n.DiskSpaceFree, node, Label{"type", "free"})
