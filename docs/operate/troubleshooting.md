@@ -276,13 +276,20 @@ curl -s localhost:9438/health | jq
 ```
 
 The status code is **200 only when every configured cluster is healthy**, and
-**503 as soon as any one of them is not**. That is the right behaviour for a
-container health check on a single-cluster deployment and the wrong one for a
-multi-cluster deployment, where losing one of five clusters is a degraded
-service, not a dead one — the exporter keeps serving every healthy cluster's
-metrics regardless of what `/health` reports. If you run several clusters from
-one process, alert on `ecs_up` per cluster and treat `/health` as a coarse
-liveness signal, or read the JSON and decide for yourself.
+**503 as soon as any one of them is not**. That answer is accurate — it means
+the last cycle got nothing usable out of at least one cluster — so what matters
+is which kind of check you wire it to, not how many clusters you run. As a
+*readiness* check, the sort that decides whether anything should be sent to this
+instance, it is right on one cluster and on five. As a *liveness* check, the
+sort that restarts the process when it fails, it is wrong on one cluster and on
+five, because no restart can make an unreachable cluster reachable; with a
+single cluster it is worse rather than milder, because the container then
+restart-loops until the exporter is dark and the `ecs_up 0` that was naming the
+problem has gone with it. Point liveness at `/metrics`, which answers 200
+whenever the process is up and serving. With several clusters a 503 also will
+not say *which* one is degraded, while the exporter keeps serving every healthy
+cluster's metrics regardless — so alert on `ecs_up` per cluster, or read the
+JSON body and decide for yourself.
 
 `/health` also answers 503 before the first collection cycle finishes, because at
 that point it knows about no clusters at all. The HTTP server deliberately starts
