@@ -24,9 +24,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started:
-      - Installation: getting-started/installation.md
-      - Configuration: getting-started/configuration.md
-      - Quick start: getting-started/quickstart.md
+      - Install: getting-started/installation.md
+      - Configure: getting-started/configuration.md
+      - First run: getting-started/first-run.md
   - Metrics:
       - Reading the metrics: metrics/reading.md
       - Reference: metrics/index.md
@@ -38,6 +38,7 @@ nav:
   - Operate:
       - Verify & troubleshoot: operate/troubleshooting.md
       - Upgrading: operate/upgrading.md
+  - Try it without hardware: demo.md
   # The twelve ADRs stay published and stay linked from this index; they leave the
   # nav because they were more than half of it, and a reader looking for how to
   # deploy should not scan mostly maintainer material. mkdocs does not require a

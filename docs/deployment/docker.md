@@ -38,8 +38,9 @@ docker run --rm \
 ```
 
 That is the fastest connectivity check against a new cluster: one collection
-cycle, every sample printed, then exit. See [Quick start](../getting-started/quickstart.md)
-for the `--once --debug --trace` workflow.
+cycle, every sample printed, then exit. See [Verify and
+troubleshoot](../operate/troubleshooting.md) for the `--once --debug --trace`
+workflow.
 
 Check it came up:
 
