@@ -41,6 +41,9 @@ func fluxCaptureCmd() *cobra.Command {
 			"its files carry real cluster hostnames, IPs and namespace names, and must " +
 			"never be committed.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if (bucket == "") != (measurement == "") {
+				return fmt.Errorf("--bucket and --measurement must be given together (got --bucket=%q --measurement=%q)", bucket, measurement)
+			}
 			config.LoadDotEnv(cfgPath)
 			cfg, err := config.Load(cfgPath)
 			if err != nil {

@@ -70,6 +70,41 @@ func TestCountRowsOnUnparseableInputReturnsZero(t *testing.T) {
 	}
 }
 
+// TestFluxCaptureRejectsOneOfBucketOrMeasurement guards against a silent
+// whole-table capture when an operator sets only one of the two probe flags:
+// --bucket and --measurement are documented as used together
+// (docs/operate/flux-validation.md), and giving only one used to fall through
+// to capturing all ten table queries with no error and no file named after
+// the flag the operator did type.
+func TestFluxCaptureRejectsOneOfBucketOrMeasurement(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		bucket      string
+		measurement string
+	}{
+		{name: "measurement only", measurement: "diskio"},
+		{name: "bucket only", bucket: "monitoring_op"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := fluxCaptureCmd()
+			cmd.SetArgs([]string{
+				"--config", "does-not-exist.yaml",
+				"--bucket", tc.bucket,
+				"--measurement", tc.measurement,
+			})
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("Execute with only one of --bucket/--measurement set returned no error")
+			}
+			if !strings.Contains(err.Error(), "--bucket") || !strings.Contains(err.Error(), "--measurement") {
+				t.Errorf("error %q does not name both flags", err.Error())
+			}
+		})
+	}
+}
+
 func TestFluxCaptureCmdRegistersOutputAndClusterFlags(t *testing.T) {
 	cmd := fluxCaptureCmd()
 	if cmd.Use != "flux-capture" {
