@@ -23,11 +23,13 @@ capture contradicted.
   estimate from the histogram, distinguished in the legend, so it still draws
   regardless of which family a given cluster emits.
 - **Flux-sourced series now go absent within ten minutes of a node falling
-  silent, instead of holding a stale value.** Flux rows carry no timestamp of
-  their own; the collector previously read `last()` over a fifteen-minute
-  window and republished whatever it found, however old. Rows are now dated
-  from `_time` and dropped past ten minutes (twice the live cluster's
-  five-minute write cadence). A row that cannot be dated is dropped too.
+  silent, instead of holding a stale value.** The exported Prometheus samples
+  do not retain the source timestamp — Flux rows carry `_time`, but Prometheus
+  stamps a scraped sample at scrape time, not at `_time` — so the collector
+  previously read `last()` over a fifteen-minute window and republished
+  whatever it found, however old. Rows are now dated from `_time` and dropped
+  past ten minutes (twice the live cluster's five-minute write cadence). A row
+  that cannot be dated is dropped too.
 
 ### Added
 

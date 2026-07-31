@@ -27,9 +27,8 @@ pre-rated:
 
 Every query below issues once per cycle, cluster-wide, closed with `last()`
 and no host filter — one request per measurement, never per node and never
-narrower. That shape is forced, not chosen: the external Flux API enforces a
-whitelist of exactly six operations and refuses anything else, `mean`
-included:
+narrower. The external Flux API enforces a whitelist of exactly six
+operations and refuses anything else, `mean` included:
 
 ```
 operation 'mean' is not allowed. Allowed operations:
@@ -40,6 +39,13 @@ influxDBFrom, filter, range, last, drop, keep
 grouped rollup computed by the store itself is off the table for every
 measurement here — each one is Prometheus's job, downstream of what this
 collector publishes. Confirmed live 2026-07-31.
+
+That no-aggregation, no-rate limit is what the whitelist forces. It does not
+force the cluster-wide, no-host-filter shape: `filter` is itself one of the
+six whitelisted operations, so a per-node query is possible. Issuing one
+request per measurement rather than one per node is the exporter's own
+snapshot and load policy (ADR-0002), the same reasoning that made namespace
+billing a bulk POST rather than one call per namespace.
 
 !!! note "Absent, never stale"
     `last()` returns the newest point in the window regardless of its age, and
