@@ -1,4 +1,4 @@
-# Architecture Decision Records
+# Design decisions
 
 An architecture decision record (ADR) is a short document that captures one
 decision with lasting consequences: what was decided, why, and which
@@ -24,9 +24,15 @@ whoever runs it — start here if that is you:
   eventually lock that monitoring account out.
 - **[ADR-0011 — Opt-in Flux collector for metrics the management API does not
   serve](0011-flux-collector-for-unreachable-metrics.md)**: why the Flux
-  collector exists — some per-node performance fields and directory-table
-  stats are not reachable through the API every other collector uses — and
-  why it stays opt-in rather than on by default.
+  collector exists. ObjectScale 4.3 dashboard payloads omit per-node
+  performance fields the API reference documents, and the per-node
+  directory-table stats come from each node's port 9101, which the segmented
+  network layout Dell recommends for production does not expose to an outside
+  exporter. The Flux collector itself needs no firewall change: it uses the
+  same management port and the same session as every other collector. It
+  stays opt-in because it reads ObjectScale's internal InfluxDB monitoring
+  store, an implementation detail with no compatibility promise across
+  releases.
 
 The full set, in order:
 

@@ -27,17 +27,20 @@ nav:
       - Install: getting-started/installation.md
       - Configure: getting-started/configuration.md
       - First run: getting-started/first-run.md
+  # Order follows the job: understand, install, configure, deploy, operate, and
+  # only then look things up. The audience runs systemd far more often than
+  # Kubernetes, so Deploy leads with it.
+  - Deploy:
+      - systemd: deployment/systemd.md
+      - Docker: deployment/docker.md
+      - Kubernetes: deployment/kubernetes.md
+  - Operate:
+      - Verify & troubleshoot: operate/troubleshooting.md
+      - Upgrading: operate/upgrading.md
   - Metrics:
       - Reading the metrics: metrics/reading.md
       - Reference: metrics/index.md
       - The Flux collector: metrics/flux.md
-  - Deploy:
-      - Docker: deployment/docker.md
-      - Kubernetes: deployment/kubernetes.md
-      - systemd: deployment/systemd.md
-  - Operate:
-      - Verify & troubleshoot: operate/troubleshooting.md
-      - Upgrading: operate/upgrading.md
   - Try it without hardware: demo.md
   # The twelve ADRs stay published and stay linked from this index; they leave the
   # nav because they were more than half of it, and a reader looking for how to

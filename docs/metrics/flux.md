@@ -28,10 +28,17 @@ pre-rated:
 !!! warning "Rate direction is not the same in every bucket"
     The `monitoring_vdc`-sourced metrics (`ecs_cluster_requests_per_second`,
     `ecs_cluster_request_bytes_per_second`) are already rates and must
-    **never** be wrapped in `rate()`. `ecs_node_network_bytes_total`,
-    `ecs_node_requests_total` and `ecs_node_request_bytes_total` are the
-    opposite: counters that reset on datahead restart, and — like any other
-    `_total` metric — **must** be `rate()`d.
+    **never** be wrapped in `rate()`. The three `_total` names this collector
+    serves as counters are the opposite and **must** be `rate()`d, though they
+    do not all reset for the same reason. `ecs_node_requests_total` and
+    `ecs_node_request_bytes_total` come from `monitoring_main` and restart
+    from zero when the datahead service restarts.
+    `ecs_node_network_bytes_total` comes from `monitoring_op`/`net` and is an
+    OS-level NIC byte counter, so it restarts when the node reboots rather
+    than when a service does. None of that generalises to the `_total` suffix
+    itself: [five of the eight `_total` names](index.md) this exporter
+    publishes are gauges, and `rate()` over a gauge reads every decrease as a
+    counter reset and invents a spike that never happened.
 
 !!! note "Sole source for three names"
     When `collectFlux` is enabled it becomes the **sole source** of
