@@ -132,6 +132,26 @@ func TestNodesCollectUnknownShapeWarns(t *testing.T) {
 	}
 }
 
+func TestNodesGivesUpLatencyWhenFluxOwnsIt(t *testing.T) {
+	// Prometheus reads X_bucket as belonging to a histogram named X, so the
+	// dashboard gauge and the Flux histogram cannot both hold this family.
+	with, err := Nodes{FluxOwnsPerf: true}.Collect(t.Context(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(with, "ecs_node_transaction_latency_milliseconds"); ok {
+		t.Error("Nodes emitted the latency gauge while Flux owns the family")
+	}
+	// The cluster-level name has no Flux equivalent and is untouched.
+	without, err := Nodes{}.Collect(t.Context(), mockClient(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(without, "ecs_node_transaction_latency_milliseconds"); !ok {
+		t.Error("Nodes stopped emitting the latency gauge with Flux off")
+	}
+}
+
 func TestInfoCollect(t *testing.T) {
 	samples, err := Info{}.Collect(context.Background(), mockClient(t))
 	if err != nil {

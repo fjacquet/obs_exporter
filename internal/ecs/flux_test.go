@@ -514,6 +514,85 @@ func TestFluxClusterDTIsUnaffectedByArbitration(t *testing.T) {
 	}
 }
 
+func TestFluxLatencyBuckets(t *testing.T) {
+	// The field names are the bucket bounds and the values are cumulative, with
+	// +Inf equal to the last finite bound -- a Prometheus histogram in every
+	// respect except that the store serves no _sum.
+	f := Flux{now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, map[string]string{
+		"statDataHead_performance_internal_latency": "flux_latency.json",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := Label{"node", "supr01-r01"}
+	read := Label{"op", "read"}
+
+	inf, ok := findSample(samples, "ecs_node_transaction_latency_milliseconds_bucket", node, read, Label{"le", "+Inf"})
+	if !ok {
+		t.Fatal("no +Inf bucket")
+	}
+	if inf.Type != Counter {
+		t.Error("histogram buckets are cumulative counters")
+	}
+	count, ok := findSample(samples, "ecs_node_transaction_latency_milliseconds_count", node, read)
+	if !ok {
+		t.Fatal("no _count series")
+	}
+	if count.Value != inf.Value {
+		t.Errorf("_count = %v, +Inf bucket = %v; they are the same number", count.Value, inf.Value)
+	}
+	// ttlb_write maps onto the write op, the same dimension the dashboard path
+	// uses for this family.
+	if _, ok := findSample(samples, "ecs_node_transaction_latency_milliseconds_bucket",
+		node, Label{"op", "write"}, Label{"le", "+Inf"}); !ok {
+		t.Error("no write-op buckets: ttlb_write did not map onto op=write")
+	}
+	// No _sum: ECS does not serve one, and inventing it would be a lie.
+	if _, ok := findSample(samples, "ecs_node_transaction_latency_milliseconds_sum"); ok {
+		t.Error("a _sum was emitted; the store serves none")
+	}
+}
+
+func TestFluxLatencyBucketLabelKeyOrder(t *testing.T) {
+	// One name, one ordered label-key set (ADR-0006).
+	f := Flux{now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, map[string]string{
+		"statDataHead_performance_internal_latency": "flux_latency.json",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := findSample(samples, "ecs_node_transaction_latency_milliseconds_bucket")
+	got := make([]string, len(s.Labels))
+	for i, l := range s.Labels {
+		got[i] = l.Key
+	}
+	if !slices.Equal(got, []string{"node", "op", "le"}) {
+		t.Errorf("label keys = %v, want [node op le]", got)
+	}
+}
+
+func TestFluxLatencyIgnoresUnknownIDs(t *testing.T) {
+	// An id the mapping does not cover would otherwise land under a short label
+	// set and break the name's schema.
+	q := fluxQuery{
+		bucket: "monitoring_main", measurement: "statDataHead_performance_internal_latency",
+		perNode: false,
+		buckets: &fluxBuckets{
+			name:     "ecs_node_transaction_latency_milliseconds",
+			idLabels: map[string]string{"ttfb_read": "read", "ttlb_write": "write"},
+		},
+	}
+	rows := []fluxRow{{cols: map[string]string{
+		"_field": "1.0", "_value": "5", "_time": captureInstant.Format(time.RFC3339), "id": "ttlb_read",
+	}}}
+	out, _, _ := q.samples(rows, nil, captureInstant)
+	if len(out) != 0 {
+		t.Errorf("an unmapped id produced %d samples, want none", len(out))
+	}
+}
+
 func TestFluxDropsStaleFixtureRows(t *testing.T) {
 	// The same fixture, read an hour later: every row is older than fluxMaxAge,
 	// so the collector must publish nothing rather than an hour-old CPU reading

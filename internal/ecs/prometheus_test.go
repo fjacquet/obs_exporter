@@ -153,3 +153,56 @@ func TestPromCollectorEmitsCounterType(t *testing.T) {
 		t.Errorf("cpu_utilization type = %v, want GAUGE", types["ecs_node_cpu_utilization_percent"])
 	}
 }
+
+// TestPromCollectorAcceptsLeAsVariableLabel proves the approach in flux.go's
+// bucket mode is sound: le is a label name Prometheus reserves for its own
+// histogram type, and this collector is unchecked, publishing buckets as
+// ordinary counters through prometheus.NewConstMetric rather than
+// MustNewConstHistogram (which would require a _sum ECS does not serve). If
+// the client library rejected le as a plain variable label here, Gather would
+// return an error or the series would be missing.
+func TestPromCollectorAcceptsLeAsVariableLabel(t *testing.T) {
+	store := NewSnapshotStore()
+	store.Store(&Snapshot{Clusters: []*ClusterSnapshot{{
+		Cluster: "c1",
+		Samples: []Sample{
+			{
+				Name:   "ecs_node_transaction_latency_milliseconds_bucket",
+				Labels: []Label{{"node", "n1"}, {"op", "read"}, {"le", "+Inf"}},
+				Value:  5, Type: Counter,
+			},
+		},
+	}}})
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(NewPromCollector(store))
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mf *dto.MetricFamily
+	for _, f := range mfs {
+		if f.GetName() == "ecs_node_transaction_latency_milliseconds_bucket" {
+			mf = f
+		}
+	}
+	if mf == nil {
+		t.Fatal("ecs_node_transaction_latency_milliseconds_bucket missing from gather")
+	}
+	if mf.GetType() != dto.MetricType_COUNTER {
+		t.Errorf("bucket type = %v, want COUNTER", mf.GetType())
+	}
+	if len(mf.GetMetric()) != 1 {
+		t.Fatalf("got %d series, want 1", len(mf.GetMetric()))
+	}
+	var le string
+	var leFound bool
+	for _, lp := range mf.GetMetric()[0].GetLabel() {
+		if lp.GetName() == "le" {
+			le, leFound = lp.GetValue(), true
+		}
+	}
+	if !leFound || le != "+Inf" {
+		t.Errorf("le label = %q,%v, want %q,true", le, leFound, "+Inf")
+	}
+}

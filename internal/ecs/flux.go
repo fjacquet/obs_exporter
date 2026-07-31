@@ -16,7 +16,7 @@ import (
 
 // Flux is the opt-in collector for metric families the management API does
 // not serve, sourced from the cluster's Flux/InfluxDB monitoring store. Its
-// query table decides which source owns the three contested per-node names
+// query table decides which source owns the four contested per-node names
 // that Registry's arbitration keeps Nodes from also emitting (ADR-0006).
 type Flux struct {
 	// DTOwnedByDT suppresses the per-node DT query when the opt-in DT collector
@@ -148,6 +148,27 @@ type fluxQuery struct {
 	hostTag string
 	// dtPerNode marks the query the DT collector owns when it is enabled.
 	dtPerNode bool
+	// buckets, when set, reads field names as bucket bounds instead of matching
+	// them against fields.
+	buckets *fluxBuckets
+}
+
+// fluxBuckets describes a measurement whose field *names* are histogram bucket
+// bounds and whose values are cumulative counts.
+//
+// statDataHead_performance_internal_latency is the only such measurement, and
+// it is the source the ECS dashboard reads its own read/write latency from —
+// which is what justifies mapping its id tag onto the op dimension the
+// dashboard-sourced family already uses. The store serves no _sum, so
+// prometheus.MustNewConstHistogram is unusable and the buckets are published as
+// ordinary counters carrying an le label, which is what histogram_quantile
+// consumes.
+type fluxBuckets struct {
+	// name is the family name; _bucket and _count are appended to it.
+	name string
+	// idLabels maps the id tag onto its op label value. A row whose id is absent
+	// from this map is dropped rather than published under a short label set.
+	idLabels map[string]string
 }
 
 // script renders the Flux program for this measurement.
@@ -227,6 +248,14 @@ var fluxQueries = []fluxQuery{
 		fields: []fluxField{
 			{field: "total_read_requests_size", name: "ecs_node_request_bytes_total", typ: Counter, labels: []Label{{"op", "read"}}},
 			{field: "total_write_requests_size", name: "ecs_node_request_bytes_total", typ: Counter, labels: []Label{{"op", "write"}}},
+		},
+	},
+	{
+		bucket: "monitoring_main", measurement: "statDataHead_performance_internal_latency",
+		perNode: true,
+		buckets: &fluxBuckets{
+			name:     "ecs_node_transaction_latency_milliseconds",
+			idLabels: map[string]string{"ttfb_read": "read", "ttlb_write": "write"},
 		},
 	},
 	{
@@ -379,6 +408,34 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([
 			base = append(base, Label{tag, tv})
 		}
 		if short {
+			continue
+		}
+
+		if q.buckets != nil {
+			op, ok := row.value("id")
+			if !ok {
+				continue
+			}
+			opLabel, ok := q.buckets.idLabels[op]
+			if !ok {
+				continue // an id the mapping does not cover
+			}
+			labels := append(slices.Clone(base), Label{"op", opLabel})
+			out = append(out, Sample{
+				Name:   q.buckets.name + "_bucket",
+				Labels: append(slices.Clone(labels), Label{"le", field}),
+				Value:  v,
+				Type:   Counter,
+			})
+			// _count is the +Inf bucket: every observation falls under it.
+			if field == "+Inf" {
+				out = append(out, Sample{
+					Name:   q.buckets.name + "_count",
+					Labels: labels,
+					Value:  v,
+					Type:   Counter,
+				})
+			}
 			continue
 		}
 
