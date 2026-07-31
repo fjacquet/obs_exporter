@@ -38,17 +38,9 @@ nav:
   - Operate:
       - Verify & troubleshoot: operate/troubleshooting.md
       - Upgrading: operate/upgrading.md
-  - Architecture decisions:
-      - Overview: adr/index.md
-      - 0001 Supply-chain hardening: adr/0001-ci-supply-chain-hardening.md
-      - 0002 Snapshot model: adr/0002-prometheus-snapshot-model.md
-      - 0003 Hand-rolled client: adr/0003-hand-rolled-client-over-goobjectscale.md
-      - 0004 Token auth & retry: adr/0004-token-auth-retry-policy.md
-      - 0005 Hot reload swap: adr/0005-config-hot-reload-rebuild-and-swap.md
-      - 0006 Naming, units & labels: adr/0006-metric-naming-units-and-label-invariant.md
-      - 0007 OBS 4.1 API alignment: adr/0007-obs-4-1-api-alignment.md
-      - 0008 Swagger 4.2 validation findings: adr/0008-swagger-4.2-validation-findings.md
-      - 0009 Modular resource collectors: adr/0009-modular-resource-collectors.md
-      - 0010 mockecs demo harness: adr/0010-mockecs-demo-harness.md
-      - 0011 Opt-in Flux collector: adr/0011-flux-collector-for-unreachable-metrics.md
-      - 0012 Label consolidation: adr/0012-label-consolidation-and-sum-safety.md
+  # The twelve ADRs stay published and stay linked from this index; they leave the
+  # nav because they were more than half of it, and a reader looking for how to
+  # deploy should not scan mostly maintainer material. mkdocs does not require a
+  # page to be in the nav — it reports the omission at INFO level, not as a
+  # warning, so --strict still passes.
+  - Design decisions: adr/index.md
