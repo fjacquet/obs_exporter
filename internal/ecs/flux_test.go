@@ -700,6 +700,44 @@ func TestFluxLatencyGroupIsAllOrNothing(t *testing.T) {
 	}
 }
 
+// TestFluxLatencyGroupWithoutInfBoundIsSuppressed covers a group that never
+// received a +Inf row at all, as opposed to one that received it and had it
+// dropped -- g.bad already covers the latter, but a series simply absent from
+// the response left the group "good" and let a holed bucket set through: three
+// bound rows with no +Inf produced 3 _bucket samples, 0 _count, and no
+// suppression. A _bucket family with no _count is malformed, and a missing
+// intermediate bound would let histogram_quantile interpolate across the
+// wrong boundaries and return a plausible wrong number, so this family is
+// suppressed all-or-nothing per series (owner ruling) on a missing +Inf bound
+// too, not just on a dropped row.
+func TestFluxLatencyGroupWithoutInfBoundIsSuppressed(t *testing.T) {
+	fresh := captureInstant.Format(time.RFC3339)
+	mapper := &nodeMapper{byKey: map[string]string{"supr01-r01": "supr01-r01"}}
+	q := fluxQuery{
+		bucket: "monitoring_main", measurement: "statDataHead_performance_internal_latency",
+		perNode: true,
+		buckets: &fluxBuckets{
+			name:     "ecs_node_transaction_latency_milliseconds",
+			idLabels: map[string]string{"ttfb_read": "read"},
+		},
+	}
+	// Three finite bounds, no +Inf row at all -- the live capture writes all
+	// ten bounds every group, so this shape is unconfirmed against real
+	// cluster behaviour; it is a guard against a shape the store has not been
+	// observed to produce.
+	rows := []fluxRow{
+		{cols: map[string]string{"_field": "0.0", "_value": "1", "_time": fresh, "host": "supr01-r01", "id": "ttfb_read"}},
+		{cols: map[string]string{"_field": "1.0", "_value": "3", "_time": fresh, "host": "supr01-r01", "id": "ttfb_read"}},
+		{cols: map[string]string{"_field": "5.0", "_value": "5", "_time": fresh, "host": "supr01-r01", "id": "ttfb_read"}},
+	}
+
+	out, _, _ := q.samples(rows, mapper, captureInstant)
+
+	if len(out) != 0 {
+		t.Errorf("a group missing its +Inf bound emitted %d samples, want 0 (fully suppressed)", len(out))
+	}
+}
+
 func TestFluxDropsStaleFixtureRows(t *testing.T) {
 	// The same fixture, read an hour later: every row is older than fluxMaxAge,
 	// so the collector must publish nothing rather than an hour-old CPU reading

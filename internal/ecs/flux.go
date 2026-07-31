@@ -615,6 +615,15 @@ func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Ti
 		if g.bad {
 			continue // any row lost condemns the whole series
 		}
+		if _, ok := g.vals["+Inf"]; !ok {
+			// The +Inf bound is the group's _count. A group that never received
+			// it -- as opposed to one that received it and had it dropped, which
+			// g.bad already covers -- is still a bucket set with no _count, and
+			// a missing intermediate bound would let histogram_quantile
+			// interpolate across the wrong boundaries and return a plausible
+			// wrong number. All-or-nothing per series (owner ruling).
+			continue
+		}
 		var base []Label
 		if q.perNode {
 			base = append(base, Label{"node", g.node})

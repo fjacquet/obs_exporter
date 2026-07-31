@@ -174,13 +174,21 @@ func TestLabelKeyConsistency(t *testing.T) {
 // to feed the multi-key net measurement — ecs_node_network_bytes_total carries
 // {node, interface, direction} in that order from a static query table today;
 // nothing else in the suite would catch an edit that made the order depend on
-// row data instead.
+// row data instead. The fixture map also covers the bucket-mode latency
+// histogram (the only family carrying an "le" label) and per-node
+// ecs_node_dt_total, so both new label-key sets this branch adds are checked
+// here too — previously neither reached this test at all.
 func TestLabelKeyConsistencyFlux(t *testing.T) {
 	cl := config.Cluster{Name: "test-cluster", CollectFlux: true, CollectMetering: boolPtr(false)}
 	client := fluxMock(t, map[string]string{
-		"cpu":               "flux_cpu.json",
-		"net":               "flux_net.json",
-		"dtquery_dt_status": "flux_dt_status.json",
+		"cpu":                             "flux_cpu.json",
+		"mem":                             "flux_mem.json",
+		"net":                             "flux_net.json",
+		"dtquery_dt_status":               "flux_dt_status.json",
+		"dtquery_dt_dist_host_dt_node_id": "flux_dt_dist.json",
+		"statDataHead_performance_internal_latency":      "flux_latency.json",
+		"statDataHead_performance_internal_transactions": "flux_transactions.json",
+		"statDataHead_performance_internal_throughput":   "flux_throughput.json",
 	})
 	// Registry builds Flux{} with the real clock; pin it to the fixtures'
 	// capture instant (flux_test.go) so their _time values read as fresh
