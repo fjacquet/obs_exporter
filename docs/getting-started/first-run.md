@@ -67,7 +67,8 @@ is not set, the exporter refuses to start and names it. That is deliberate: a
 typo in a secret's *name* becomes one clear error at startup instead of an
 authentication failure repeating every five minutes for a week.
 [Configuration](configuration.md#secrets) covers the alternative, `passwordFile`,
-which reads the password from a file verbatim and is the better choice when a
+which reads the password from a file — trimmed of surrounding whitespace, so a
+trailing newline from `echo` does you no harm — and is the better choice when a
 secret manager already puts one on disk for you.
 
 Everything not in that file has a default: the exporter listens on `:9438` and
@@ -108,10 +109,11 @@ dead process. So the exporter answers immediately, and a scrape that arrives
 during that first cycle gets a valid response containing only
 `obs_exporter_build_info` — no cluster metrics yet, but no failed scrape either.
 
-When the exporter's output is not a terminal — redirected to a file, piped into
-another command, or captured by systemd or Docker — the logging library switches
-to a machine-readable form, and that is the format you will see in the journal
-and in the rest of these pages:
+All of this logging goes to standard error, and when *that* is not a terminal the
+logging library switches to a machine-readable form. This is the format you will
+see in the journal, in `docker logs`, and in the rest of these pages — note that
+it takes `2>` or `2>&1` to reproduce locally, since plain `> out.log` redirects
+only standard output and leaves the logging on your terminal in the form above:
 
 ```text
 time="2026-07-31T09:31:02+02:00" level=info msg="running initial collection cycle"
@@ -126,7 +128,7 @@ collector that *fails* logs a warning at the default level — you do not need
 collect and the error text names the request that failed:
 
 ```text
-level=warning msg="collector failed" cluster=ecs-prod-01 collector=quotas err="GET /object/namespaces: status 403"
+WARN[0123] collector failed                              cluster=ecs-prod-01 collector=quotas err="GET /object/namespaces: status 403"
 ```
 
 That is not fatal. A failing collector does not fail the cycle, the cluster or

@@ -44,9 +44,9 @@ writes to the cluster, and one process covers as many clusters as you list.
 - **Two opt-in collectors** — `collectDT` reads legacy node-local directory-table
   and connection stats; `collectFlux` reads per-node CPU, memory, network and
   request counters from the cluster's own monitoring store, over the same
-  management port and session as everything else. Flux covers fields ObjectScale
-  4.3 no longer serves through the dashboard API, and needs the `SYSTEM_MONITOR`
-  role.
+  management port and session as everything else. Flux covers fields the
+  dashboard API does not serve on ObjectScale 4.3, and needs the
+  `SYSTEM_MONITOR` or `SYSTEM_ADMIN` role.
 
 Full catalog: [docs/metrics/index.md](docs/metrics/index.md).
 

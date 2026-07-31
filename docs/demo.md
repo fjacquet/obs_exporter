@@ -1,6 +1,6 @@
 # Try it without hardware
 
-You can run the whole thing — exporter, Prometheus, Grafana and every provisioned
+You can run the whole thing — exporter, Prometheus, Grafana and every bundled
 dashboard — without an ObjectScale cluster, without credentials, and without
 asking anyone for access to production. One command starts a fake cluster
 alongside the real exporter and gives you a browser tab full of populated
@@ -8,8 +8,7 @@ dashboards.
 
 This is the fastest way to answer "what would this actually give me?" before you
 spend anything on it. It is also useful once you are running it for real: it is a
-safe place to try a dashboard edit, a new alert expression, or a build from a
-branch.
+safe place to try a dashboard edit, a new alert rule, or a build from a branch.
 
 The only prerequisite is Docker with the Compose plugin and a clone of the
 repository. You do not need a Go toolchain — the binaries are compiled inside the
@@ -88,9 +87,11 @@ lag), how much capacity runway is left, what the request path is doing
 exporter itself is healthy.
 
 From there, the **ObjectScale dashboards** dropdown at the top of every dashboard
-links the six focused drill-downs — Performance, Nodes, Namespaces,
-Replication, Storage internals, and Maintenance & Directory Tables — keeping your
-current time range as you move between them.
+lists all seven — the Overview itself plus the six focused drill-downs
+(Performance, Nodes, Namespaces, Replication, Storage internals, and
+Maintenance & Directory Tables) — and keeps your current time range as you move
+between them, so a spike you spotted on the Overview is still on screen when you
+land on the drill-down.
 
 One dashboard in that folder is not ours: **Node Exporter Full** is the
 well-known Linux host dashboard — [Grafana

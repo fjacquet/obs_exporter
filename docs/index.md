@@ -62,8 +62,8 @@ flowchart TD
 ObjectScale cluster — `make demo` gives you the exporter, Prometheus and
 provisioned Grafana dashboards against a fake cluster.
 
-- [Installation](getting-started/installation.md) — binary, container, or package
-- [Configuration](getting-started/configuration.md) — the config file and every collector flag
+- [Install](getting-started/installation.md) — binary, container, or package
+- [Configure](getting-started/configuration.md) — the config file and every collector flag
 - [First run](getting-started/first-run.md) — the smallest working config, run in the foreground
 - [Metrics reference](metrics/index.md) — the full catalog
 

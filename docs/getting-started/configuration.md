@@ -1,4 +1,4 @@
-# Configuration
+# Configure
 
 The exporter reads a single YAML file (`--config config.yaml`). Reference:
 
