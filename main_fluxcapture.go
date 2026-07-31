@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/fjacquet/obs_exporter/internal/config"
@@ -83,7 +84,14 @@ func fluxCaptureCmd() *cobra.Command {
 				Err   string `json:"error,omitempty"`
 			}
 			var summary []result
-			for key, script := range scripts {
+			// Sorted, not range order: this command exists to capture a cluster's
+			// Flux responses for comparison over time, so the order files are
+			// written in, the order printed to stdout, and summary.json's entry
+			// order must all be stable between otherwise identical runs -- or a
+			// diff between two captures is dominated by map-order noise instead of
+			// real differences.
+			for _, key := range sortedScriptKeys(scripts) {
+				script := scripts[key]
 				var raw json.RawMessage
 				r := result{Key: key, Query: script}
 				if err := c.Post(cmd.Context(), ecs.FluxPath,
@@ -115,6 +123,21 @@ func fluxCaptureCmd() *cobra.Command {
 	cmd.Flags().StringVar(&measurement, "measurement", "", "probe one measurement: its name")
 	cmd.Flags().BoolVar(&trace, "trace", false, "log every management API response body")
 	return cmd
+}
+
+// sortedScriptKeys returns scripts' keys ("bucket/measurement") in sorted
+// order. scripts is a map, so ranging it directly makes the order files are
+// written in, the order printed to stdout, and summary.json's entry order all
+// vary between otherwise-identical runs -- needlessly, since flux-capture
+// exists to compare a cluster's Flux responses over time and a diff between
+// two captures should reflect real differences, not map-order noise.
+func sortedScriptKeys(scripts map[string]string) []string {
+	keys := make([]string, 0, len(scripts))
+	for key := range scripts {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // selectCluster picks the cluster to capture from: the named cluster when
