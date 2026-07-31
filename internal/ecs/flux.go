@@ -7,6 +7,7 @@ import (
 	"net"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 	log "github.com/sirupsen/logrus"
@@ -16,7 +17,18 @@ import (
 // not serve, sourced from the cluster's Flux/InfluxDB monitoring store. Its
 // query table decides which source owns the three contested per-node names
 // that Registry's arbitration keeps Nodes from also emitting (ADR-0006).
-type Flux struct{}
+type Flux struct {
+	// now overrides the clock. Zero means time.Now; tests set it so fixtures
+	// captured at a fixed instant are not all judged stale.
+	now func() time.Time
+}
+
+func (f Flux) clock() time.Time {
+	if f.now == nil {
+		return time.Now()
+	}
+	return f.now()
+}
 
 // Name identifies this collector in ecs_collector_up.
 func (Flux) Name() string { return "flux" }
@@ -122,6 +134,9 @@ type fluxQuery struct {
 	// carries one ordered label-key set (ADR-0006).
 	tagLabels []string
 	fields    []fluxField
+	// maxAge overrides fluxMaxAge for a measurement outside the five-minute
+	// cadence class. Zero means the default.
+	maxAge time.Duration
 }
 
 // script renders the Flux program for this measurement.
@@ -212,12 +227,13 @@ var fluxQueries = []fluxQuery{
 // measurement the cluster does not carry answers with no rows and yields a
 // warning plus absent samples, because measurement names are undocumented and a
 // rename must not take the other seven down with it.
-func (Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
+func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 	mapper, err := newNodeMapper(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 
+	now := f.clock()
 	var out []Sample
 	var unmapped float64
 	for _, q := range fluxQueries {
@@ -231,9 +247,10 @@ func (Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 				Warn("Flux measurement returned no rows; its samples are absent this cycle")
 			continue
 		}
-		samples, miss := q.samples(rows, mapper)
+		samples, miss, stale := q.samples(rows, mapper, now)
 		out = append(out, samples...)
 		unmapped += miss
+		_ = stale // reported by the per-measurement debug line in Task 9
 	}
 
 	// Always emitted, including as 0: "mapping worked" is the information that
@@ -254,12 +271,18 @@ func (Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 // collectCluster keys off this constant, not a literal, so the two stay in sync.
 const unmappedNodesMetric = "ecs_collector_unmapped_nodes"
 
-// samples maps one measurement's rows, returning the samples and how many rows
-// were dropped for an unresolvable host.
-func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper) ([]Sample, float64) {
+// samples maps one measurement's rows, returning the samples, how many rows were
+// dropped for an unresolvable host, and how many were dropped as stale.
+func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64) {
 	var out []Sample
-	var unmapped float64
+	var unmapped, stale float64
+	limit := q.maxAgeOrDefault()
 	for _, row := range rows {
+		age, dated := row.age(now)
+		if !dated || age > limit {
+			stale++
+			continue
+		}
 		field, ok := row.value("_field")
 		if !ok {
 			continue
@@ -307,5 +330,5 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper) ([]Sample, float6
 			})
 		}
 	}
-	return out, unmapped
+	return out, unmapped, stale
 }

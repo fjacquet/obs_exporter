@@ -182,8 +182,17 @@ func TestLabelKeyConsistencyFlux(t *testing.T) {
 		"net":               "flux_net.json",
 		"dtquery_dt_status": "flux_dt_status.json",
 	})
+	// Registry builds Flux{} with the real clock; pin it to the fixtures'
+	// capture instant (flux_test.go) so their _time values read as fresh
+	// rather than all being dropped as stale.
+	collectors := Registry(cl)
+	for i, rc := range collectors {
+		if _, ok := rc.(Flux); ok {
+			collectors[i] = Flux{now: func() time.Time { return captureInstant }}
+		}
+	}
 	store := NewSnapshotStore()
-	col := NewCollector([]Target{{Client: client, Collectors: Registry(cl)}}, store, time.Minute, 10*time.Second)
+	col := NewCollector([]Target{{Client: client, Collectors: collectors}}, store, time.Minute, 10*time.Second)
 	snap := col.CollectOnce(context.Background())
 
 	cs := snap.Clusters[0]
