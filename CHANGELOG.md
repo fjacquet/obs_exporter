@@ -6,6 +6,74 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+This release confronts the Flux collector, shipped undated in 3.2.0, with a
+real ObjectScale 4.3.0.0.142978 capture (`flux-capture`) and corrects what the
+capture contradicted.
+
+### Behaviour changes an operator would notice
+
+- **`ecs_node_transaction_latency_milliseconds` (the gauge) disappears when
+  `collectFlux` is on.** Flux serves that measurement as a histogram, and one
+  metric name cannot be both a gauge and a histogram family (ADR-0006); the
+  histogram — `ecs_node_transaction_latency_milliseconds_bucket{node,op,le}`
+  and `..._count` — replaces it. There is no `_sum`, so `histogram_quantile()`
+  works but average latency cannot be reconstructed. Any alert or dashboard
+  panel on the gauge, on a `collectFlux` cluster, goes silent; `grafana/dashboards/obs-performance.json`'s
+  "Node transaction latency" panel now charts both the gauge and a p95
+  estimate from the histogram, distinguished in the legend, so it still draws
+  regardless of which family a given cluster emits.
+- **Flux-sourced series now go absent within ten minutes of a node falling
+  silent, instead of holding a stale value.** Flux rows carry no timestamp of
+  their own; the collector previously read `last()` over a fifteen-minute
+  window and republished whatever it found, however old. Rows are now dated
+  from `_time` and dropped past ten minutes (twice the live cluster's
+  five-minute write cadence). A row that cannot be dated is dropped too.
+
+### Added
+
+- Per-query failure tolerance: a Flux measurement that fails to compile (a
+  malformed query, or one the running Flux version rejects) no longer takes
+  the other nine measurements down with it. A permission refusal or transport
+  error still fails the whole cycle fast, on the first query.
+- Per-node directory-table counts, `ecs_node_dt_total`, from Flux's
+  `dtquery_dt_dist_host_dt_node_id` measurement. Arbitrated against the
+  existing DT collector (`internal/ecs/dt.go`, port 9101): whichever one runs
+  owns the name, so the same metric works whether or not that port is
+  reachable.
+- Warn-once logging: a Flux measurement that returns no rows for one cluster
+  logs a warning on its first occurrence and steps down to debug afterward,
+  instead of one warning per cycle for as long as the condition persists.
+- `cmd/mockecs` now serves the Flux query endpoint from fixtures, so the demo
+  stack and any manual verification exercise the same code path production
+  does.
+- `flux-capture`, a CLI subcommand that replays the exporter's own Flux
+  queries against a live cluster and writes the responses as fixtures —
+  proof against the queries actually issued, not a hand-written approximation
+  of them.
+- Trace spans distinguish the ten Flux queries a cycle issues, previously
+  indistinguishable in a trace view.
+
+### Fixed
+
+- `ecsclient.APIError` decodes the ECS error envelope
+  (`{code,description,retryable}`) instead of retrying on HTTP status class
+  alone. ObjectScale answers both a permission refusal and an invalid Flux
+  query with HTTP 500; the client was retrying a refusal three times per
+  measurement per cycle for an outcome that could never change. A body that
+  does not decode to the envelope makes no claim and still retries as before.
+- `internal/ecs/testdata/flux/*.json` fixtures replaced with the live 4.3
+  capture; the discriminating power a hand-transcribed `dt_status` fixture
+  had lost (every value distinct enough to catch a swapped field) is restored.
+
+### Known limitations — resolved
+
+- 3.2.0 noted the Flux collector's bucket/measurement mapping and `host`-tag
+  node identity were derived from the admin guide and unconfirmed against a
+  running cluster, and that `cmd/mockecs` did not serve the Flux endpoint.
+  Both are addressed by this release: `flux-capture` confirmed the mapping
+  against a live 4.3.0.0.142978 cluster, and `cmd/mockecs` now serves the
+  endpoint.
+
 ## [3.2.0] - 2026-07-30
 
 Non-breaking: no metric is removed or renamed, and no existing series changes
