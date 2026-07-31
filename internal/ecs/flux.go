@@ -8,6 +8,7 @@ import (
 	"net"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
@@ -26,6 +27,49 @@ type Flux struct {
 	// now overrides the clock. Zero means time.Now; tests set it so fixtures
 	// captured at a fixed instant are not all judged stale.
 	now func() time.Time
+	// silent remembers which measurements have already been reported as
+	// returning nothing, so a cluster that legitimately does not carry one is
+	// announced once rather than on every cycle. Held by pointer so the value
+	// receiver Collect uses still mutates it; rebuilt when Registry rebuilds the
+	// collector, which is what makes a config reload re-announce.
+	silent *silenceSet
+}
+
+// silenceSet tracks measurements already reported silent. A measurement that
+// starts answering again is forgotten, so a later disappearance warns afresh.
+// A nil *silenceSet is safe and behaves as "always first time": several tests
+// construct Flux without one, and Collect must still function.
+type silenceSet struct {
+	mu   sync.Mutex
+	seen map[string]bool
+}
+
+// firstTime reports whether this is the first cycle in which the measurement
+// came back empty.
+func (s *silenceSet) firstTime(key string) bool {
+	if s == nil {
+		return true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.seen == nil {
+		s.seen = map[string]bool{}
+	}
+	if s.seen[key] {
+		return false
+	}
+	s.seen[key] = true
+	return true
+}
+
+// answered forgets a measurement that produced rows.
+func (s *silenceSet) answered(key string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.seen, key)
 }
 
 func (f Flux) clock() time.Time {
@@ -328,11 +372,19 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 		}
 		succeeded++
 		rows := resp.rows()
+		key := q.bucket + "/" + q.measurement
 		if len(rows) == 0 {
-			log.WithFields(log.Fields{"cluster": c.Name(), "bucket": q.bucket, "measurement": q.measurement}).
-				Warn("Flux measurement returned no rows; its samples are absent this cycle")
+			entry := log.WithFields(log.Fields{
+				"cluster": c.Name(), "bucket": q.bucket, "measurement": q.measurement,
+			})
+			if f.silent.firstTime(key) {
+				entry.Warn("Flux measurement returned no rows; its samples are absent this cycle")
+			} else {
+				entry.Debug("Flux measurement still returns no rows")
+			}
 			continue
 		}
+		f.silent.answered(key)
 		samples, miss, stale := q.samples(rows, mapper, now)
 		out = append(out, samples...)
 		unmapped += miss

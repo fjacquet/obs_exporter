@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
+	log "github.com/sirupsen/logrus"
 )
 
 // captureInstant is a moment shortly after every flux_*.json fixture was
@@ -710,5 +711,177 @@ func TestFluxDropsStaleFixtureRows(t *testing.T) {
 	}
 	if _, ok := findSample(samples, "ecs_node_cpu_utilization_percent"); ok {
 		t.Error("an hour-old point was published as a live gauge")
+	}
+}
+
+// fluxFixtureByMeasurement maps every measurement fluxQueries knows about onto
+// the real capture that answers it, so a test can hold exactly one back and
+// make it -- and only it -- the run's silent measurement. fluxQueries carries
+// ten entries; leaving nine of them without a fixture (as a bare
+// {"cpu": "flux_cpu.json"} map would) makes "warned once" and "the same
+// silent measurement" impossible to state cleanly, since nine different
+// measurements would each independently warn on their own first cycle.
+var fluxFixtureByMeasurement = map[string]string{
+	"cpu":                             "flux_cpu.json",
+	"mem":                             "flux_mem.json",
+	"net":                             "flux_net.json",
+	"dtquery_dt_status":               "flux_dt_status.json",
+	"dtquery_dt_dist_host_dt_node_id": "flux_dt_dist.json",
+	"statDataHead_performance_internal_transactions": "flux_transactions.json",
+	"statDataHead_performance_internal_throughput":   "flux_throughput.json",
+	"statDataHead_performance_internal_latency":      "flux_latency.json",
+	"cq_performance_transaction":                     "flux_cq_transaction.json",
+	"cq_performance_throughput":                      "flux_cq_throughput.json",
+}
+
+// fluxFixturesExcept returns a fixture map covering every measurement
+// fluxQueries currently defines except the named one, which is left to fall
+// through fluxMock's default "cluster does not carry this" empty response.
+// Passing "" excludes nothing, so every measurement answers. It fails the
+// test outright if fluxQueries ever grows a measurement this table does not
+// know about, rather than silently leaving more than the intended one silent.
+func fluxFixturesExcept(t *testing.T, silent string) map[string]string {
+	t.Helper()
+	m := make(map[string]string, len(fluxQueries))
+	for _, q := range fluxQueries {
+		if q.measurement == silent {
+			continue
+		}
+		fx, ok := fluxFixtureByMeasurement[q.measurement]
+		if !ok {
+			t.Fatalf("no fixture registered for measurement %q; add one to fluxFixtureByMeasurement", q.measurement)
+		}
+		m[q.measurement] = fx
+	}
+	return m
+}
+
+// silenceHook counts the Warn and Debug log entries Flux.Collect emits about a
+// measurement returning no rows, so a test can assert on how many of each
+// fired without parsing log output.
+type silenceHook struct {
+	warns, debugs int
+}
+
+func (h *silenceHook) Levels() []log.Level {
+	return []log.Level{log.WarnLevel, log.DebugLevel}
+}
+
+func (h *silenceHook) Fire(e *log.Entry) error {
+	if !strings.Contains(e.Message, "no rows") {
+		return nil
+	}
+	switch e.Level {
+	case log.WarnLevel:
+		h.warns++
+	case log.DebugLevel:
+		h.debugs++
+	}
+	return nil
+}
+
+// withSilenceHook installs a silenceHook on the shared standard logger for
+// the duration of the test and returns it.
+//
+// Two things a naive install-and-defer-cleanup would get wrong:
+//
+//  1. Logrus never fires a hook for a level the logger is not currently
+//     emitting, and the default level is Info -- so a Debug entry would never
+//     reach the hook unless the level is raised for the test.
+//  2. log.StandardLogger().ReplaceHooks(make(log.LevelHooks)) as a cleanup
+//     would wipe every hook on the shared standard logger, not just the one
+//     this test added. Nothing else in this suite installs a hook today, but
+//     that makes it a trap for whoever adds one next rather than a safe
+//     pattern to copy. ReplaceHooks both installs and returns the displaced
+//     value, so the prior hooks are saved and restored exactly, and the prior
+//     level is restored the same way.
+func withSilenceHook(t *testing.T) *silenceHook {
+	t.Helper()
+	prevLevel := log.GetLevel()
+	log.SetLevel(log.DebugLevel)
+	t.Cleanup(func() { log.SetLevel(prevLevel) })
+
+	var hook silenceHook
+	prevHooks := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+	log.AddHook(&hook)
+	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(prevHooks) })
+
+	return &hook
+}
+
+func TestFluxWarnsOncePerSilentMeasurement(t *testing.T) {
+	// A measurement the cluster legitimately does not carry would otherwise warn
+	// on every cycle forever, about something the operator cannot fix.
+	hook := withSilenceHook(t)
+
+	f := Flux{now: func() time.Time { return captureInstant }, silent: &silenceSet{}}
+	c := fluxMock(t, fluxFixturesExcept(t, "mem"))
+	for range 3 {
+		if _, err := f.Collect(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hook.warns != 1 {
+		t.Errorf("warned %d times for the same silent measurement, want 1", hook.warns)
+	}
+	if hook.debugs == 0 {
+		t.Error("later cycles logged nothing at debug")
+	}
+}
+
+func TestFluxNilSilentAlwaysWarns(t *testing.T) {
+	// A nil *silenceSet must be safe and behave as "always first time": several
+	// existing tests build Flux{now: ...} without setting silent at all, and
+	// they must keep working exactly as before this change.
+	hook := withSilenceHook(t)
+
+	f := Flux{now: func() time.Time { return captureInstant }} // silent left nil
+	c := fluxMock(t, fluxFixturesExcept(t, "mem"))
+	for range 3 {
+		if _, err := f.Collect(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hook.warns != 3 {
+		t.Errorf("a nil silence set warned %d times over 3 cycles, want 3 (no memory across cycles)", hook.warns)
+	}
+	if hook.debugs != 0 {
+		t.Errorf("a nil silence set logged %d debug entries, want 0", hook.debugs)
+	}
+}
+
+func TestFluxSilentMeasurementReannouncesAfterAnswering(t *testing.T) {
+	// A measurement that starts answering again is forgotten, so a later
+	// disappearance must warn afresh rather than staying silenced forever. This
+	// is the round trip TestFluxWarnsOncePerSilentMeasurement alone cannot show,
+	// since that test only ever sees mem silent.
+	hook := withSilenceHook(t)
+	f := Flux{now: func() time.Time { return captureInstant }, silent: &silenceSet{}}
+
+	// Cycle 1: mem is silent for the first time, so it warns.
+	silentBodies := fluxFixturesExcept(t, "mem")
+	if _, err := f.Collect(t.Context(), fluxMock(t, silentBodies)); err != nil {
+		t.Fatal(err)
+	}
+	if hook.warns != 1 {
+		t.Fatalf("after the first silent cycle, warns = %d, want 1", hook.warns)
+	}
+
+	// Cycle 2: mem answers. It must be forgotten, not merely skipped once.
+	answeringBodies := fluxFixturesExcept(t, "")
+	if _, err := f.Collect(t.Context(), fluxMock(t, answeringBodies)); err != nil {
+		t.Fatal(err)
+	}
+	if hook.warns != 1 {
+		t.Fatalf("a cycle where mem answered must not warn: warns = %d, want 1", hook.warns)
+	}
+
+	// Cycle 3: mem goes silent again. Having been forgotten in cycle 2, this
+	// must warn afresh rather than staying silenced from cycle 1.
+	if _, err := f.Collect(t.Context(), fluxMock(t, silentBodies)); err != nil {
+		t.Fatal(err)
+	}
+	if hook.warns != 2 {
+		t.Errorf("mem's reappearing silence did not warn afresh: warns = %d, want 2", hook.warns)
 	}
 }
