@@ -318,6 +318,27 @@ var fluxQueries = []fluxQuery{
 	},
 }
 
+// FluxScripts returns every query this collector issues, keyed
+// "bucket/measurement". Exported for the flux-capture subcommand, which replays
+// the real table rather than a hand-written approximation — a capture of
+// queries we do not issue proves nothing about the ones we do.
+func FluxScripts() map[string]string {
+	out := make(map[string]string, len(fluxQueries))
+	for _, q := range fluxQueries {
+		out[q.bucket+"/"+q.measurement] = q.script()
+	}
+	return out
+}
+
+// FluxScriptFor renders an ad-hoc query in the same shape, for probing a
+// measurement the table does not carry.
+func FluxScriptFor(bucket, measurement string) string {
+	return fluxQuery{bucket: bucket, measurement: measurement}.script()
+}
+
+// FluxPath is the Flux query endpoint, exported for the same reason.
+const FluxPath = fluxPath
+
 // fluxFatal reports whether an error condemns the whole collector rather than
 // one measurement.
 //
