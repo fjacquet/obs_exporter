@@ -146,6 +146,8 @@ func run(cfgPath string, once, debug, trace bool) error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		healthHandler(w, store)
 	})
+	mux.HandleFunc("/livez", staticOKHandler)
+	mux.HandleFunc("/readyz", staticOKHandler)
 
 	srv := &http.Server{
 		Addr:              cfg.Server.Host + ":" + cfg.Server.Port,
@@ -311,4 +313,14 @@ func healthHandler(w http.ResponseWriter, store *ecs.SnapshotStore) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	_ = json.NewEncoder(w).Encode(out)
+}
+
+// staticOKHandler always answers 200 — no cluster state, no collection
+// state, nothing that can make it fail. /livez and /readyz both use it: a
+// probe wired here can never be the reason a healthy process gets restarted
+// or pulled from rotation. /health remains the endpoint for anything that
+// wants to know whether a cluster is actually reachable.
+func staticOKHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 }
