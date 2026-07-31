@@ -64,7 +64,7 @@ provisioned Grafana dashboards against a fake cluster.
 
 - [Installation](getting-started/installation.md) — binary, container, or package
 - [Configuration](getting-started/configuration.md) — the config file and every collector flag
-- [Metrics reference](metrics.md) — the full catalog
+- [Metrics reference](metrics/index.md) — the full catalog
 
 Deploying it:
 

@@ -20,7 +20,7 @@ Useful flags:
 - `--once` — run a single collection cycle, log the result, and exit (connectivity check).
 - `--debug` — verbose logging, including per-collector failures. Combined with
   `--once`, it also prints **every collected sample** (sorted, exposition style)
-  so you can diff a live cluster against the [metrics reference](../metrics.md).
+  so you can diff a live cluster against the [metrics reference](../metrics/index.md).
 - `--trace` — log every management API response body (method, path, status,
   payload; the auth token is never logged). Use it when a metric you expect is
   absent: the exporter never guesses values, so an unexpected payload shape shows
@@ -30,7 +30,7 @@ Validating against a real cluster:
 
 ```bash
 obs_exporter --config config.yaml --once --debug --trace 2>trace.log | sort > samples.txt
-# samples.txt  → every metric collected (compare with docs/metrics.md)
+# samples.txt  → every metric collected (compare with docs/metrics/)
 # trace.log    → raw API payloads for anything missing or suspicious
 ```
 

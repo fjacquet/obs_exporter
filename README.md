@@ -71,7 +71,7 @@ a provisioned dashboard at <http://localhost:3000> (admin/admin).
   Flux monitoring store over the same management port. Covers fields the dashboard
   API does not serve on ObjectScale 4.3. Requires `SYSTEM_MONITOR`.
 
-Full catalog: [docs/metrics.md](docs/metrics.md).
+Full catalog: [docs/metrics/](docs/metrics/index.md).
 
 ## Configuration
 

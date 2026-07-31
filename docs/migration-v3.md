@@ -172,7 +172,7 @@ obs_exporter --config /etc/obs_exporter/config.yaml --once --debug | sort
 ```
 
 Every name in the v3 column should appear, subject to what your cluster
-populates — see the availability notes in [Metrics](metrics.md).
+populates — see the availability notes in [Metrics](metrics/index.md).
 
 No name in the v2 column should appear **except the three retained above**:
 `ecs_cluster_nodes`, `ecs_cluster_disks` and `ecs_node_disks` are still emitted,

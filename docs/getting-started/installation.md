@@ -46,4 +46,4 @@ make cli          # builds bin/obs_exporter
   `data_ip`, and its DT stats port (9101) on its `mgmt_ip`. On the segmented
   network layout Dell recommends for production, 9101 listens on a private
   link-local VLAN and is **not** reachable from an external exporter — see the
-  [reachability warning](../metrics.md#node-dt-opt-in-collectdt-true).
+  [reachability warning](../metrics/index.md#node-dt-opt-in-collectdt-true).

@@ -104,8 +104,8 @@ keeping the running config. Changes to `server.*` need a restart.
 | --- | --- | --- |
 | `collectMetering` | `true` | namespace usage via one bulk billing POST. Disable on very large clusters if the billing query is slow; this also disables `quotas`. |
 | `collectQuotas` | `true` | the `quotas` collector (per-namespace quota limits). Requires `collectMetering`. See below. |
-| `collectDT` | `false` | legacy node-local DT/connection stats over ports 9101/9021 (undocumented ECS internals, v1 parity). See the [DT reachability warning](../metrics.md#node-dt-opt-in-collectdt-true). |
-| `collectFlux` | `false` | per-node CPU/memory/network, per-node request counters, and cluster-wide DT and transaction metrics from the cluster's Flux monitoring store. Same management port and session as every other collector — **no extra network access** — but the account must hold `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. Adds eight requests per cycle. See the [Flux collector section](../metrics.md#flux-collector-opt-in-collectflux-true). |
+| `collectDT` | `false` | legacy node-local DT/connection stats over ports 9101/9021 (undocumented ECS internals, v1 parity). See the [DT reachability warning](../metrics/index.md#node-dt-opt-in-collectdt-true). |
+| `collectFlux` | `false` | per-node CPU/memory/network, per-node request counters, and cluster-wide DT and transaction metrics from the cluster's Flux monitoring store. Same management port and session as every other collector — **no extra network access** — but the account must hold `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. Adds eight requests per cycle. See the [Flux collector page](../metrics/flux.md). |
 
 Enabling `collectFlux` makes it the **sole source** of `ecs_node_cpu_utilization_percent`,
 `ecs_node_memory_utilization_percent` and `ecs_node_memory_used_bytes` — the dashboard

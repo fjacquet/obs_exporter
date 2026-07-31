@@ -27,7 +27,9 @@ nav:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Quick start: getting-started/quickstart.md
-  - Metrics reference: metrics.md
+  - Metrics:
+      - Reference: metrics/index.md
+      - The Flux collector: metrics/flux.md
   - Migrating from v1: migration-v2.md
   - Migrating to v3: migration-v3.md
   - Deployment:
