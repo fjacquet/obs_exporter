@@ -79,8 +79,11 @@ run against does not check what the exporter asks it for.
 
 ## The diagnostic flags
 
-The exporter has four flags in total. `--config` is the one you use in normal
-operation; the other three exist for the work on this page.
+The exporter has four flags of its own. `--config` is the one you use in normal
+operation; the other three exist for the work on this page. Two more come from
+the command-line library it is built on: `-h`/`--help`, and `-v`/`--version`,
+which prints the build version and exits — the quickest way to read the version
+off a binary when you are writing up a bug report.
 
 | Flag | Effect |
 | --- | --- |
@@ -363,8 +366,8 @@ The failing collectors log a warning each, naming the collector and the
 underlying error, and the error names the request that failed:
 
 ```text
-level=warning msg="collector failed" cluster=ecs-prod-01 collector=cluster err="login GET: status 401"
-level=warning msg="collector failed" cluster=ecs-prod-01 collector=nodes err="GET /dashboard/zones/localzone/nodes: status 403"
+time="2026-07-31T09:13:02+02:00" level=warning msg="collector failed" cluster=ecs-prod-01 collector=cluster err="login GET: status 401"
+time="2026-07-31T09:13:02+02:00" level=warning msg="collector failed" cluster=ecs-prod-01 collector=nodes err="GET /dashboard/zones/localzone/nodes: status 403"
 ```
 
 A cluster nothing is listening on is noisier than that, because the HTTP client
@@ -472,7 +475,7 @@ back empty. Each empty measurement logs a warning naming the bucket and the
 measurement it asked for:
 
 ```text
-level=warning msg="Flux measurement returned no rows; its samples are absent this cycle" bucket=monitoring_op cluster=ecs-prod-01 measurement=mem
+time="2026-07-31T09:13:02+02:00" level=warning msg="Flux measurement returned no rows; its samples are absent this cycle" bucket=monitoring_op cluster=ecs-prod-01 measurement=mem
 ```
 
 That is the signature of a cluster whose measurement names differ from the ones
