@@ -52,7 +52,7 @@ func TestStaleRowYieldsNoSample(t *testing.T) {
 	rows := []fluxRow{{cols: map[string]string{
 		"_field": "usage_user", "_value": "5.1", "_time": "2026-07-31T08:28:00Z",
 	}}}
-	out, _, stale := q.samples(rows, nil, now)
+	out, _, stale, _ := q.samples(rows, nil, now)
 	if len(out) != 0 {
 		t.Errorf("a 12-minute-old point produced %d samples, want none", len(out))
 	}
@@ -70,7 +70,7 @@ func TestFreshRowIsKept(t *testing.T) {
 	rows := []fluxRow{{cols: map[string]string{
 		"_field": "usage_user", "_value": "5.1", "_time": "2026-07-31T08:36:00Z",
 	}}}
-	out, _, stale := q.samples(rows, nil, now)
+	out, _, stale, _ := q.samples(rows, nil, now)
 	if len(out) != 1 || out[0].Value != 5.1 {
 		t.Fatalf("samples = %v, want one sample valued 5.1", out)
 	}
@@ -87,7 +87,7 @@ func TestRowWithoutTimeIsDropped(t *testing.T) {
 		fields: []fluxField{{field: "usage_user", name: "ecs_node_cpu_utilization_percent"}},
 	}
 	rows := []fluxRow{{cols: map[string]string{"_field": "usage_user", "_value": "5.1"}}}
-	out, _, stale := q.samples(rows, nil, time.Now())
+	out, _, stale, _ := q.samples(rows, nil, time.Now())
 	if len(out) != 0 {
 		t.Errorf("an undated row produced %d samples, want none", len(out))
 	}

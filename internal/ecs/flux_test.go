@@ -231,7 +231,7 @@ func TestFluxClusterDTFieldMappingIsDistinct(t *testing.T) {
 	}
 	// Cluster-wide (perNode is false for this measurement), so samples never
 	// dereferences the mapper: nil stands in for "no node join needed."
-	samples, unmapped, stale := dtStatus.samples(rows, nil, captureInstant)
+	samples, unmapped, stale, _ := dtStatus.samples(rows, nil, captureInstant)
 	if unmapped != 0 {
 		t.Fatalf("unmapped = %v, want 0: dtquery_dt_status carries no host to map", unmapped)
 	}
@@ -574,6 +574,10 @@ func TestFluxLatencyBucketLabelKeyOrder(t *testing.T) {
 	}
 }
 
+// TestFluxLatencyIgnoresUnknownIDs also guards the badID counter: a third id
+// value the cluster starts emitting must be visible in the "Flux measurement
+// collected" debug line (Collect), the same way unmapped and stale already
+// are -- otherwise its loss during live-cluster validation is invisible.
 func TestFluxLatencyIgnoresUnknownIDs(t *testing.T) {
 	// An id the mapping does not cover would otherwise land under a short label
 	// set and break the name's schema.
@@ -588,9 +592,30 @@ func TestFluxLatencyIgnoresUnknownIDs(t *testing.T) {
 	rows := []fluxRow{{cols: map[string]string{
 		"_field": "1.0", "_value": "5", "_time": captureInstant.Format(time.RFC3339), "id": "ttlb_read",
 	}}}
-	out, _, _ := q.samples(rows, nil, captureInstant)
+	out, _, _, badID := q.samples(rows, nil, captureInstant)
 	if len(out) != 0 {
 		t.Errorf("an unmapped id produced %d samples, want none", len(out))
+	}
+	if badID != 1 {
+		t.Errorf("badID = %v, want 1: the row's id is not in idLabels", badID)
+	}
+}
+
+// TestFluxRowByRowSamplesReportsZeroBadID proves the row-by-row path (any
+// query with q.buckets == nil) always reports badID = 0: it never reads an id
+// tag, so the counter must not silently keep a stale nonzero value from
+// elsewhere.
+func TestFluxRowByRowSamplesReportsZeroBadID(t *testing.T) {
+	q := fluxQuery{
+		bucket: "monitoring_op", measurement: "cpu",
+		fields: []fluxField{{field: "usage_user", name: "ecs_node_cpu_utilization_percent"}},
+	}
+	rows := []fluxRow{{cols: map[string]string{
+		"_field": "usage_user", "_value": "5", "_time": captureInstant.Format(time.RFC3339),
+	}}}
+	_, _, _, badID := q.samples(rows, nil, captureInstant)
+	if badID != 0 {
+		t.Errorf("badID = %v, want 0: the row-by-row path does not read an id tag", badID)
 	}
 }
 
@@ -671,7 +696,7 @@ func TestFluxLatencyGroupIsAllOrNothing(t *testing.T) {
 				tc.broken(tc.host),
 			}, healthyGroup...)
 
-			out, unmapped, stale := q.samples(rows, mapper, captureInstant)
+			out, unmapped, stale, _ := q.samples(rows, mapper, captureInstant)
 
 			if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket", Label{"node", "supr01-r01"}); ok {
 				t.Error("the group with one broken row emitted samples; want it fully suppressed")
@@ -731,10 +756,74 @@ func TestFluxLatencyGroupWithoutInfBoundIsSuppressed(t *testing.T) {
 		{cols: map[string]string{"_field": "5.0", "_value": "5", "_time": fresh, "host": "supr01-r01", "id": "ttfb_read"}},
 	}
 
-	out, _, _ := q.samples(rows, mapper, captureInstant)
+	out, _, _, _ := q.samples(rows, mapper, captureInstant)
 
 	if len(out) != 0 {
 		t.Errorf("a group missing its +Inf bound emitted %d samples, want 0 (fully suppressed)", len(out))
+	}
+}
+
+// TestFluxLatencyGroupMissingIntermediateBoundIsSuppressed covers the hole
+// TestFluxLatencyGroupWithoutInfBoundIsSuppressed does not: a group that DOES
+// carry +Inf but is missing a bound one of its siblings in the same response
+// received. That shape looks complete -- _count is present -- so nothing
+// row-local catches it; only comparing against a sibling group reveals the
+// hole. Left unsuppressed, histogram_quantile would interpolate across the
+// wrong boundaries and return a plausible, wrong number, which is worse than
+// no data (owner ruling). supr01-r02 is the intact sibling that makes the
+// hole in supr01-r01 detectable; supr01-r02 itself must still emit in full.
+func TestFluxLatencyGroupMissingIntermediateBoundIsSuppressed(t *testing.T) {
+	fresh := captureInstant.Format(time.RFC3339)
+	mapper := &nodeMapper{byKey: map[string]string{
+		"supr01-r01": "supr01-r01",
+		"supr01-r02": "supr01-r02",
+	}}
+	q := fluxQuery{
+		bucket: "monitoring_main", measurement: "statDataHead_performance_internal_latency",
+		perNode: true,
+		buckets: &fluxBuckets{
+			name:     "ecs_node_transaction_latency_milliseconds",
+			idLabels: map[string]string{"ttfb_read": "read"},
+		},
+	}
+	row := func(host, field, value string) fluxRow {
+		return fluxRow{cols: map[string]string{
+			"_field": field, "_value": value, "_time": fresh, "host": host, "id": "ttfb_read",
+		}}
+	}
+	rows := []fluxRow{
+		// supr01-r01: has +Inf but is missing the "1.0" bound its sibling below
+		// received -- a hole that looks like a complete series on its own.
+		row("supr01-r01", "0.0", "1"),
+		row("supr01-r01", "+Inf", "9"),
+		// supr01-r02: every bound present, the sibling that makes the hole
+		// above detectable and that must itself remain unaffected.
+		row("supr01-r02", "0.0", "1"),
+		row("supr01-r02", "1.0", "3"),
+		row("supr01-r02", "+Inf", "9"),
+	}
+
+	out, unmapped, stale, _ := q.samples(rows, mapper, captureInstant)
+	if unmapped != 0 || stale != 0 {
+		t.Fatalf("unmapped=%v stale=%v, want 0 and 0 -- every row here is fresh and every host maps", unmapped, stale)
+	}
+
+	if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket",
+		Label{"node", "supr01-r01"}, Label{"op", "read"}, Label{"le", "0.0"}); ok {
+		t.Error("supr01-r01 is missing the 1.0 bound its sibling has; it must be fully suppressed, but a sample was found")
+	}
+	if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_count",
+		Label{"node", "supr01-r01"}, Label{"op", "read"}); ok {
+		t.Error("supr01-r01's _count was emitted despite the group being holed")
+	}
+
+	if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_bucket",
+		Label{"node", "supr01-r02"}, Label{"op", "read"}, Label{"le", "1.0"}); !ok {
+		t.Error("supr01-r02 is a complete sibling group and must still emit its 1.0 bound")
+	}
+	if _, ok := findSample(out, "ecs_node_transaction_latency_milliseconds_count",
+		Label{"node", "supr01-r02"}, Label{"op", "read"}); !ok {
+		t.Error("supr01-r02's _count is missing even though the group is complete")
 	}
 }
 
@@ -910,7 +999,7 @@ func TestFluxDebugLine(t *testing.T) {
 	if found == nil {
 		t.Fatalf(`no "Flux measurement collected" entry for cpu; entries: %+v`, hook.entries)
 	}
-	for _, field := range []string{"bucket", "measurement", "rows", "samples", "unmapped", "stale"} {
+	for _, field := range []string{"bucket", "measurement", "rows", "samples", "unmapped", "stale", "badID"} {
 		if _, ok := found.Data[field]; !ok {
 			t.Errorf("debug entry missing field %q: %v", field, found.Data)
 		}

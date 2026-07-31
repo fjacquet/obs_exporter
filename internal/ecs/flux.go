@@ -406,12 +406,15 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 			continue
 		}
 		f.silent.answered(key)
-		samples, miss, stale := q.samples(rows, mapper, now)
+		samples, miss, stale, badID := q.samples(rows, mapper, now)
 		out = append(out, samples...)
 		unmapped += miss
 		// One line per measurement per cycle: with --trace this is what turns
 		// ten indistinguishable Flux POSTs into an accounted rows-in/samples-out
-		// per measurement, the evidence the live-cluster validation needs.
+		// per measurement, the evidence the live-cluster validation needs. badID
+		// is 0 outside bucket mode; kept in every line rather than only bucket
+		// ones so a third id value the cluster starts emitting is visible without
+		// knowing in advance which measurement to look at.
 		log.WithFields(log.Fields{
 			"cluster":     c.Name(),
 			"bucket":      q.bucket,
@@ -420,6 +423,7 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 			"samples":     len(samples),
 			"unmapped":    miss,
 			"stale":       stale,
+			"badID":       badID,
 		}).Debug("Flux measurement collected")
 	}
 	if attempted > 0 && succeeded == 0 {
@@ -444,13 +448,16 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 // collectCluster keys off this constant, not a literal, so the two stay in sync.
 const unmappedNodesMetric = "ecs_collector_unmapped_nodes"
 
-// samples maps one measurement's rows, returning the samples, how many rows were
-// dropped for an unresolvable host, and how many were dropped as stale.
+// samples maps one measurement's rows, returning the samples, how many rows
+// were dropped for an unresolvable host, how many were dropped as stale, and
+// how many were dropped for carrying an id the query's idLabels mapping does
+// not cover (always 0 outside bucket mode, which is the only mode that reads
+// an id tag).
 //
 // Bucket-mode queries (q.buckets != nil) are dispatched to bucketSamples, which
 // evaluates rows as groups rather than independently -- see its doc comment.
 // Every other query stays row-by-row exactly as before.
-func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64) {
+func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64, float64) {
 	if q.buckets != nil {
 		return q.bucketSamples(rows, mapper, now)
 	}
@@ -515,7 +522,7 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([
 			})
 		}
 	}
-	return out, unmapped, stale
+	return out, unmapped, stale, 0
 }
 
 // bucketGroupKey identifies one (host, id) series family within a bucket-mode
@@ -547,7 +554,20 @@ type bucketGroup struct {
 // unresolvable host, or a missing _field condemns every bound already
 // collected for that group -- the same instinct the row-by-row path already
 // applies to a tagLabels row that would otherwise publish a short label set.
-func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64) {
+//
+// A group missing its +Inf bound entirely is caught below. That alone is not
+// enough: a group can carry +Inf while still missing an intermediate bound,
+// which is the more dangerous shape because it looks complete.
+// histogram_quantile would then interpolate across the wrong boundaries and
+// return a plausible, wrong number -- worse than the absent series a
+// suppressed group produces. Detecting that requires a second series to
+// compare against, so this response's groups are also checked against each
+// other: the union of le keys across every group in this call is computed
+// once, and any group whose own key set falls short of that union is
+// suppressed too. The union is scoped to this one response -- not persisted
+// across cycles and not hard-coded -- so with only one group there is no
+// sibling to reveal a hole and nothing extra is suppressed.
+func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([]Sample, float64, float64, float64) {
 	limit := q.maxAgeOrDefault()
 	hostTag := q.hostTag
 	if hostTag == "" {
@@ -556,7 +576,7 @@ func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Ti
 
 	groups := map[bucketGroupKey]*bucketGroup{}
 	var order []bucketGroupKey // stable emission order, purely for readability
-	var unmapped, stale float64
+	var unmapped, stale, badID float64
 
 	for _, row := range rows {
 		id, idOK := row.value("id")
@@ -602,11 +622,25 @@ func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Ti
 		}
 		opLabel, ok := q.buckets.idLabels[id]
 		if !ok {
+			badID++
 			g.bad = true // an id the mapping does not cover
 			continue
 		}
 		g.op = opLabel
 		g.vals[field] = v
+	}
+
+	// unionBounds is the set of le keys seen across every group in this
+	// response, valid or not -- the closest thing to "the bound set this
+	// cluster is publishing this cycle" available without a hard-coded bound
+	// list. With a single group there is no sibling to compare against, so
+	// the union equals that group's own set and nothing is suppressed by this
+	// check: a hole is undetectable without a second series to reveal it.
+	unionBounds := map[string]struct{}{}
+	for _, key := range order {
+		for field := range groups[key].vals {
+			unionBounds[field] = struct{}{}
+		}
 	}
 
 	var out []Sample
@@ -622,6 +656,15 @@ func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Ti
 			// a missing intermediate bound would let histogram_quantile
 			// interpolate across the wrong boundaries and return a plausible
 			// wrong number. All-or-nothing per series (owner ruling).
+			continue
+		}
+		if len(g.vals) != len(unionBounds) {
+			// This group has +Inf but a sibling group in the same response
+			// received a bound this one did not -- a hole in an otherwise
+			// complete-looking series. histogram_quantile would interpolate
+			// across the wrong boundaries and return a plausible wrong number,
+			// which is worse than no data. All-or-nothing per series (owner
+			// ruling); see bucketSamples' doc comment.
 			continue
 		}
 		var base []Label
@@ -647,5 +690,5 @@ func (q fluxQuery) bucketSamples(rows []fluxRow, mapper *nodeMapper, now time.Ti
 			})
 		}
 	}
-	return out, unmapped, stale
+	return out, unmapped, stale, badID
 }
