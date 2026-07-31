@@ -1,5 +1,10 @@
 # Metrics reference
 
+New to Prometheus metrics, or unsure why one of these is missing?
+[Reading the metrics](reading.md) covers gauges versus counters, why a metric
+can be absent rather than zero, and how the collection interval relates to your
+scrape interval.
+
 Every domain metric carries the `cluster` identity label (one exporter process can
 serve many clusters). Metrics are gauges holding the latest snapshot value by
 default. Most `_total`-suffixed names are the exception: they export as

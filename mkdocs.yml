@@ -28,6 +28,7 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick start: getting-started/quickstart.md
   - Metrics:
+      - Reading the metrics: metrics/reading.md
       - Reference: metrics/index.md
       - The Flux collector: metrics/flux.md
   - Deployment:
