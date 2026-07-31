@@ -3,6 +3,7 @@ package ecs
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -222,11 +223,32 @@ var fluxQueries = []fluxQuery{
 	},
 }
 
+// fluxFatal reports whether an error condemns the whole collector rather than
+// one measurement.
+//
+// Anything that is not a per-request API error — a transport failure, a login
+// failure, a cancelled context — is global by construction: it says nothing
+// about the query and everything about the connection. An API error is global
+// only when ECS itself says retrying can never help, which is how a permission
+// refusal (HTTP 500, code 6401) is told from a query bug (HTTP 500, a compile
+// error) that leaves the other measurements perfectly collectable.
+func fluxFatal(err error) bool {
+	var api *ecsclient.APIError
+	if !errors.As(err, &api) {
+		return true
+	}
+	return api.Permanent()
+}
+
 // Collect issues one query per measurement and maps the rows onto samples. A
-// transport or auth failure fails the whole collector (ecs_collector_up=0); a
-// measurement the cluster does not carry answers with no rows and yields a
-// warning plus absent samples, because measurement names are undocumented and a
-// rename must not take the other seven down with it.
+// transport failure, a login failure, or a permanent API refusal (a permission
+// error ECS says retrying can never fix) fails the whole collector
+// (ecs_collector_up=0) without issuing the remaining queries. A query-scoped
+// failure — a renamed measurement returning no rows, or a malformed query
+// ECS rejects with a compile error — is logged and skipped, because
+// measurement names are undocumented and a rename must not take the other
+// seven down with it. Collect still fails if every query failed: tolerating
+// one bad query must not disguise a collector that produced nothing at all.
 func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error) {
 	mapper, err := newNodeMapper(ctx, c)
 	if err != nil {
@@ -236,11 +258,21 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 	now := f.clock()
 	var out []Sample
 	var unmapped float64
+	var attempted, succeeded int
 	for _, q := range fluxQueries {
+		attempted++
 		var resp fluxResp
 		if err := c.Post(ctx, fluxPath, map[string]string{"query": q.script()}, &resp); err != nil {
-			return nil, fmt.Errorf("flux %s/%s: %w", q.bucket, q.measurement, err)
+			wrapped := fmt.Errorf("flux %s/%s: %w", q.bucket, q.measurement, err)
+			if fluxFatal(err) {
+				return nil, wrapped
+			}
+			log.WithFields(log.Fields{
+				"cluster": c.Name(), "bucket": q.bucket, "measurement": q.measurement, "err": err,
+			}).Warn("Flux query failed; its samples are absent this cycle")
+			continue
 		}
+		succeeded++
 		rows := resp.rows()
 		if len(rows) == 0 {
 			log.WithFields(log.Fields{"cluster": c.Name(), "bucket": q.bucket, "measurement": q.measurement}).
@@ -251,6 +283,9 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 		out = append(out, samples...)
 		unmapped += miss
 		_ = stale // reported by the per-measurement debug line in Task 9
+	}
+	if attempted > 0 && succeeded == 0 {
+		return nil, fmt.Errorf("flux: all %d queries failed", attempted)
 	}
 
 	// Always emitted, including as 0: "mapping worked" is the information that

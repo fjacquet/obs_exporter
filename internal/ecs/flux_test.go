@@ -115,14 +115,14 @@ func fluxMock(t *testing.T, byMeasurement map[string]string) ecsclient.Client {
 
 type fluxClient struct {
 	ecsclient.Client
-	bodies map[string]string
-	t      *testing.T
-	fail   bool
+	bodies  map[string]string
+	t       *testing.T
+	postErr error
 }
 
 func (f *fluxClient) Post(_ context.Context, path string, body, out any) error {
-	if f.fail {
-		return errors.New("401 Unauthorized")
+	if f.postErr != nil {
+		return f.postErr
 	}
 	if path != fluxPath {
 		return fmt.Errorf("unexpected POST to %s", path)
@@ -262,8 +262,145 @@ func TestFluxCollectFailsOnEndpointError(t *testing.T) {
 	// returning an error is what drives ecs_collector_up{collector="flux"}=0.
 	c := mockClient(t)
 	f := Flux{now: func() time.Time { return captureInstant }}
-	if _, err := f.Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, fail: true}); err == nil {
+	if _, err := f.Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, postErr: errors.New("401 Unauthorized")}); err == nil {
 		t.Error("Collect must return an error when the Flux endpoint rejects the query")
+	}
+}
+
+// erroringFluxClient fails the named measurements and serves fixtures for the
+// rest, so a partial failure can be told from a total one.
+type erroringFluxClient struct {
+	*fluxClient
+	errByMeasurement map[string]error
+}
+
+func (e *erroringFluxClient) Post(ctx context.Context, path string, body, out any) error {
+	q, _ := body.(map[string]string)
+	for measurement, err := range e.errByMeasurement {
+		if strings.Contains(q["query"], `"`+measurement+`"`) {
+			return err
+		}
+	}
+	return e.fluxClient.Post(ctx, path, body, out)
+}
+
+// permissionRefusal is the decoded, permanent shape a real ECS 500 takes when
+// the authenticated account lacks the roles for this endpoint: retrying it,
+// on this or any other measurement, can never succeed.
+func permissionRefusal() error {
+	return &ecsclient.APIError{
+		Method: "POST", Path: fluxPath, Status: 500,
+		Code: ecsclient.CodeInsufficientPermissions, Description: "Insufficient permissions", Decoded: true,
+	}
+}
+
+func TestFluxPermissionRefusalFailsTheWholeCollector(t *testing.T) {
+	// Nothing this collector asks for will work; failing fast is both correct
+	// and the difference between one request per cycle and ten.
+	c := &erroringFluxClient{
+		fluxClient:       &fluxClient{Client: mockClient(t), bodies: map[string]string{"cpu": "flux_cpu.json"}, t: t},
+		errByMeasurement: map[string]error{"cpu": permissionRefusal()},
+	}
+	f := Flux{now: func() time.Time { return captureInstant }}
+	if _, err := f.Collect(t.Context(), c); err == nil {
+		t.Fatal("a permission refusal must fail the collector")
+	}
+}
+
+func TestFluxOneBadQueryLeavesTheOthersStanding(t *testing.T) {
+	// A compile error is scoped to one query. Taking the other nine down with it
+	// costs the operator every metric this collector exists to provide.
+	c := &erroringFluxClient{
+		fluxClient: &fluxClient{Client: mockClient(t), bodies: map[string]string{
+			"cpu": "flux_cpu.json",
+			"mem": "flux_mem.json",
+		}, t: t},
+		errByMeasurement: map[string]error{
+			"mem": &ecsclient.APIError{Method: "POST", Path: fluxPath, Status: 500,
+				Body: `{"error":"failed to compile query: undefined identifier"}`},
+		},
+	}
+	f := Flux{now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), c)
+	if err != nil {
+		t.Fatalf("one failing query must not fail the collector: %v", err)
+	}
+	if _, ok := findSample(samples, "ecs_node_cpu_utilization_percent"); !ok {
+		t.Error("cpu samples were lost to an unrelated query's failure")
+	}
+	if _, ok := findSample(samples, "ecs_node_memory_utilization_percent"); ok {
+		t.Error("the failed measurement emitted samples")
+	}
+}
+
+func TestFluxTransportErrorFailsTheWholeCollector(t *testing.T) {
+	// A plain transport error is not an *ecsclient.APIError, so fluxFatal must
+	// treat it as fatal and Collect must return on the very first query — this
+	// exercises the "not an APIError" arm of fluxFatal, not the succeeded==0
+	// tally below (see TestFluxAllQueriesFailNonFatallyFailsTheCollector for that).
+	c := &erroringFluxClient{
+		fluxClient:       &fluxClient{Client: mockClient(t), bodies: nil, t: t},
+		errByMeasurement: nil,
+	}
+	c.fluxClient.postErr = errors.New("500 Internal Server Error")
+	f := Flux{now: func() time.Time { return captureInstant }}
+	if _, err := f.Collect(t.Context(), c); err == nil {
+		t.Fatal("Collect must fail when the transport itself is broken")
+	}
+}
+
+// TestFluxAllQueriesFailNonFatallyFailsTheCollector reaches the succeeded==0
+// branch that TestFluxTransportErrorFailsTheWholeCollector cannot: every query
+// fails, but each with a query-scoped, non-fatal *ecsclient.APIError (an
+// undecoded body, the same shape a Flux compile error takes), so fluxFatal
+// returns false for every one of them and Collect only sees the tally. Without
+// this test, "tolerate a per-query failure" and "still fail when nothing
+// succeeded" could silently regress into "always succeed."
+func TestFluxAllQueriesFailNonFatallyFailsTheCollector(t *testing.T) {
+	compileError := &ecsclient.APIError{Method: "POST", Path: fluxPath, Status: 500,
+		Body: `{"error":"failed to compile query: undefined identifier"}`}
+	errs := make(map[string]error, len(fluxQueries))
+	for _, q := range fluxQueries {
+		errs[q.measurement] = compileError
+	}
+	c := &erroringFluxClient{
+		fluxClient:       &fluxClient{Client: mockClient(t), bodies: nil, t: t},
+		errByMeasurement: errs,
+	}
+	f := Flux{now: func() time.Time { return captureInstant }}
+	if _, err := f.Collect(t.Context(), c); err == nil {
+		t.Fatal("Collect must fail when every query failed, even non-fatally")
+	}
+}
+
+// TestFluxFatalClassifiesErrors covers fluxFatal directly. It exists because
+// TestFluxTransportErrorFailsTheWholeCollector cannot, by itself, prove that a
+// plain transport error is classified fatal: every query in that test shares
+// the same postErr, so even a fluxFatal that always returned false would still
+// fail Collect via the succeeded==0 tally. Only a direct call isolates the
+// classification rule from that fallback.
+func TestFluxFatalClassifiesErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"transport failure, not an APIError", errors.New("connection refused"), true},
+		{"login failure, not an APIError", errors.New("401 Unauthorized"), true},
+		{"decoded permission refusal (retryable false)", &ecsclient.APIError{
+			Status: 500, Code: ecsclient.CodeInsufficientPermissions, Description: "Insufficient permissions",
+			Decoded: true, Retryable: false,
+		}, true},
+		{"decoded, retryable true, not the permission code", &ecsclient.APIError{
+			Status: 500, Code: 1234, Decoded: true, Retryable: true,
+		}, false},
+		{"undecoded body (a Flux compile error)", &ecsclient.APIError{
+			Status: 500, Body: `{"error":"failed to compile query: undefined identifier"}`,
+		}, false},
+	} {
+		if got := fluxFatal(tc.err); got != tc.want {
+			t.Errorf("%s: fluxFatal(%v) = %v, want %v", tc.name, tc.err, got, tc.want)
+		}
 	}
 }
 
