@@ -54,6 +54,42 @@ func TestSelectClusterEmptyNameOnNoClustersErrors(t *testing.T) {
 	}
 }
 
+// TestSortedScriptKeysIsDeterministic pins flux-capture's write/print/summary
+// order: sortedScriptKeys must return the same sorted order regardless of the
+// map's internal iteration order, which Go deliberately randomizes. Without
+// this, the files written, the console output, and summary.json's entries
+// would vary between otherwise-identical runs, making two captures needlessly
+// hard to diff.
+func TestSortedScriptKeysIsDeterministic(t *testing.T) {
+	scripts := map[string]string{
+		"monitoring_vdc/cq_performance_transaction":                 "q1",
+		"monitoring_op/cpu":                                         "q2",
+		"monitoring_main/statDataHead_performance_internal_latency": "q3",
+		"monitoring_op/mem":                                         "q4",
+		"monitoring_op/dtquery_dt_status":                           "q5",
+	}
+	want := []string{
+		"monitoring_main/statDataHead_performance_internal_latency",
+		"monitoring_op/cpu",
+		"monitoring_op/dtquery_dt_status",
+		"monitoring_op/mem",
+		"monitoring_vdc/cq_performance_transaction",
+	}
+	// Run several times: map iteration order is randomized per-process, not
+	// deterministic across a single run, so one call proves little.
+	for i := 0; i < 5; i++ {
+		got := sortedScriptKeys(scripts)
+		if len(got) != len(want) {
+			t.Fatalf("run %d: len(sortedScriptKeys) = %d, want %d", i, len(got), len(want))
+		}
+		for j := range want {
+			if got[j] != want[j] {
+				t.Fatalf("run %d: sortedScriptKeys()[%d] = %q, want %q (full: %v)", i, j, got[j], want[j], got)
+			}
+		}
+	}
+}
+
 func TestCountRowsSumsAllSeries(t *testing.T) {
 	raw := json.RawMessage(`{"Series":[
 		{"Columns":["a"],"Values":[["1"],["2"]]},
