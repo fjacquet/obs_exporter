@@ -455,6 +455,65 @@ func TestFluxCollectEmitsZeroUnmappedOnSuccess(t *testing.T) {
 	mustSample(t, samples, "ecs_collector_unmapped_nodes", 0, Label{"collector", "flux"})
 }
 
+func TestFluxCollectsPerNodeDT(t *testing.T) {
+	// dtquery_dt_dist_host_dt_node_id has no host tag, which is why ADR-0011
+	// concluded Flux could not report DT per node. It identifies the node under
+	// dt_node_id instead, holding the data_ip the inventory already indexes.
+	f := Flux{now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, map[string]string{
+		"dtquery_dt_dist_host_dt_node_id": "flux_dt_dist.json",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, ok := findSample(samples, "ecs_node_dt_total", Label{"node", "supr01-r01"})
+	if !ok {
+		t.Fatal("no per-node DT sample for supr01-r01")
+	}
+	if s.Value <= 0 {
+		t.Errorf("ecs_node_dt_total = %v, want the capture's count", s.Value)
+	}
+	if _, ok := findSample(samples, "ecs_node_dt_total", Label{"node", "supr01-r02"}); !ok {
+		t.Error("no per-node DT sample for supr01-r02")
+	}
+}
+
+func TestFluxSkipsPerNodeDTWhenDTCollectorOwnsIt(t *testing.T) {
+	// collectDT serves unready and unknown per node as well, so where it is
+	// reachable it keeps the name and Flux must not issue the query at all.
+	c := mockClient(t)
+	fc := &fluxClient{Client: c, bodies: map[string]string{
+		"dtquery_dt_dist_host_dt_node_id": "flux_dt_dist.json",
+	}, t: t}
+	f := Flux{DTOwnedByDT: true, now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(samples, "ecs_node_dt_total"); ok {
+		t.Error("Flux emitted ecs_node_dt_total while collectDT owns it")
+	}
+	for _, q := range fc.queries {
+		if strings.Contains(q, "dtquery_dt_dist_host_dt_node_id") {
+			t.Error("Flux issued the per-node DT query it does not own")
+		}
+	}
+}
+
+func TestFluxClusterDTIsUnaffectedByArbitration(t *testing.T) {
+	// The cluster totals have no per-node equivalent and no other owner.
+	f := Flux{DTOwnedByDT: true, now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, map[string]string{
+		"dtquery_dt_status": "flux_dt_status.json",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(samples, "ecs_cluster_dt_total"); !ok {
+		t.Error("cluster DT totals must survive per-node arbitration")
+	}
+}
+
 func TestFluxDropsStaleFixtureRows(t *testing.T) {
 	// The same fixture, read an hour later: every row is older than fluxMaxAge,
 	// so the collector must publish nothing rather than an hour-old CPU reading

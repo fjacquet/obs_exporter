@@ -39,7 +39,10 @@ func Registry(cl config.Cluster) []ResourceCollector {
 		rcs = append(rcs, NewDT(cl))
 	}
 	if cl.CollectFlux {
-		rcs = append(rcs, Flux{})
+		// The DT collector, where it runs, owns ecs_node_dt_total: it is the only
+		// source of unready and unknown per node, and Flux has no breakdown of
+		// either. Decided here, once, like Nodes' arbitration above.
+		rcs = append(rcs, Flux{DTOwnedByDT: cl.CollectDT})
 	}
 	return rcs
 }

@@ -13,10 +13,12 @@ const pathVdcNodes = "/vdc/nodes"
 // name) are consumed from it.
 type vdcNodesResp struct {
 	Node []struct {
-		Version  string `json:"version"`
-		Nodename string `json:"nodename"`
-		MgmtIP   string `json:"mgmt_ip"`
-		DataIP   string `json:"data_ip"`
+		Version   string `json:"version"`
+		Nodename  string `json:"nodename"`
+		MgmtIP    string `json:"mgmt_ip"`
+		DataIP    string `json:"data_ip"`
+		Data2IP   string `json:"data2_ip"`
+		PrivateIP string `json:"private_ip"`
 	} `json:"node"`
 }
 
