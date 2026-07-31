@@ -93,8 +93,22 @@ Replication, Storage internals, and Maintenance & Directory Tables — keeping y
 current time range as you move between them.
 
 One dashboard in that folder is not ours: **Node Exporter Full** is the
-well-known Linux host dashboard, bundled for people who run `node_exporter` on
-their ObjectScale nodes. Nothing in this stack feeds it, so it will be empty.
+well-known Linux host dashboard — [Grafana
+1860](https://grafana.com/grafana/dashboards/1860-node-exporter-full/), shipped
+as `node-exporter-full.json` and provisioned alongside the others. It draws
+host-operating-system metrics — CPU, memory, disk and network as Linux reports
+them — which come from
+[`prom/node-exporter`](https://hub.docker.com/r/prom/node-exporter), not from
+this exporter. Nothing in this stack feeds it, so it will be empty.
+
+That omission is deliberate. `node_exporter` belongs on the hosts you actually
+want to watch, which for ObjectScale means the cluster nodes themselves, not
+bolted onto the exporter's Compose file where it would only report on the
+container host. The dashboard is bundled because the two views answer different
+halves of the same question — this exporter tells you what ObjectScale thinks it
+is doing, and `node_exporter` tells you what the underlying Linux hosts are
+doing. To populate it, run `prom/node-exporter` on those hosts and add a
+`node-exporter` scrape job to your own Prometheus.
 
 Two other endpoints are worth a look while the stack is up. The exporter's raw
 output is at <http://localhost:9438/metrics>, which is the fastest way to read the

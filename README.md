@@ -8,76 +8,73 @@
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://fjacquet.github.io/obs_exporter/)
 
 Prometheus + OTLP exporter for **Dell EMC ECS / ObjectScale** object-storage
-clusters, built against the ObjectScale **4.1.0.0** management REST API (the
-dashboard endpoints and fields this exporter consumes are verified unchanged
-through **4.3**).
+clusters. One process polls every cluster you configure on a fixed interval and
+serves the latest snapshot at `/metrics`, so a scrape never reaches the
+management API: load on the cluster follows your collection interval, not the
+number of Prometheus servers scraping the exporter. An optional OTLP gRPC push
+reads the same snapshot.
 
-A single exporter polls every configured cluster on an interval and serves the
-latest snapshot at `/metrics` — backend API load is independent of how many
-Prometheus servers scrape it. An optional OTLP gRPC push reads the same snapshot.
+> **Coming from v1 (`prometheus-emcecs-exporter`), or from v2?** Each of those
+> steps renames metrics. [Upgrading](docs/operate/upgrading.md) says which guide
+> applies to the version you are on.
 
-> **v2.0.0 is a breaking change** (new metric names, new scrape model, new
-> configuration). Coming from `prometheus-emcecs-exporter` v1.x? Read the
-> [migration guide](docs/migration-v2.md).
+## Does it fit your cluster
 
-## Quick start
+Built against the ObjectScale **4.1.0.0** management REST API. The dashboard
+endpoints and fields it reads are verified unchanged through **4.3**, and the
+surface is backward compatible with the ECS **3.x** dashboards that 4.1 extends.
 
-```bash
-export OBS1_PASSWORD='...'
-cat > config.yaml <<'YAML'
-clusters:
-  - name: ecs-prod-01
-    host: ecs01.example.com
-    username: ecs-monitor
-    password: "${OBS1_PASSWORD}"
-YAML
-./obs_exporter --config config.yaml      # serves :9438/metrics and /health
-```
-
-Prometheus side:
-
-```yaml
-scrape_configs:
-  - job_name: ecs
-    static_configs:
-      - targets: ["obs-exporter.example.net:9438"]
-```
-
-No hardware? `make demo` brings up mock ECS → exporter → Prometheus → Grafana with
-a provisioned dashboard at <http://localhost:3000> (admin/admin).
-
-## Install
-
-- **Binaries**: [GitHub Releases](https://github.com/fjacquet/obs_exporter/releases)
-  (linux/darwin × amd64/arm64, checksums, CycloneDX SBOM)
-- **Homebrew**: `brew install --cask fjacquet/tap/obs_exporter`
-- **Container**: `ghcr.io/fjacquet/obs_exporter:latest` (multi-arch, non-root)
-- **Source**: `make cli` (Go 1.26.4+)
+It needs one management account with monitoring (read) rights and network access
+from the exporter host to the management port, 4443 by default. Nothing it does
+writes to the cluster, and one process covers as many clusters as you list.
 
 ## What it exports
 
-- **Cluster**: node/disk health counts, unacknowledged alerts by severity,
-  capacity, transaction latency/bandwidth/TPS, per-code transaction errors.
-- **Replication groups**: traffic, pending repo/journal/XOR backlog, RPO
-  timestamp + lag.
-- **Nodes** (documented dashboard API): health, per-node capacity, CPU, memory,
-  NIC, per-node transaction stats.
-- **Namespaces**: hard/soft quota, usage, object counts, multipart-upload backlog
-  (one bulk billing call per cycle).
-- **Meta**: `ecs_up` / `ecs_collector_up` per cluster, build info; `/health` JSON.
-- Opt-in (`collectDT: true`): legacy node-local DT and active-connection stats.
-- Opt-in (`collectFlux: true`): per-node CPU, memory and network, per-node request
-  counters, and cluster-wide DT and transaction metrics, read from the cluster's
-  Flux monitoring store over the same management port. Covers fields the dashboard
-  API does not serve on ObjectScale 4.3. Requires `SYSTEM_MONITOR`.
+- **Cluster** — node and disk health counts, unacknowledged alerts by severity,
+  capacity, and the transaction path: latency, bandwidth, rate and errors.
+- **Replication groups** — traffic, pending repository/journal/XOR backlog, and
+  RPO timestamp and lag.
+- **Nodes** — per-node health, capacity, CPU, memory, NIC and transaction stats,
+  from the documented dashboard API.
+- **Namespaces** — hard and soft quota, usage, object counts and multipart-upload
+  backlog, from one bulk billing call per cycle rather than one call per
+  namespace.
+- **The exporter itself** — whether each cluster and each collector succeeded on
+  the last cycle, build information, and a `/health` JSON endpoint.
+- **Two opt-in collectors** — `collectDT` reads legacy node-local directory-table
+  and connection stats; `collectFlux` reads per-node CPU, memory, network and
+  request counters from the cluster's own monitoring store, over the same
+  management port and session as everything else. Flux covers fields ObjectScale
+  4.3 no longer serves through the dashboard API, and needs the `SYSTEM_MONITOR`
+  role.
 
-Full catalog: [docs/metrics/](docs/metrics/index.md).
+Full catalog: [docs/metrics/index.md](docs/metrics/index.md).
+
+## Quick start
+
+With hardware: [First run](docs/getting-started/first-run.md) is a four-field
+config file, one foreground command, and one `curl` that confirms the cluster
+answered.
+
+Without: `make demo` starts a fake ObjectScale cluster, the real exporter,
+Prometheus and Grafana with every dashboard already provisioned — see
+[Try it without hardware](docs/demo.md).
+
+## Install
+
+On macOS, `brew install --cask fjacquet/tap/obs_exporter`. Everywhere else —
+release binaries with checksums and a CycloneDX SBOM, the multi-arch container
+image on GHCR, or a build from source — see
+[Installation](docs/getting-started/installation.md).
 
 ## Configuration
 
-YAML with `${ENV_VAR}` interpolation and `passwordFile` secrets, multi-cluster,
-SIGHUP + file-watch hot reload. See
-[docs/getting-started/configuration.md](docs/getting-started/configuration.md).
+One YAML file: `${ENV_VAR}` interpolation and `passwordFile` for secrets, one
+list entry per cluster, and per-cluster flags for the optional collectors. It
+reloads on SIGHUP or when the file changes on disk, so adding a cluster or
+rotating a password does not need a restart.
+
+Every setting and every flag: [Configuration](docs/getting-started/configuration.md).
 
 ## Development
 
@@ -87,7 +84,7 @@ make sure      # quicker local gate
 make demo      # end-to-end Compose stack
 ```
 
-Architecture decisions are recorded in [docs/adr/](docs/adr/index.md).
+Architecture decisions are recorded in [docs/adr/index.md](docs/adr/index.md).
 
 ## Lineage & license
 
@@ -95,15 +92,3 @@ Originally forked from
 [paychex/prometheus-emcecs-exporter](https://github.com/paychex/prometheus-emcecs-exporter)
 by [Mark DeNeve](https://github.com/xphyr); v2 is a ground-up rewrite. Licensed
 under the [Apache 2.0 license](LICENSE).
-
-## Node Exporter Full (Grafana 1860)
-
-This repo bundles the community [Node Exporter Full](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
-dashboard (`node-exporter-full.json`, auto-provisioned). It visualizes **host OS** metrics
-(CPU, memory, disk, network) exposed by [`prom/node-exporter`](https://hub.docker.com/r/prom/node-exporter) —
-**not** this exporter's own metrics.
-
-`node_exporter` is **not** part of this demo stack: it belongs on the hosts you actually want to
-monitor, not bolted onto the exporter's compose. To use this dashboard, run `prom/node-exporter`
-on those hosts and add a `node-exporter` scrape job to your Prometheus; the dashboard then
-visualizes them.

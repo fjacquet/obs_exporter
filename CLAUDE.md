@@ -67,8 +67,14 @@ the Compose demo; demo-only, never published.
 - **Label-key invariant** (ADR-0006): one metric name = one ordered label-key set
   across all series. `TestLabelKeyConsistency` fails on drift; keep it passing.
 - **Naming**: `ecs_<object>_<metric>[_<unit>]`, unit-explicit where the API
-  documents a unit; per-second values are gauges (never `rate()` them). Update
-  `docs/metrics.md` AND the Grafana dashboard when adding/renaming metrics.
+  documents a unit; per-second values are gauges (never `rate()` them).
+- **Docs follow the metric, everywhere it is already documented**: adding or
+  renaming a metric means updating `docs/metrics/` *and* the Grafana dashboards
+  in `grafana/dashboards/`. A new per-cluster flag means more: `collectFlux`
+  shipped documented only in the metrics reference while the getting-started
+  pages, the README and `charts/obs-exporter/values.yaml` stayed stale for a
+  full release. `grep -rl collectDT` lists every file that documents the closest
+  existing equivalent — the new flag belongs in all of them.
 - **Metering is batched**: namespace usage comes from one bulk
   `POST /object/billing/namespace/info` per cycle — don't reintroduce per-namespace
   billing GETs.
