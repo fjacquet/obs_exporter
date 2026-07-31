@@ -15,3 +15,4 @@ clusters:
     username: monitor
     password: "demo"
     insecureSkipVerify: true
+    collectFlux: true # mockecs now serves /flux/api/external/v2/query
