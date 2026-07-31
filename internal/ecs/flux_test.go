@@ -292,7 +292,7 @@ func (e *erroringFluxClient) Post(ctx context.Context, path string, body, out an
 			// An intercepted call never reaches fluxClient.Post, so record it
 			// here — otherwise a query this type fails would vanish from the
 			// count fluxClient.Post is meant to keep.
-			e.fluxClient.queries = append(e.fluxClient.queries, q["query"])
+			e.queries = append(e.queries, q["query"])
 			return err
 		}
 	}
@@ -365,7 +365,7 @@ func TestFluxTransportErrorFailsTheWholeCollector(t *testing.T) {
 		fluxClient:       &fluxClient{Client: mockClient(t), bodies: nil, t: t},
 		errByMeasurement: nil,
 	}
-	c.fluxClient.postErr = errors.New("500 Internal Server Error")
+	c.postErr = errors.New("500 Internal Server Error")
 	f := Flux{now: func() time.Time { return captureInstant }}
 	if _, err := f.Collect(t.Context(), c); err == nil {
 		t.Fatal("Collect must fail when the transport itself is broken")
