@@ -388,7 +388,18 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 		samples, miss, stale := q.samples(rows, mapper, now)
 		out = append(out, samples...)
 		unmapped += miss
-		_ = stale // reported by the per-measurement debug line in Task 9
+		// One line per measurement per cycle: with --trace this is what turns
+		// ten indistinguishable Flux POSTs into an accounted rows-in/samples-out
+		// per measurement, the evidence the live-cluster validation needs.
+		log.WithFields(log.Fields{
+			"cluster":     c.Name(),
+			"bucket":      q.bucket,
+			"measurement": q.measurement,
+			"rows":        len(rows),
+			"samples":     len(samples),
+			"unmapped":    miss,
+			"stale":       stale,
+		}).Debug("Flux measurement collected")
 	}
 	if attempted > 0 && succeeded == 0 {
 		return nil, fmt.Errorf("flux: all %d queries failed", attempted)

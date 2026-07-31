@@ -103,12 +103,21 @@ func NewClusterClient(cfg Config) *ClusterClient {
 			if r.Request.URL == cfg.BaseURL+loginPath {
 				return nil // login body is uninteresting; the token lives in a header
 			}
-			log.WithFields(log.Fields{
+			fields := log.Fields{
 				"cluster": cfg.Name,
 				"method":  r.Request.Method,
 				"url":     r.Request.URL,
 				"status":  r.StatusCode(),
-			}).Infof("API trace:\n%s", r.Body())
+			}
+			// Every Flux query is a POST to one path, so the URL identifies
+			// nothing. The query itself is the only thing that tells ten
+			// otherwise identical trace blocks apart.
+			if q, ok := r.Request.Body.(map[string]string); ok {
+				if query := q["query"]; query != "" {
+					fields["query"] = query
+				}
+			}
+			log.WithFields(fields).Infof("API trace:\n%s", r.Body())
 			return nil
 		})
 	}
