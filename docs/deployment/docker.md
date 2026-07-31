@@ -68,27 +68,32 @@ curl -s localhost:9438/health | jq .
 
 ## Health check
 
-`/health` returns per-cluster JSON and **HTTP 503 while any cluster is failing**.
+Docker's own `HEALTHCHECK` cannot probe the exporter, for the reason given at
+the top of this page: the instruction runs a command *inside* the container,
+and this image has no shell and no HTTP client to run. Probe it from outside
+instead — Kubernetes probes, a Compose-level external check, or your
+monitoring system.
 
-Docker's own `HEALTHCHECK` cannot use it, for the reason given at the top of
-this page: the instruction runs a command *inside* the container, and this image
-has no shell and no HTTP client to run. Probe it from outside instead —
-Kubernetes probes, a Compose-level external check, or your monitoring system.
+Point that check at **`/livez`** or **`/readyz`**. Both always answer 200 —
+neither depends on cluster reachability or on the collection cycle having run
+at all, so neither can flag a healthy process as failing over a cluster that
+happens to be unreachable, which no restart could fix anyway.
+[ADR-0013](../adr/0013-static-liveness-readiness-probes.md) has the full
+argument. Because they don't wait on the first collection cycle, there's no
+startup window to cover for them.
 
-Point that check at **`/metrics`**, not `/health`. `/metrics` answers 200
-whenever the process is up and serving, which is what a restart-me-if-I-fail
-check is supposed to test; `/health` answers 503 while any one configured
-cluster is failing, and no restart can make an unreachable cluster reachable.
-Keep `/health` for a readiness signal if you have one, and alert on `ecs_up` and
-`ecs_collector_up` rather than on either endpoint. [Verify and
+`/health` still exists, unchanged: it returns per-cluster JSON and **HTTP 503
+while any cluster is failing**. It's not what an external health check should
+use, but it's the right endpoint for a human checking in, or for a monitoring
+system that wants to know *which* cluster is degraded. Alert on `ecs_up` and
+`ecs_collector_up` rather than on any probe endpoint. [Verify and
 troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
 sets out the full argument and what the `/health` JSON body contains.
 
-Whichever endpoint you probe, give the check a start period long enough to cover
-the first collection cycle. The HTTP server deliberately comes up before that
-cycle finishes, so there is a real window in which `/health` answers 503 and
-`/metrics` carries only `obs_exporter_build_info`. Its length is bounded by
-`collection.timeout` — 60 seconds by default — not by `collection.interval`.
+`/metrics` carries only `obs_exporter_build_info` until the first collection
+cycle finishes — the HTTP server deliberately comes up before that cycle
+completes. That window's length is bounded by `collection.timeout` — 60
+seconds by default — not by `collection.interval`.
 
 ## Compose
 
