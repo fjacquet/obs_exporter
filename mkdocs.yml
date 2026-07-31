@@ -14,7 +14,13 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.highlight
-  - pymdownx.superfences
+  # Renders ```mermaid fences as diagrams rather than code blocks. GitHub renders
+  # the same fences natively, so a diagram written once works in both places.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 nav:
   - Home: index.md
   - Getting started:
@@ -25,6 +31,8 @@ nav:
   - Migrating from v1: migration-v2.md
   - Migrating to v3: migration-v3.md
   - Deployment:
+      - Docker: deployment/docker.md
+      - Kubernetes: deployment/kubernetes.md
       - systemd: deployment/systemd.md
   - Architecture decisions:
       - Overview: adr/index.md
