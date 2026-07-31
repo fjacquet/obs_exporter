@@ -75,14 +75,21 @@ collector publishes. Confirmed live 2026-07-31.
     `ecs_node_cpu_utilization_percent`, `ecs_node_memory_utilization_percent`
     and `ecs_node_memory_used_bytes` — the [dashboard-sourced node
     collector](index.md#nodes-dashboard) stops emitting them so exactly one source
-    owns each name (ADR-0006). Every other metric this collector emits uses a
+    owns each name (ADR-0006). Most of what else this collector emits uses a
     **name no other collector emits** (`ecs_node_network_bytes_total`,
     `ecs_node_requests_total`, `ecs_node_request_bytes_total`,
+    `ecs_node_transaction_latency_milliseconds_bucket`/`_count`,
     `ecs_cluster_dt_*`, `ecs_cluster_requests_per_second`,
     `ecs_cluster_request_bytes_per_second`), so there is no shared name for
     it to collide on. An extra label on a shared name would *not* be safe —
     ADR-0006 requires one label-key set per name, and a second source adding
     a label the first does not carry is exactly the drift it forbids.
+
+    The one exception is `ecs_node_dt_total`, which `collectDT` also emits.
+    Unlike the three names above, ownership there is not exclusive to Flux: it
+    is arbitrated by whether `collectDT` is on, not by `collectFlux` alone —
+    see the "Cluster-wide totals, plus a per-node count Flux can serve after
+    all" note below for the exact rule.
 
     Arbitration is unconditional on the flag, not on what the cluster
     actually still serves: enabling `collectFlux` against a cluster whose
