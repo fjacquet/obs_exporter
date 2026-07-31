@@ -3,6 +3,7 @@ package ecsclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -160,5 +161,60 @@ func TestCloseLogsOut(t *testing.T) {
 	}
 	if got := atomic.LoadInt64(&hooks.logouts); got != 1 {
 		t.Errorf("logouts after idempotent close = %d, want 1", got)
+	}
+}
+
+func TestClientDoesNotRetryPermanentRefusal(t *testing.T) {
+	// A SECURITY_ADMIN-only account is refused with an HTTP 500. The transport
+	// retries 5xx twice, so without reading the body this costs three requests
+	// per measurement per cycle, forever, for an outcome that cannot change.
+	var calls int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Header().Set("X-SDS-AUTH-TOKEN", "tok")
+			return
+		}
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"code":6401,"description":"Insufficient permissions","retryable":false}`))
+	}))
+	defer srv.Close()
+
+	c := NewClusterClient(Config{Name: "t", BaseURL: srv.URL, HTTPClient: srv.Client()})
+	var out map[string]any
+	err := c.Post(t.Context(), "/flux/api/external/v2/query", map[string]string{"query": "x"}, &out)
+	if err == nil {
+		t.Fatal("Post must return an error on a permission refusal")
+	}
+	var api *APIError
+	if !errors.As(err, &api) || !api.Permanent() {
+		t.Fatalf("err = %v, want a permanent *APIError", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Errorf("issued %d requests, want 1: a permanent refusal must not be retried", got)
+	}
+}
+
+func TestClientStillRetriesUnclaimedServerErrors(t *testing.T) {
+	// A 5xx that makes no retryable claim keeps the old behaviour: two retries.
+	var calls int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Header().Set("X-SDS-AUTH-TOKEN", "tok")
+			return
+		}
+		atomic.AddInt32(&calls, 1)
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("<html>Bad Gateway</html>"))
+	}))
+	defer srv.Close()
+
+	c := NewClusterClient(Config{Name: "t", BaseURL: srv.URL, HTTPClient: srv.Client()})
+	var out map[string]any
+	if err := c.Get(t.Context(), "/dashboard/zones/localzone", &out); err == nil {
+		t.Fatal("Get must return an error on a 502")
+	}
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Errorf("issued %d requests, want 3 (initial + 2 retries)", got)
 	}
 }
