@@ -7,11 +7,14 @@ scrape interval.
 
 Every domain metric carries the `cluster` identity label (one exporter process can
 serve many clusters). Metrics are gauges holding the latest snapshot value by
-default. Most `_total`-suffixed names are the exception: they export as
-Prometheus `TYPE counter` (and as OTLP observable counters) because the value
-is cumulative, and `rate()` is for those. `ecs_cluster_dt_total` is a gauge
-despite its name — it deliberately mirrors the pre-existing `ecs_node_dt_total`
-gauge — so `_total` is a strong hint, not a guarantee; the [Flux collector
+default. Eight names end in `_total`, and three of them are the exception: the
+Flux collector's `ecs_node_requests_total`, `ecs_node_request_bytes_total` and
+`ecs_node_network_bytes_total` export as Prometheus `TYPE counter` (and as OTLP
+observable counters) because the value is cumulative, and `rate()` is for those.
+The other five — `ecs_cluster_transactions_total`,
+`ecs_cluster_gc_reclaimed_bytes_total`, `ecs_cluster_gc_detected_bytes_total`,
+`ecs_node_dt_total` and `ecs_cluster_dt_total` — emit as gauges, so `_total` is
+a strong hint, not a guarantee; the [Flux collector
 mapping tables](flux.md) spell out each
 metric's type explicitly. Per-second values (TPS, bandwidth, and the metrics
 named `…_rate` — `ecs_cluster_ec_rate`, `ecs_cluster_recovery_rate`) are

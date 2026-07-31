@@ -53,12 +53,13 @@ nobody wants, and it is not so much wrong as meaningless. Neither mistake
 produces an error. Both produce a panel that quietly says nothing.
 
 A `_total` suffix is a strong hint that a metric is a counter, but in this
-exporter it is not a promise: `ecs_cluster_dt_total` and `ecs_node_dt_total`
-carry the suffix and are gauges, because those names predate the convention and
-were kept rather than broken. Where the distinction matters it is stated
-explicitly — the [Flux collector](flux.md) mapping tables give a type for every
-metric they publish, and the [reference](index.md) flags the values that are
-already rates. The exporter's own output is the final authority, since a
+exporter it is not a promise — most of the names carrying it are served as
+gauges. `ecs_node_dt_total` is one: there `_total` means "all of the directory
+tables", a count you can take right now and one that falls as well as rises, not
+a tally that accumulates. Where the distinction matters it is stated explicitly
+— the [reference](index.md) names which `_total` metrics are counters and flags
+the values that are already rates, and the [Flux collector](flux.md) mapping
+tables give a type for every metric they publish. The exporter's own output is the final authority, since a
 Prometheus exporter declares each metric's type in the text it serves:
 
 ```bash
