@@ -260,6 +260,27 @@ func TestRegistryArbitratesPerfNamesWithFlux(t *testing.T) {
 	}
 }
 
+func TestRegistryGivesDTOwnershipToTheDTCollector(t *testing.T) {
+	both := Registry(config.Cluster{CollectFlux: true, CollectDT: true})
+	fluxOnly := Registry(config.Cluster{CollectFlux: true})
+	find := func(rcs []ResourceCollector) Flux {
+		t.Helper()
+		for _, rc := range rcs {
+			if f, ok := rc.(Flux); ok {
+				return f
+			}
+		}
+		t.Fatal("no Flux collector in the registry")
+		return Flux{}
+	}
+	if !find(both).DTOwnedByDT {
+		t.Error("with collectDT on, the DT collector must own the per-node name")
+	}
+	if find(fluxOnly).DTOwnedByDT {
+		t.Error("with collectDT off, Flux must own the per-node name")
+	}
+}
+
 func TestNodesYieldsArbitratedNames(t *testing.T) {
 	samples, err := Nodes{FluxOwnsPerf: true}.Collect(t.Context(), mockClient(t))
 	if err != nil {

@@ -19,6 +19,10 @@ import (
 // query table decides which source owns the three contested per-node names
 // that Registry's arbitration keeps Nodes from also emitting (ADR-0006).
 type Flux struct {
+	// DTOwnedByDT suppresses the per-node DT query when the opt-in DT collector
+	// runs: it serves unready and unknown per node as well, so where it is
+	// reachable it is the richer source and keeps the name (ADR-0006).
+	DTOwnedByDT bool
 	// now overrides the clock. Zero means time.Now; tests set it so fixtures
 	// captured at a fixed instant are not all judged stale.
 	now func() time.Time
@@ -56,7 +60,7 @@ func newNodeMapper(ctx context.Context, c ecsclient.Client) (*nodeMapper, error)
 		if label == "" {
 			continue
 		}
-		for _, key := range []string{n.Nodename, shortHost(n.Nodename), n.MgmtIP, n.DataIP} {
+		for _, key := range []string{n.Nodename, shortHost(n.Nodename), n.MgmtIP, n.DataIP, n.Data2IP, n.PrivateIP} {
 			if key == "" {
 				continue
 			}
@@ -138,6 +142,12 @@ type fluxQuery struct {
 	// maxAge overrides fluxMaxAge for a measurement outside the five-minute
 	// cadence class. Zero means the default.
 	maxAge time.Duration
+	// hostTag is the column carrying the node's identity. Empty means "host".
+	// dtquery_dt_dist_host_dt_node_id identifies the node under dt_node_id
+	// instead, holding its data_ip rather than a hostname.
+	hostTag string
+	// dtPerNode marks the query the DT collector owns when it is enabled.
+	dtPerNode bool
 }
 
 // script renders the Flux program for this measurement.
@@ -191,6 +201,18 @@ var fluxQueries = []fluxQuery{
 			{field: "total", name: "ecs_cluster_dt_total"},
 			{field: "unready", name: "ecs_cluster_dt_unready"},
 			{field: "unknown", name: "ecs_cluster_dt_unknown"},
+		},
+	},
+	{
+		// Tagged {dt_node_id, process, tag}: no host column, but dt_node_id
+		// carries the node's data_ip, which the inventory indexes. On the live
+		// 4.3 capture the per-node counts sum to dtquery_dt_status's cluster
+		// total, so this is that total's breakdown under another column name.
+		// Owned by the DT collector when that one runs — see Registry.
+		bucket: "monitoring_op", measurement: "dtquery_dt_dist_host_dt_node_id",
+		perNode: true, hostTag: "dt_node_id", dtPerNode: true,
+		fields: []fluxField{
+			{field: "count_i", name: "ecs_node_dt_total"},
 		},
 	},
 	{
@@ -260,6 +282,9 @@ func (f Flux) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, error)
 	var unmapped float64
 	var attempted, succeeded int
 	for _, q := range fluxQueries {
+		if q.dtPerNode && f.DTOwnedByDT {
+			continue
+		}
 		attempted++
 		var resp fluxResp
 		if err := c.Post(ctx, fluxPath, map[string]string{"query": q.script()}, &resp); err != nil {
@@ -329,7 +354,11 @@ func (q fluxQuery) samples(rows []fluxRow, mapper *nodeMapper, now time.Time) ([
 
 		var base []Label
 		if q.perNode {
-			host, ok := row.value("host")
+			tag := q.hostTag
+			if tag == "" {
+				tag = "host"
+			}
+			host, ok := row.value(tag)
 			if !ok {
 				continue
 			}
