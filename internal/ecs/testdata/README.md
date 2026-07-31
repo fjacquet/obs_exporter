@@ -26,3 +26,22 @@ It is read by exactly one test (`cluster_livepayload_test.go`), which asserts
 **shape, never values**: the cluster was idle, so most values are zero and would
 make weak assertions. Do not add it to `mockClient`, and do not copy it to
 `cmd/mockecs/fixtures/`.
+
+## Flux fixtures (`flux_*.json`)
+
+Real `POST /flux/api/external/v2/query` responses captured on an ObjectScale
+4.3.0.0.142978 acceptance cluster on 2026-07-31, verbatim except for host
+identifiers: the capture's already-pseudonymous `node-1`/`node-2` and
+`192.168.2.1`/`192.168.2.2` are remapped onto this repo's demo inventory
+(`supr01-r01`/`supr01-r02`, `10.1.0.1`/`10.1.0.2`) and rows for the capture's
+other three nodes are dropped, so `make demo` shows one coherent cluster rather
+than two disjoint node sets. `flux_net.json` carries one extra row under
+`not-in-this-cluster.example.com` so the unmapped-host counter has something to
+count.
+
+`flux_cq_transaction.json` and `flux_cq_throughput.json` are **synthesized**:
+their measurements are confirmed in prose with no attached payload. Each says so
+in a `_comment` key. Replace them when a real capture arrives.
+
+`flux_empty.json` is the live answer to a measurement the store does not carry —
+HTTP 200 with `Series:[{Datatypes:null,Columns:null,Values:null}]`.

@@ -1,0 +1,13 @@
+{
+  "_comment": "SYNTHESIZED, not a live capture. The reporter confirmed in prose that cq_performance_throughput emits with these fields on 4.3, but attached no payload. Shape copied from the real x-vdc-cq_performance_error capture: no host, no tags, every value a string. Replace with a real capture when one arrives (see docs/operate/flux-validation.md).",
+  "Series": [
+    {
+      "Datatypes": ["long", "dateTime:RFC3339", "dateTime:RFC3339", "dateTime:RFC3339", "double", "string", "string"],
+      "Columns": ["table", "_start", "_stop", "_time", "_value", "_field", "_measurement"],
+      "Values": [
+        ["0", "2026-07-31T08:08:25Z", "2026-07-31T08:38:25Z", "2026-07-31T08:35:00Z", "41943040", "total_read_requests_size", "cq_performance_throughput"],
+        ["1", "2026-07-31T08:08:25Z", "2026-07-31T08:38:25Z", "2026-07-31T08:35:00Z", "20971520", "total_write_requests_size", "cq_performance_throughput"]
+      ]
+    }
+  ]
+}

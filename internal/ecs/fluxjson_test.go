@@ -16,19 +16,19 @@ func decodeFlux(t *testing.T, body string) fluxResp {
 
 func TestFluxRowsAddressColumnsByName(t *testing.T) {
 	rows := decodeFlux(t, fixture(t, "flux_transactions.json")).rows()
-	if len(rows) != 2 {
-		t.Fatalf("got %d rows, want 2", len(rows))
+	if len(rows) != 3 {
+		t.Fatalf("got %d rows, want 3", len(rows))
 	}
 	field, ok := rows[0].value("_field")
 	if !ok || field != "failed_request_counter" {
 		t.Errorf("_field = %q (ok=%v), want failed_request_counter", field, ok)
 	}
 	v, ok := rows[0].num("_value")
-	if !ok || v != 17 {
-		t.Errorf("_value = %v (ok=%v), want 17", v, ok)
+	if !ok || v != 3671325 {
+		t.Errorf("_value = %v (ok=%v), want 3671325", v, ok)
 	}
-	if host, _ := rows[1].value("host"); host != "supr01-r01.example.com" {
-		t.Errorf("host = %q, want supr01-r01.example.com", host)
+	if host, _ := rows[1].value("host"); host != "supr01-r01" {
+		t.Errorf("host = %q, want supr01-r01", host)
 	}
 }
 

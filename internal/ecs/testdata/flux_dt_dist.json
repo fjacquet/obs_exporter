@@ -1,0 +1,56 @@
+{
+  "Series": [
+    {
+      "Datatypes": [
+        "long",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "dateTime:RFC3339",
+        "long",
+        "string",
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
+      "Columns": [
+        "table",
+        "_start",
+        "_stop",
+        "_time",
+        "_value",
+        "_field",
+        "_measurement",
+        "dt_node_id",
+        "process",
+        "tag"
+      ],
+      "Values": [
+        [
+          "0",
+          "2026-07-31T08:32:25.221115287Z",
+          "2026-07-31T08:38:25.221115287Z",
+          "2026-07-31T08:35:57Z",
+          "383",
+          "count_i",
+          "dtquery_dt_dist_host_dt_node_id",
+          "10.1.0.1",
+          "dtquery",
+          "dt"
+        ],
+        [
+          "1",
+          "2026-07-31T08:32:25.221115287Z",
+          "2026-07-31T08:38:25.221115287Z",
+          "2026-07-31T08:35:57Z",
+          "393",
+          "count_i",
+          "dtquery_dt_dist_host_dt_node_id",
+          "10.1.0.2",
+          "dtquery",
+          "dt"
+        ]
+      ]
+    }
+  ]
+}
