@@ -115,12 +115,22 @@ func fluxMock(t *testing.T, byMeasurement map[string]string) ecsclient.Client {
 
 type fluxClient struct {
 	ecsclient.Client
-	bodies  map[string]string
-	t       *testing.T
+	bodies map[string]string
+	t      *testing.T
+	// queries records every query body actually POSTed, in order, so a test
+	// can assert on request *count* — the short-circuit is a promise that
+	// Collect stops issuing queries, not merely that it returns an error, and
+	// only a recording of what was actually sent can tell those apart. A later
+	// task on this branch needs the same field to assert a query was *not*
+	// issued, hence recording the raw string rather than just a count.
+	queries []string
 	postErr error
 }
 
 func (f *fluxClient) Post(_ context.Context, path string, body, out any) error {
+	if q, ok := body.(map[string]string); ok {
+		f.queries = append(f.queries, q["query"])
+	}
 	if f.postErr != nil {
 		return f.postErr
 	}
@@ -278,6 +288,10 @@ func (e *erroringFluxClient) Post(ctx context.Context, path string, body, out an
 	q, _ := body.(map[string]string)
 	for measurement, err := range e.errByMeasurement {
 		if strings.Contains(q["query"], `"`+measurement+`"`) {
+			// An intercepted call never reaches fluxClient.Post, so record it
+			// here — otherwise a query this type fails would vanish from the
+			// count fluxClient.Post is meant to keep.
+			e.fluxClient.queries = append(e.fluxClient.queries, q["query"])
 			return err
 		}
 	}
@@ -296,7 +310,9 @@ func permissionRefusal() error {
 
 func TestFluxPermissionRefusalFailsTheWholeCollector(t *testing.T) {
 	// Nothing this collector asks for will work; failing fast is both correct
-	// and the difference between one request per cycle and ten.
+	// and the difference between one request per cycle and ten. cpu is the
+	// first entry in fluxQueries, so a genuine short-circuit issues exactly
+	// that one query and stops -- never reaching mem, net, or the rest.
 	c := &erroringFluxClient{
 		fluxClient:       &fluxClient{Client: mockClient(t), bodies: map[string]string{"cpu": "flux_cpu.json"}, t: t},
 		errByMeasurement: map[string]error{"cpu": permissionRefusal()},
@@ -304,6 +320,12 @@ func TestFluxPermissionRefusalFailsTheWholeCollector(t *testing.T) {
 	f := Flux{now: func() time.Time { return captureInstant }}
 	if _, err := f.Collect(t.Context(), c); err == nil {
 		t.Fatal("a permission refusal must fail the collector")
+	}
+	// The behavioral property, not just the return value: a client that keeps
+	// looping past the fatal query and only fails via err != nil would still
+	// pass the check above while quietly issuing all len(fluxQueries) requests.
+	if got := len(c.queries); got != 1 {
+		t.Fatalf("issued %d queries after a permission refusal, want exactly 1 (the short-circuit): %v", got, c.queries)
 	}
 }
 
