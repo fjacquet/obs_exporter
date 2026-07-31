@@ -1,5 +1,35 @@
 # Architecture Decision Records
 
+An architecture decision record (ADR) is a short document that captures one
+decision with lasting consequences: what was decided, why, and which
+alternatives were rejected and why. Nothing here gets deleted or rewritten
+when a later decision changes course — a superseded ADR stays published, with
+a note pointing at whatever replaced it. The point is that a decision can be
+revisited on its merits years later, instead of being reconstructed from a
+commit message or rediscovered the hard way in production.
+
+Most of these records exist for whoever maintains this exporter's code.
+Three of them explain behaviour that would otherwise look like a bug to
+whoever runs it — start here if that is you:
+
+- **[ADR-0007 — ObjectScale 4.1 API alignment](0007-obs-4-1-api-alignment.md)**:
+  why a metric is missing from a scrape instead of reading zero, whenever a
+  cluster does not report that field. If you expected a value and see
+  nothing, this is why — and why "absent" should not be read as "the
+  exporter is broken."
+- **[ADR-0004 — Token auth & retry policy](0004-token-auth-retry-policy.md)**:
+  why the exporter logs out of every cluster it talks to on shutdown.
+  ObjectScale caps how many session tokens a single account can hold at
+  once, and an exporter that leaked sessions instead of releasing them would
+  eventually lock that monitoring account out.
+- **[ADR-0011 — Opt-in Flux collector for metrics the management API does not
+  serve](0011-flux-collector-for-unreachable-metrics.md)**: why the Flux
+  collector exists — some per-node performance fields and directory-table
+  stats are not reachable through the API every other collector uses — and
+  why it stays opt-in rather than on by default.
+
+The full set, in order:
+
 | ADR | Decision |
 | --- | --- |
 | [0001](0001-ci-supply-chain-hardening.md) | CI/CD supply-chain hardening: SHA-pinned actions, GoReleaser, SBOM, Semgrep |
@@ -12,5 +42,5 @@
 | [0008](0008-swagger-4.2-validation-findings.md) | Swagger 4.2 validation findings: billing body, `/vdc/nodes`, content-type — all three verified live on 4.3 and closed, no code change needed |
 | [0009](0009-modular-resource-collectors.md) | Modular `ResourceCollector` interface: one file per metric domain, per-cluster feature-flag wiring, per-collector degradation |
 | [0010](0010-mockecs-demo-harness.md) | mockecs fake-API demo harness (demo-only, never published) and the duplicated-fixtures sync constraint |
-| [0011](0011-flux-collector-for-unreachable-metrics.md) | Opt-in Flux collector accepted as direction for the performance fields the dashboard omits and the DT stats a segmented network hides; implementation deferred |
+| [0011](0011-flux-collector-for-unreachable-metrics.md) | Opt-in Flux collector accepted as direction for the performance fields the dashboard omits and the DT stats a segmented network hides; shipped, opt-in, in 3.2.0 |
 | [0012](0012-label-consolidation-and-sum-safety.md) | Consolidate one-measurement-many-names families into one name plus a label, bounded by the sum-safety rule: a whole and its parts never share a metric name |

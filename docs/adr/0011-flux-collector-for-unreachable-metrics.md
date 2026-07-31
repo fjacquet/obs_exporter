@@ -9,7 +9,7 @@ the live-cluster reporter — see the [Flux collector
 design](../superpowers/specs/2026-07-30-flux-collector-design.md) for the full
 analysis. Implementation shipped across two releases: v3.1.0 (the object-port
 ping-decode correction and the internal `Sample.Type` groundwork) and v3.2.0
-(the Flux collector itself — see `docs/metrics.md`). Supersedes the "out of
+(the Flux collector itself — see `docs/metrics/`). Supersedes the "out of
 scope" position implied by [ADR-0008](0008-swagger-4.2-validation-findings.md)
 and by the deferred ADR-0011 placeholder in the tolerant-HAL-decode plan.
 
@@ -121,12 +121,12 @@ reference; per the Source column below, only questions 1 and 3 also carry
 live-cluster confirmation from the reporter. The full analysis for each is in
 the [Flux collector design
 spec](../superpowers/specs/2026-07-30-flux-collector-design.md); the mapping
-table question (2) resolved into `docs/metrics.md`'s "Flux collector" section.
+table question (2) resolved into `docs/metrics/flux.md`'s "Flux collector" section.
 
 | # | Question | Answer | Source |
 | --- | --- | --- | --- |
 | 1 | Auth and config surface | Same 4443, same `X-SDS-AUTH-TOKEN` from `/login`, role `SYSTEM_MONITOR` or `SYSTEM_ADMIN`. One bool flag, no `flux:` block. | reporter + admin guide, "Flux API" |
-| 2 | Bucket/measurement → metric mapping | Table in `docs/metrics.md`. Three buckets, not two. | admin guide, "Flux API field descriptions" |
+| 2 | Bucket/measurement → metric mapping | Table in `docs/metrics/flux.md`. Three buckets, not two. | admin guide, "Flux API field descriptions" |
 | 3 | Version skew | Warning plus absent series, never a hard collector failure. | reporter; the 4.3 guide confirms `net` has no `utilization` field. Its presence in 3.8 is the reporter's recollection, unverified either way — which is itself the argument for tolerating absence rather than asserting a schema |
 | 4 | Response parsing | Structured JSON (`Series`/`Datatypes`/`Columns`/`Values`) via `accept:application/json`. Annotated CSV is offered but not used. | admin guide worked example |
 | 5 | Whether DT stats move to Flux entirely | Partly. Flux DT is cluster-scoped (`ecs_cluster_dt_*`); per-node DT stays on `collectDT` (`ecs_node_dt_*`), and the two flags are independent — see the Context correction above. | admin guide tag listings |
@@ -140,7 +140,7 @@ table question (2) resolved into `docs/metrics.md`'s "Flux collector" section.
   and nothing else.
 - Operators who do not enable it see no change: no new requests, no new config
   required, no new failure mode.
-- The DT reachability caveat stays documented in `docs/metrics.md`, now
+- The DT reachability caveat stays documented in `docs/metrics/`, now
   alongside the Flux collector's own section (shipped in v3.2.0). `collectDT`
   keeps working as-is for flat-network clusters and for node-local exporter
   deployments; per the Context correction above, Flux only ever adds

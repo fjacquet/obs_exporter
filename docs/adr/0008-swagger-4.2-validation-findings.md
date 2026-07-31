@@ -29,7 +29,7 @@ We validated the implementation against the bundled management-API swagger
 
 All seven management endpoints the exporter calls exist in the swagger with matching
 methods and auth, **except** as noted below. The Grafana dashboard references only
-emitted metrics (no broken panels), and `docs/metrics.md` is complete.
+emitted metrics (no broken panels), and `docs/metrics/` is complete.
 
 Three discrepancies were found that the swagger *can* express (request shape / path)
 but which could not be resolved from the 4.2 artifact alone, because ADR-0007
@@ -106,7 +106,7 @@ Two things worth recording from the same run, outside this ADR's three findings:
   exactly 10% of total.
 - The per-node payload carried no `nodeCpuUtilization`, `nodeMemory*` or NIC
   fields, and the cluster payload carried no `transaction*` fields, on a cluster
-  where the reference documents all of them. `docs/metrics.md` records this as an
+  where the reference documents all of them. `docs/metrics/` records this as an
   availability caveat; the Flux API is the only known source for those.
 
 ## Consequences
