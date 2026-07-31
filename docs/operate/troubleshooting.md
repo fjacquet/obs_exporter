@@ -67,10 +67,13 @@ This is not a hypothetical workflow. It is how the live-cluster evidence in
 [ADR-0008](../adr/0008-swagger-4.2-validation-findings.md) was produced: a
 contributor ran the exporter against their ObjectScale 4.3 cluster with tracing
 on and supplied the sanitised output, 61 requests across all seven endpoints on
-a five-node cluster with 54 namespaces. Three suspected bugs — any one of which
-would have silently removed a whole metric family on every deployment — were
-settled by reading what the cluster actually answered. None of them turned out
-to be real, and no test in the repository could have shown that.
+a five-node cluster with 54 namespaces. Three suspected bugs were settled by
+reading what the cluster actually answered, and two of them would have silently
+removed a whole metric family from every deployment had they been real — the
+namespace usage metrics in one case, the cluster version and the whole
+directory-table collector in the other. None of them was real. No test in the
+repository could have shown that either way, because the fake cluster the tests
+run against does not check what the exporter asks it for.
 
 ## The diagnostic flags
 
@@ -81,7 +84,7 @@ operation; the other three exist for the work on this page.
 | --- | --- |
 | `--config PATH` | path to the config file (default `config.yaml`) |
 | `--once` | run a single collection cycle, log the result, and exit |
-| `--debug` | raise the log level, and with `--once` also print every collected sample |
+| `--debug` | more verbose logging, and with `--once` also print every collected sample |
 | `--trace` | log every management API response body |
 
 `--debug` and `--trace` are independent of each other and of `--once`. Each one
@@ -100,15 +103,15 @@ exporter already running on the same host — you can run it on a production box
 while the real service is up.
 
 It is the fastest way to check that a new cluster entry works. Credentials,
-hostname resolution, the management port, TLS trust and the account's rights all
-have to be right for a cycle to succeed, and a failing one names which of them
-was wrong. Use it after every config change, before restarting the service that
-serves your dashboards.
+hostname resolution, the management port and TLS trust all have to be right
+before a single collector can return anything, and a failing run names which of
+them was wrong. Use it after every config change, before restarting the service
+that serves your dashboards.
 
 The per-cluster summary at the end looks like this:
 
 ```text
-INFO[0002] collection done  cluster=ecs-prod-01 ok=true samples=284
+time="2026-07-31T09:13:02+02:00" level=info msg="collection done" cluster=ecs-prod-01 ok=true samples=128
 ```
 
 `ok=false` means the cluster produced no usable data this cycle — that is the
@@ -121,13 +124,12 @@ across all collectors, so a sudden drop between two runs is itself a signal.
 obs_exporter --config config.yaml --once --debug
 ```
 
-`--debug` lowers the log level so lower-severity messages appear. It is worth
-knowing what that does and does not add. Per-collector failures are logged as
-**warnings**, so they show up at the default level too — you do not need
-`--debug` to see that the `quotas` collector failed. What `--debug` adds that you
-cannot get any other way is this: combined with `--once`, it prints **every
-collected sample** to standard output, sorted, one per line, in the
-`name{label="value",…} value` form Prometheus uses.
+`--debug` makes the logging more verbose, and it is worth knowing what that does
+and does not add. Per-collector failures are logged as **warnings**, so they show
+up at the default level too — you do not need `--debug` to see that the `quotas`
+collector failed. What `--debug` adds that you cannot get any other way is this:
+combined with `--once`, it prints **every collected sample** to standard output,
+sorted, one per line, in the `name{label="value",…} value` form Prometheus uses.
 
 ```text
 ecs_cluster_disk_space_bytes{cluster="ecs-prod-01",type="allocated"} 4.12316860416e+11
@@ -181,6 +183,20 @@ Note that the trace shows **responses**, not requests. If a collector sends a
 request body — the bulk namespace billing call and every Flux query do — the
 trace shows what came back, not what was asked. The status code is usually
 enough to tell whether the request itself was accepted.
+
+Each traced call is written as a **single log line**, with the response body
+JSON-escaped inside the message and the identifying fields at the end:
+
+```text
+time="2026-07-31T09:13:02+02:00" level=info msg="API trace:\n{\n    \"title\": \"nodes List\",\n …}" cluster=ecs-prod-01 method=GET status=200 url="https://ecs01.example.com:4443/dashboard/zones/localzone/nodes"
+```
+
+One line per call means `grep` on the path gives you the whole record, payload
+included. Undo the escaping to read it:
+
+```bash
+grep 'localzone/nodes' trace.log | sed 's/\\n/\n/g; s/\\"/"/g'
+```
 
 ### The combined run: one command, two artefacts
 
@@ -241,7 +257,10 @@ before the first cycle — logging in to every cluster and polling it can take
 longer than a scrape timeout, and a blocked `/metrics` looks like a dead process
 — so there is a real window at startup where `/metrics` answers with only
 `obs_exporter_build_info` and `/health` answers 503. Give a container health
-check a start period at least as long as one collection cycle.
+check a start period long enough to cover that first cycle. Its length is
+bounded by `collection.timeout` (60 seconds by default), not by
+`collection.interval`: clusters are polled in parallel, and the timeout is the
+per-cluster budget within one cycle.
 
 The path `/health` is fixed. Only the metrics path is configurable, through
 `server.uri` in the config file, so on a deployment that has moved `/metrics`
@@ -285,7 +304,7 @@ grep '^ecs_node_cpu' samples.txt        # e.g. is it there for any node at all?
 
 # 2. What did the cluster actually send for the endpoint that owns it?
 obs_exporter --config config.yaml --once --trace 2>trace.log
-grep -A20 'dashboard/zones/localzone/nodes' trace.log
+grep 'dashboard/zones/localzone/nodes' trace.log | sed 's/\\n/\n/g; s/\\"/"/g'
 ```
 
 The metrics reference lists the source endpoint for each family at the top of
@@ -299,9 +318,10 @@ see [sharing a trace safely](#sharing-a-trace-safely).
 ### `ecs_up` is 0 for a cluster
 
 **What it means.** That cluster produced no usable data in the last cycle —
-either every collector failed, or they all succeeded and none of them returned a
-single domain sample. In practice it is almost always credentials, network
-reachability, or TLS trust, because those three break every collector at once.
+either every collector failed, or the ones that did not fail returned nothing
+between them, so the cycle yielded no domain sample at all. In practice it is
+almost always credentials, network reachability or TLS trust, because those
+three break every collector at once.
 
 **What to run.**
 
@@ -313,9 +333,14 @@ The failing collectors log a warning each, naming the collector and the
 underlying error, and the error names the request that failed:
 
 ```text
-WARN[0000] collector failed  cluster=ecs-prod-01 collector=cluster err="login GET: status 401"
-WARN[0000] collector failed  cluster=ecs-prod-01 collector=nodes   err="GET /dashboard/zones/localzone/nodes: status 403"
+level=warning msg="collector failed" cluster=ecs-prod-01 collector=cluster err="login GET: status 401"
+level=warning msg="collector failed" cluster=ecs-prod-01 collector=nodes err="GET /dashboard/zones/localzone/nodes: status 403"
 ```
+
+A cluster nothing is listening on is noisier than that, because the HTTP client
+retries transport failures twice before giving up and logs each attempt in its
+own format, and because every collector tries to log in independently. Read the
+first `collector failed` line and ignore the rest — they all say the same thing.
 
 Read the error text before changing anything:
 
@@ -407,7 +432,7 @@ back empty. Each empty measurement logs a warning naming the bucket and the
 measurement it asked for:
 
 ```text
-WARN[0001] Flux measurement returned no rows; its samples are absent this cycle  cluster=ecs-prod-01 bucket=monitoring_op measurement=mem
+level=warning msg="Flux measurement returned no rows; its samples are absent this cycle" bucket=monitoring_op cluster=ecs-prod-01 measurement=mem
 ```
 
 That is the signature of a cluster whose measurement names differ from the ones
@@ -431,8 +456,10 @@ whatever it has, including `ecs_up 0` for the cluster that is down.
 
 `/metrics` itself has no failure mode that produces a 503. A cluster that is
 completely unreachable still yields a 200 with `ecs_up{cluster="…"} 0` in the
-body — that is the entire point of the snapshot model, and it is why you should
-alert on `ecs_up` rather than on scrape failure.
+body, because a scrape reads the last stored collection result rather than
+triggering a fresh call to the cluster — nothing a cluster does can fail a
+scrape. That is why you should alert on `ecs_up` rather than on scrape failure:
+scrape failure means the exporter is gone, not that a cluster is.
 
 **What to run.**
 
@@ -544,7 +571,7 @@ smaller thing to review by hand than a whole trace.
 
 ### What a maintainer actually needs
 
-A useful report is four things. Two of them are one command each:
+A useful report is four things, and one command gives you the first two:
 
 ```bash
 curl -s localhost:9438/metrics | grep -E '^(obs_exporter_build_info|ecs_cluster_info)'

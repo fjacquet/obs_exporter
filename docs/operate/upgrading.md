@@ -48,7 +48,8 @@ So split the work either side of the restart:
 
 1. **Before.** Read the rename table for your hop and find every query that
    references a name in the left-hand column — dashboard panels, alert rules,
-   recording rules, and anything else querying this exporter. Write the
+   recording rules (the precomputed queries Prometheus stores back as new
+   series), and anything else querying this exporter. Write the
    replacements, but do not apply them yet: they would query names that do not
    exist until the new binary is running. If you run the Grafana dashboards from
    this repository, take the updated ones from the same release as the binary,
