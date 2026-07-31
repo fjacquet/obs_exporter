@@ -52,3 +52,20 @@ the Homebrew cask only installs the binary on your PATH — it defines no servic
 register a `launchd` job yourself, e.g. `~/Library/LaunchAgents/com.fjacquet.obs_exporter.plist`
 with `ProgramArguments` `[/opt/homebrew/bin/obs_exporter, --config, <path>/config.yaml]` and
 `RunAtLoad`/`KeepAlive` set, then `launchctl load` it.
+
+## Next
+
+`systemctl status` showing *active (running)* means the process started, not
+that it is talking to your cluster — those are different questions, and the
+exporter is deliberately quiet when a cluster stops answering. Confirm the
+second one before you walk away.
+
+- [Configuration](../getting-started/configuration.md) — every setting in the
+  `config.yaml` installed above, and the two ways to keep the password out of it.
+- [First run](../getting-started/first-run.md) — the one `curl` against
+  `/metrics` that proves the cluster answered, and how to read the startup
+  lines `journalctl` will show you.
+- [Verify and troubleshoot](../operate/troubleshooting.md) — the `--once
+  --debug` check, which is safe to run by hand alongside the running service
+  because `--once` binds no port, plus what `/health` reports and what to do
+  when a metric you expect is missing.

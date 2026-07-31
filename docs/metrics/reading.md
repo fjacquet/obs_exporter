@@ -94,28 +94,17 @@ between "traffic stopped" and "the counter restarted".
 
 ## Absent, never zero
 
-The exporter never invents a value. Every number on `/metrics` was read out of a
-payload the cluster actually returned and parsed cleanly as a number. When a
-cluster does not report a field, or reports it in a shape the collector cannot
-read, the metric is simply **absent** from `/metrics` for that cycle. It is not
-published as `0`, and the previous cycle's value is not carried forward.
+The exporter never invents a value. When a cluster does not report a field, or
+reports it in a shape the collector cannot read, that metric is simply **absent**
+from `/metrics` for the cycle — never published as `0`, and never carried forward
+from the previous cycle, because a fabricated zero is a claim nothing downstream
+can tell apart from a real one ([ADR-0007](../adr/0007-obs-4-1-api-alignment.md)).
 
-That is deliberate, and recorded as
-[ADR-0007](../adr/0007-obs-4-1-api-alignment.md). A zero is a claim. "The pool
-is 0% full" and "we could not read how full the pool is" are very different
-statements, and once a fabricated zero is stored in Prometheus nothing
-downstream can tell them apart — it will eventually fire an alert, or clear one
-that should have fired.
-
-The practical consequence is that a panel which is *empty* rather than flat at
-zero usually means the cluster did not report that field, not that the exporter
-is broken. `ecs_up` and every `ecs_collector_up` can be 1 while a metric you
-expect is missing, and the log may say nothing at all, because from the
-collector's point of view nothing went wrong. Telling "your cluster does not
-publish this" apart from "the exporter could not read what your cluster sent"
-means looking at the payload itself, which is what the exporter's trace mode is
-for. [Verify and troubleshoot](../operate/troubleshooting.md) walks through that
-workflow.
+So a panel that is *empty* rather than flat at zero usually means the cluster did
+not report that field, not that the exporter is broken. [Verify and
+troubleshoot](../operate/troubleshooting.md#read-this-first-a-missing-metric-not-a-wrong-one)
+owns the full explanation, and the workflow for telling "your cluster does not
+publish this" apart from "the exporter could not read what your cluster sent".
 
 ## Scrape interval and collection interval
 

@@ -75,25 +75,20 @@ this page: the instruction runs a command *inside* the container, and this image
 has no shell and no HTTP client to run. Probe it from outside instead —
 Kubernetes probes, a Compose-level external check, or your monitoring system.
 
-Which endpoint you probe then matters, because the two answer different
-questions and only one of them is a fair test of whether the process should be
-restarted:
+Point that check at **`/metrics`**, not `/health`. `/metrics` answers 200
+whenever the process is up and serving, which is what a restart-me-if-I-fail
+check is supposed to test; `/health` answers 503 while any one configured
+cluster is failing, and no restart can make an unreachable cluster reachable.
+Keep `/health` for a readiness signal if you have one, and alert on `ecs_up` and
+`ecs_collector_up` rather than on either endpoint. [Verify and
+troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
+sets out the full argument and what the `/health` JSON body contains.
 
-- **`/health`** reports whether collection is succeeding. One unreachable
-  cluster turns the whole endpoint 503, even though the exporter is still
-  collecting and serving every other cluster in the config. Wire that to a
-  restart and one bad cluster takes down the metrics for all the healthy ones —
-  and the restart cannot fix anything, because a fresh process has exactly the
-  same network path to the cluster that is not answering.
-- **`/metrics`** reports only that the process is up and serving, which is what
-  liveness is supposed to mean. It answers 200 while a cluster is failing,
-  carrying `ecs_up 0` for that cluster in the body.
-
-That is why the usual split is `/metrics` for liveness, `/health` for readiness,
-and `ecs_up` / `ecs_collector_up` for alerting. The exporter is built to degrade
-one cluster and one collector at a time rather than go dark, so the thing you
-want to be told about is which part is degraded — which is what those two
-metrics say and what a restart cannot change.
+Whichever endpoint you probe, give the check a start period long enough to cover
+the first collection cycle. The HTTP server deliberately comes up before that
+cycle finishes, so there is a real window in which `/health` answers 503 and
+`/metrics` carries only `obs_exporter_build_info`. Its length is bounded by
+`collection.timeout` — 60 seconds by default — not by `collection.interval`.
 
 ## Compose
 

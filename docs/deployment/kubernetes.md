@@ -118,10 +118,11 @@ creates an object that is silently ignored and a target that is never scraped.
 Point your Prometheus at the Service's address and port 9438 the way you would
 point it at any other host.
 
-Set `collection.interval` to match your scrape interval rather than exceeding
-it. The exporter serves a snapshot, so scraping faster than it collects returns
-the same values repeatedly — it costs the cluster nothing, but it does not make
-the data fresher.
+Whichever route you take, set `collection.interval` to match the scrape interval
+you configure here rather than leaving it higher. [Reading the
+metrics](../metrics/reading.md#scrape-interval-and-collection-interval) explains
+why these are two separate clocks and why matching them low beats matching them
+high.
 
 ## Probes
 
@@ -130,17 +131,18 @@ shell and no `curl` — so a probe that runs a command inside the container has
 nothing to run. Every probe has to be an HTTP request, which the kubelet — the
 Kubernetes agent running on each node — makes from outside the container.
 
-Which endpoint each probe uses is a real decision, not a formality. `/health`
-answers 503 while **any** configured cluster is failing. In a deployment that
-polls several clusters from one process, that means a single unreachable cluster
-would fail a liveness probe and restart a pod that is collecting every other
-cluster perfectly well — and the restart cannot help, because nothing about a
-fresh process makes an unreachable cluster reachable. `/metrics` answers 200 as
-long as the process is up and serving, which is what liveness is supposed to
-mean.
+Which endpoint each probe uses is a real decision, not a formality: use
+`/metrics` for liveness and `/health` for readiness. `/health` answers 503 while
+**any** configured cluster is failing, and a restart cannot make an unreachable
+cluster reachable — which holds with a single cluster just as much as with
+several, where the restart additionally drops the metrics for every cluster that
+was collecting perfectly well. `/metrics` answers 200 as long as the process is
+up and serving, which is what liveness is supposed to mean. [Verify and
+troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
+sets out the full argument and what the `/health` JSON body contains.
 
-So use `/metrics` for liveness and `/health` for readiness. The chart ships with
-both probes pointing at `/health`, so override the liveness one:
+The chart ships with both probes pointing at `/health`, so override the liveness
+one:
 
 ```yaml
 livenessProbe:
@@ -148,6 +150,14 @@ livenessProbe:
     path: /metrics
     port: http
 ```
+
+Cover the startup window as well, with `initialDelaySeconds` or a
+`startupProbe`. The exporter's HTTP server deliberately comes up before the
+first collection cycle finishes, so there is a real window in which `/health`
+answers 503 and `/metrics` carries only `obs_exporter_build_info` — long enough
+to fail a readiness probe and, without a delay, to restart a pod that is
+starting normally. Its length is bounded by `collection.timeout`, 60 seconds by
+default.
 
 Then alert on `ecs_up` and `ecs_collector_up` rather than on either probe. The
 exporter is built to degrade per cluster and per collector instead of going
