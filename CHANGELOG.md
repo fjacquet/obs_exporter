@@ -50,8 +50,9 @@ capture contradicted.
   queries against a live cluster and writes the responses as fixtures —
   proof against the queries actually issued, not a hand-written approximation
   of them.
-- Trace spans distinguish the ten Flux queries a cycle issues, previously
-  indistinguishable in a trace view.
+- `--trace` now logs each Flux query's own body as a logrus field, so the ten
+  otherwise-identical POSTs to `/flux/api/external/v2/query` a cycle issues
+  are distinguishable in the trace log, previously indistinguishable there.
 
 ### Fixed
 
@@ -61,7 +62,7 @@ capture contradicted.
   query with HTTP 500; the client was retrying a refusal three times per
   measurement per cycle for an outcome that could never change. A body that
   does not decode to the envelope makes no claim and still retries as before.
-- `internal/ecs/testdata/flux/*.json` fixtures replaced with the live 4.3
+- `internal/ecs/testdata/flux_*.json` fixtures replaced with the live 4.3
   capture; the discriminating power a hand-transcribed `dt_status` fixture
   had lost (every value distinct enough to catch a swapped field) is restored.
 
