@@ -8,9 +8,14 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
 )
+
+// captureInstant is a moment shortly after every flux_*.json fixture was
+// written on the live cluster, so fixture rows read as fresh (see fluxMaxAge).
+var captureInstant = time.Date(2026, 7, 31, 8, 38, 30, 0, time.UTC)
 
 func TestNodeMapperResolvesFluxHosts(t *testing.T) {
 	// The vdc-nodes fixture names supr01-r01 at 10.0.0.1 / 10.1.0.1. Flux reports
@@ -137,7 +142,8 @@ func (f *fluxClient) Post(_ context.Context, path string, body, out any) error {
 
 func collectFlux(t *testing.T, byMeasurement map[string]string) []Sample {
 	t.Helper()
-	samples, err := Flux{}.Collect(t.Context(), fluxMock(t, byMeasurement))
+	f := Flux{now: func() time.Time { return captureInstant }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, byMeasurement))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,16 +211,21 @@ func TestFluxClusterDTFieldMappingIsDistinct(t *testing.T) {
 			dtStatus = q
 		}
 	}
+	// _time is set to a moment the fixed clock below reads as fresh: an undated
+	// row would be dropped as stale before its field mapping is ever checked.
 	rows := []fluxRow{
-		{cols: map[string]string{"_field": "total", "_value": "10"}},
-		{cols: map[string]string{"_field": "unready", "_value": "20"}},
-		{cols: map[string]string{"_field": "unknown", "_value": "30"}},
+		{cols: map[string]string{"_field": "total", "_value": "10", "_time": "2026-07-31T08:36:00Z"}},
+		{cols: map[string]string{"_field": "unready", "_value": "20", "_time": "2026-07-31T08:36:00Z"}},
+		{cols: map[string]string{"_field": "unknown", "_value": "30", "_time": "2026-07-31T08:36:00Z"}},
 	}
 	// Cluster-wide (perNode is false for this measurement), so samples never
 	// dereferences the mapper: nil stands in for "no node join needed."
-	samples, unmapped := dtStatus.samples(rows, nil)
+	samples, unmapped, stale := dtStatus.samples(rows, nil, captureInstant)
 	if unmapped != 0 {
 		t.Fatalf("unmapped = %v, want 0: dtquery_dt_status carries no host to map", unmapped)
+	}
+	if stale != 0 {
+		t.Fatalf("stale = %v, want 0: every row is dated fresh relative to captureInstant", stale)
 	}
 	mustSample(t, samples, "ecs_cluster_dt_total", 10)
 	mustSample(t, samples, "ecs_cluster_dt_unready", 20)
@@ -250,7 +261,8 @@ func TestFluxCollectFailsOnEndpointError(t *testing.T) {
 	// An unreachable or unauthorized endpoint degrades this collector alone:
 	// returning an error is what drives ecs_collector_up{collector="flux"}=0.
 	c := mockClient(t)
-	if _, err := (Flux{}).Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, fail: true}); err == nil {
+	f := Flux{now: func() time.Time { return captureInstant }}
+	if _, err := f.Collect(t.Context(), &fluxClient{Client: c, bodies: nil, t: t, fail: true}); err == nil {
 		t.Error("Collect must return an error when the Flux endpoint rejects the query")
 	}
 }
@@ -282,4 +294,18 @@ func TestFluxCountsUnmappedHosts(t *testing.T) {
 func TestFluxCollectEmitsZeroUnmappedOnSuccess(t *testing.T) {
 	samples := collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
 	mustSample(t, samples, "ecs_collector_unmapped_nodes", 0, Label{"collector", "flux"})
+}
+
+func TestFluxDropsStaleFixtureRows(t *testing.T) {
+	// The same fixture, read an hour later: every row is older than fluxMaxAge,
+	// so the collector must publish nothing rather than an hour-old CPU reading
+	// that Prometheus will stamp as current.
+	f := Flux{now: func() time.Time { return captureInstant.Add(time.Hour) }}
+	samples, err := f.Collect(t.Context(), fluxMock(t, map[string]string{"cpu": "flux_cpu.json"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findSample(samples, "ecs_node_cpu_utilization_percent"); ok {
+		t.Error("an hour-old point was published as a live gauge")
+	}
 }
