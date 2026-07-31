@@ -306,7 +306,7 @@ This is the part that makes the page worth reading, and it must not be compresse
 
 This exporter never guesses a value. If ObjectScale returns a payload shaped differently from what a collector expects, the result is a *missing* metric, not a wrong one. That is the opposite of what someone expects coming from exporters that emit zeros on failure, and it is the most likely reason a reader arrives here: a panel is empty and nothing in the logs says why.
 
-The trace is what distinguishes the two cases that look identical from outside — the cluster genuinely does not report that field, versus the exporter could not read what it sent. Note that this is not hypothetical: it is how the live-cluster evidence behind [ADR-0008](../adr/0008-swagger-4.2-validation-findings.md) was produced.
+The trace is what distinguishes the two cases that look identical from outside — the cluster genuinely does not report that field, versus the exporter could not read what it sent. Note that this is not hypothetical: it is how the live-cluster evidence behind ADR-0008 was produced. Link it as `../adr/0008-swagger-4.2-validation-findings.md`.
 
 - [ ] **Step 3: Write the symptom-first section**
 
@@ -418,9 +418,11 @@ Open by saying what these records are: decisions with lasting consequences, writ
 
 Then the part that earns a sysadmin's attention — a short "start here if you are running this" list, because three of them explain behaviour that otherwise looks like a bug:
 
-- **[ADR-0007](0007-obs-4-1-api-alignment.md)** — why a metric is absent rather than zero when a cluster does not report it.
-- **[ADR-0004](0004-token-auth-retry-policy.md)** — why the exporter logs out of every cluster on shutdown. ObjectScale caps auth tokens per user, and leaking sessions eventually locks the account out.
-- **[ADR-0011](0011-flux-collector-for-unreachable-metrics.md)** — why the Flux collector exists and why it is opt-in.
+- **ADR-0007** (`0007-obs-4-1-api-alignment.md`) — why a metric is absent rather than zero when a cluster does not report it.
+- **ADR-0004** (`0004-token-auth-retry-policy.md`) — why the exporter logs out of every cluster on shutdown. ObjectScale caps auth tokens per user, and leaking sessions eventually locks the account out.
+- **ADR-0011** (`0011-flux-collector-for-unreachable-metrics.md`) — why the Flux collector exists and why it is opt-in.
+
+Write these as real markdown links in `adr/index.md`; the filenames are siblings there, so a bare filename resolves.
 
 Keep the full table below that, unchanged in content.
 
