@@ -923,6 +923,55 @@ func TestFluxNilSilentAlwaysWarns(t *testing.T) {
 	}
 }
 
+// TestFluxScriptsMatchesTheRealTable proves FluxScripts replays fluxQueries
+// itself rather than a hand-written copy: a capture of queries the exporter
+// does not issue proves nothing about the ones it does. Every entry is keyed
+// bucket/measurement and its script carries the bucket, the measurement, the
+// range, and the trailing |> last() that makes it a single-point read.
+func TestFluxScriptsMatchesTheRealTable(t *testing.T) {
+	got := FluxScripts()
+	if len(got) != len(fluxQueries) {
+		t.Fatalf("FluxScripts returned %d entries, want %d (one per fluxQueries entry)", len(got), len(fluxQueries))
+	}
+	for _, q := range fluxQueries {
+		key := q.bucket + "/" + q.measurement
+		script, ok := got[key]
+		if !ok {
+			t.Fatalf("FluxScripts missing key %q", key)
+		}
+		for _, want := range []string{
+			fmt.Sprintf("bucket:%q", q.bucket),
+			fmt.Sprintf("r._measurement == %q", q.measurement),
+			fmt.Sprintf("range(start: %s)", fluxRange),
+			"|> last()",
+		} {
+			if !strings.Contains(script, want) {
+				t.Errorf("%s: script missing %q:\n%s", key, want, script)
+			}
+		}
+		// FluxScripts must render exactly what the collector itself would send.
+		if script != q.script() {
+			t.Errorf("%s: FluxScripts diverged from q.script()", key)
+		}
+	}
+}
+
+// TestFluxScriptForRendersTheSameShape covers the free-form probing path
+// (--bucket/--measurement), which builds a fluxQuery the table does not carry.
+func TestFluxScriptForRendersTheSameShape(t *testing.T) {
+	script := FluxScriptFor("monitoring_vdc", "cq_performance_transaction")
+	for _, want := range []string{
+		`bucket:"monitoring_vdc"`,
+		`r._measurement == "cq_performance_transaction"`,
+		fmt.Sprintf("range(start: %s)", fluxRange),
+		"|> last()",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("FluxScriptFor script missing %q:\n%s", want, script)
+		}
+	}
+}
+
 func TestFluxSilentMeasurementReannouncesAfterAnswering(t *testing.T) {
 	// A measurement that starts answering again is forgotten, so a later
 	// disappearance must warn afresh rather than staying silenced forever. This

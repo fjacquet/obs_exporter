@@ -40,6 +40,7 @@ func main() {
 	root.Flags().BoolVar(&once, "once", false, "run a single collection cycle and exit")
 	root.Flags().BoolVar(&debug, "debug", false, "verbose logging")
 	root.Flags().BoolVar(&trace, "trace", false, "log every management API response body (live-cluster payload validation; very verbose)")
+	root.AddCommand(fluxCaptureCmd())
 	if err := root.Execute(); err != nil {
 		log.Fatal(err)
 	}

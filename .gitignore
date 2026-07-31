@@ -27,6 +27,10 @@ site/
 .DS_Store
 Thumbs.db
 
+# flux-capture's default output directory. Its files are raw Flux responses
+# carrying real cluster hostnames, IPs and namespace names — never commit them.
+/flux-capture/
+
 # Local tooling state
 .rtk/
 
