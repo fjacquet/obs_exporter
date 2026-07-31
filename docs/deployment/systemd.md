@@ -22,7 +22,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now obs_exporter
 ```
 
-Set `logName: ""` in `config.yaml` so logs go to the journal.
+The exporter logs to standard error and never to a file, so systemd captures
+everything it says into the journal with nothing to configure.
 
 ## Operate
 

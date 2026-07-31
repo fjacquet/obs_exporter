@@ -38,7 +38,9 @@ fields it recognised, and published them.
 This is the opposite of what you get from exporters that emit a zero when a read
 fails, and it is the most likely reason you are reading this page: a panel is
 blank, `ecs_up` is 1, every `ecs_collector_up` is 1, and nothing in the logs
-explains the gap.
+explains the gap. [Absent, never zero](../metrics/reading.md#absent-never-zero)
+makes the same point from the other end — what an empty panel means when you are
+reading dashboards rather than debugging one.
 
 When that happens there are exactly two possibilities, and from outside the
 exporter they look identical:

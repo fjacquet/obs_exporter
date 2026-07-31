@@ -31,7 +31,7 @@ nav:
       - Reading the metrics: metrics/reading.md
       - Reference: metrics/index.md
       - The Flux collector: metrics/flux.md
-  - Deployment:
+  - Deploy:
       - Docker: deployment/docker.md
       - Kubernetes: deployment/kubernetes.md
       - systemd: deployment/systemd.md
