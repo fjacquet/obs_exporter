@@ -11,8 +11,9 @@ Prometheus + OTLP exporter for **Dell EMC ECS / ObjectScale** object-storage
 clusters. One process polls every cluster you configure on a fixed interval and
 serves the latest snapshot at `/metrics`, so a scrape never reaches the
 management API: load on the cluster follows your collection interval, not the
-number of Prometheus servers scraping the exporter. An optional OTLP gRPC push
-reads the same snapshot.
+number of Prometheus servers scraping the exporter. It also serves a `/health`
+JSON endpoint reporting per-cluster status, and an optional OTLP gRPC push reads
+the same snapshot.
 
 > **Coming from v1 (`prometheus-emcecs-exporter`), or from v2?** Each of those
 > steps renames metrics. [Upgrading](docs/operate/upgrading.md) says which guide
@@ -24,9 +25,9 @@ Built against the ObjectScale **4.1.0.0** management REST API. The dashboard
 endpoints and fields it reads are verified unchanged through **4.3**, and the
 surface is backward compatible with the ECS **3.x** dashboards that 4.1 extends.
 
-It needs one management account with monitoring (read) rights and network access
-from the exporter host to the management port, 4443 by default. Nothing it does
-writes to the cluster, and one process covers as many clusters as you list.
+It needs one management account with read rights, reaching the management port —
+4443 by default. Nothing it does writes to the cluster, and one process covers as
+many clusters as you list.
 
 ## What it exports
 
@@ -40,7 +41,7 @@ writes to the cluster, and one process covers as many clusters as you list.
   backlog, from one bulk billing call per cycle rather than one call per
   namespace.
 - **The exporter itself** — whether each cluster and each collector succeeded on
-  the last cycle, build information, and a `/health` JSON endpoint.
+  the last cycle, and build information.
 - **Two opt-in collectors** — `collectDT` reads legacy node-local directory-table
   and connection stats; `collectFlux` reads per-node CPU, memory, network and
   request counters from the cluster's own monitoring store, over the same

@@ -18,8 +18,9 @@ chart is stored in a container registry, in the same way a container image is,
 rather than in a chart repository you had to register beforehand.
 
 The chart source is in `charts/obs-exporter/` if you prefer to install from a
-checkout. One thing to know if you do: the `version` and `appVersion` committed
-there are placeholders for local installs and do not track releases — the real
+checkout. One thing to know if you do: the two version numbers committed there —
+the chart's own `version` and the `appVersion` recording which exporter release
+it deploys — are placeholders for local installs and do not track releases. The real
 numbers are stamped in when a tag is published. A local install therefore
 reports a chart version that means nothing, so pull the published chart whenever
 the version matters to you.
@@ -139,8 +140,7 @@ long as the process is up and serving, which is what liveness is supposed to
 mean.
 
 So use `/metrics` for liveness and `/health` for readiness. The chart ships with
-both probes pointing at `/health`, so on a multi-cluster deployment override the
-liveness one:
+both probes pointing at `/health`, so override the liveness one:
 
 ```yaml
 livenessProbe:
