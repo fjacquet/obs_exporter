@@ -780,8 +780,11 @@ func (h *silenceHook) Fire(e *log.Entry) error {
 	return nil
 }
 
-// withSilenceHook installs a silenceHook on the shared standard logger for
-// the duration of the test and returns it.
+// installLogHook installs h on the shared standard logger for the duration of
+// the test and restores the prior state afterward. Factored out of
+// withSilenceHook so a second, differently-shaped hook (entryCaptureHook,
+// below) can reuse the same install/restore discipline instead of duplicating
+// it.
 //
 // Two things a naive install-and-defer-cleanup would get wrong:
 //
@@ -795,18 +798,88 @@ func (h *silenceHook) Fire(e *log.Entry) error {
 //     pattern to copy. ReplaceHooks both installs and returns the displaced
 //     value, so the prior hooks are saved and restored exactly, and the prior
 //     level is restored the same way.
-func withSilenceHook(t *testing.T) *silenceHook {
+func installLogHook(t *testing.T, h log.Hook) {
 	t.Helper()
 	prevLevel := log.GetLevel()
 	log.SetLevel(log.DebugLevel)
 	t.Cleanup(func() { log.SetLevel(prevLevel) })
 
-	var hook silenceHook
 	prevHooks := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
-	log.AddHook(&hook)
+	log.AddHook(h)
 	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(prevHooks) })
+}
 
+// withSilenceHook installs a silenceHook on the shared standard logger for
+// the duration of the test and returns it.
+func withSilenceHook(t *testing.T) *silenceHook {
+	t.Helper()
+	var hook silenceHook
+	installLogHook(t, &hook)
 	return &hook
+}
+
+// entryCaptureHook records every log entry fired while installed, fields and
+// all, so a test can assert on specific field values rather than merely
+// counting occurrences of a message substring (contrast silenceHook, above).
+type entryCaptureHook struct {
+	entries []log.Entry
+}
+
+func (h *entryCaptureHook) Levels() []log.Level { return log.AllLevels }
+
+func (h *entryCaptureHook) Fire(e *log.Entry) error {
+	// e.Data is the same map instance across the entry's lifetime; a later
+	// WithFields call elsewhere builds a new Entry rather than mutating this
+	// one, but the map is still copied defensively so this hook's stored
+	// snapshot can never be altered by anything else.
+	data := make(log.Fields, len(e.Data))
+	for k, v := range e.Data {
+		data[k] = v
+	}
+	h.entries = append(h.entries, log.Entry{Message: e.Message, Level: e.Level, Data: data})
+	return nil
+}
+
+// TestFluxDebugLine proves the per-measurement accounting line Collect emits
+// after mapping a measurement's rows -- rows read, samples emitted, rows
+// dropped unmapped, rows dropped stale. Without it, --trace's per-request log
+// line (attributed to a measurement by Task 9's other half, in
+// internal/ecsclient) has no matching per-measurement summary to correlate
+// against, and `stale` in particular has had nothing consuming it since
+// Task 3 introduced it.
+func TestFluxDebugLine(t *testing.T) {
+	hook := &entryCaptureHook{}
+	installLogHook(t, hook)
+
+	// Derived from the fixture itself, not hardcoded, so a fixture edit cannot
+	// silently desync this test from what Collect actually read.
+	var resp fluxResp
+	if err := json.Unmarshal([]byte(fixture(t, "flux_cpu.json")), &resp); err != nil {
+		t.Fatal(err)
+	}
+	wantRows := len(resp.rows())
+
+	collectFlux(t, map[string]string{"cpu": "flux_cpu.json"})
+
+	var found *log.Entry
+	for i := range hook.entries {
+		e := &hook.entries[i]
+		if e.Message == "Flux measurement collected" && e.Data["measurement"] == "cpu" {
+			found = e
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf(`no "Flux measurement collected" entry for cpu; entries: %+v`, hook.entries)
+	}
+	for _, field := range []string{"bucket", "measurement", "rows", "samples", "unmapped", "stale"} {
+		if _, ok := found.Data[field]; !ok {
+			t.Errorf("debug entry missing field %q: %v", field, found.Data)
+		}
+	}
+	if got := found.Data["rows"]; got != wantRows {
+		t.Errorf("rows = %v, want %v (the cpu fixture's actual row count)", got, wantRows)
+	}
 }
 
 func TestFluxWarnsOncePerSilentMeasurement(t *testing.T) {

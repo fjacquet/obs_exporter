@@ -6,8 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // newTestServer builds a TLS httptest server simulating the ECS management API
@@ -216,5 +219,138 @@ func TestClientStillRetriesUnclaimedServerErrors(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&calls); got != 3 {
 		t.Errorf("issued %d requests, want 3 (initial + 2 retries)", got)
+	}
+}
+
+// entryCaptureHook records the fully formatted text of every log entry fired
+// while installed -- not just its structured fields -- so a test can assert
+// on what would actually reach the log stream. e.String() runs the entry
+// through the logger's own formatter, the same step a real log write takes.
+type entryCaptureHook struct {
+	lines []string
+	// fields mirrors each entry's Data, for tests that want to assert on one
+	// field's value directly rather than substring-search formatted text.
+	fields []log.Fields
+}
+
+func (h *entryCaptureHook) Levels() []log.Level { return log.AllLevels }
+
+func (h *entryCaptureHook) Fire(e *log.Entry) error {
+	line, err := e.String()
+	if err != nil {
+		return err
+	}
+	h.lines = append(h.lines, line)
+	data := make(log.Fields, len(e.Data))
+	for k, v := range e.Data {
+		data[k] = v
+	}
+	h.fields = append(h.fields, data)
+	return nil
+}
+
+// installLogHook installs h on the shared standard logger for the duration of
+// the test and restores the prior level and hooks afterward. logrus never
+// fires a hook for a level the logger isn't currently emitting (default
+// Info), so the level is raised for the test; ReplaceHooks both installs and
+// returns the displaced value, which is how the prior hooks -- not just this
+// one -- are restored exactly rather than wiped.
+func installLogHook(t *testing.T, h log.Hook) {
+	t.Helper()
+	prevLevel := log.GetLevel()
+	log.SetLevel(log.DebugLevel)
+	t.Cleanup(func() { log.SetLevel(prevLevel) })
+
+	prevHooks := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+	log.AddHook(h)
+	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(prevHooks) })
+}
+
+// TestTraceCarriesFluxQuery proves the trace hook attributes a Flux-shaped
+// POST to its query. Without this, --trace logs method/url/status for every
+// Flux call, and every Flux call is a POST to the same path: ten
+// indistinguishable trace blocks, unusable for validating payload shapes
+// against a live cluster.
+func TestTraceCarriesFluxQuery(t *testing.T) {
+	hook := &entryCaptureHook{}
+	installLogHook(t, hook)
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Header().Set("X-SDS-AUTH-TOKEN", "tok-flux-test")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"Series": []any{}})
+	}))
+	defer srv.Close()
+
+	c := NewClusterClient(Config{
+		Name: "test", BaseURL: srv.URL,
+		Username: "monitor", Password: "secret",
+		HTTPClient: srv.Client(),
+		Trace:      true,
+	})
+
+	// Shaped exactly as Collect calls Post (internal/ecs/flux.go): a
+	// map[string]string body carrying the Flux script under "query" -- the
+	// only shape the trace hook's type assertion recognizes.
+	const query = `from(bucket:"monitoring_op") |> range(start: -15m) |> filter(fn: (r) => r._measurement == "cpu")`
+	var out map[string]any
+	if err := c.Post(t.Context(), "/flux/api/external/v2/query", map[string]string{"query": query}, &out); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, fields := range hook.fields {
+		if fields["query"] == query {
+			return
+		}
+	}
+	t.Fatalf("no traced entry carried the Flux query %q; captured fields: %+v", query, hook.fields)
+}
+
+// TestTraceDoesNotLeakToken is the one protection worth a permanent test
+// rather than a code comment: the trace hook deliberately does not use
+// resty's SetDebug, which would dump request headers including
+// X-SDS-AUTH-TOKEN. This proves it end to end, against the entry's actual
+// formatted log output rather than just its known fields, so a change that
+// slipped the token in through the message string (e.g. Infof("...%v",
+// r.Request)) would also be caught.
+func TestTraceDoesNotLeakToken(t *testing.T) {
+	hook := &entryCaptureHook{}
+	installLogHook(t, hook)
+
+	const token = "tok-must-never-appear-in-any-log-line"
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			w.Header().Set("X-SDS-AUTH-TOKEN", token)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"name": "vdc1"})
+	}))
+	defer srv.Close()
+
+	c := NewClusterClient(Config{
+		Name: "test", BaseURL: srv.URL,
+		Username: "monitor", Password: "secret",
+		HTTPClient: srv.Client(),
+		Trace:      true,
+	})
+
+	// One call does both: logs in (skipped by the trace hook, per the "login
+	// body is uninteresting" branch) and issues a traced request that carries
+	// the token in its X-SDS-AUTH-TOKEN header.
+	var out struct {
+		Name string `json:"name"`
+	}
+	if err := c.Get(t.Context(), "/dashboard/zones/localzone", &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(hook.lines) == 0 {
+		t.Fatal("no traced entries were captured; the token-leak assertion below would pass vacuously")
+	}
+	for _, line := range hook.lines {
+		if strings.Contains(line, token) {
+			t.Errorf("traced log output leaked the auth token:\n%s", line)
+		}
 	}
 }
