@@ -10,7 +10,9 @@ this page states the current version without anyone editing it. The version of
 the binary you are actually running is in `obs_exporter_build_info{version}`.
 
 Prometheus + OTLP exporter for **Dell EMC ECS / ObjectScale** object-storage
-clusters. The metric surface was built against the ObjectScale **4.1.0.0**
+clusters — OTLP is the OpenTelemetry wire protocol, so alongside being scraped by
+Prometheus the exporter can push the same metrics to a collector that expects
+them. The metric surface was built against the ObjectScale **4.1.0.0**
 management REST API reference and is compatible with the ECS 3.x dashboard API
 it extends; where a live **4.3** cluster contradicted that reference the code
 follows the cluster, and the opt-in Flux collector targets 4.3 sources the
@@ -65,11 +67,21 @@ provisioned Grafana dashboards against a fake cluster.
 - [Install](getting-started/installation.md) — binary, container, or package
 - [Configure](getting-started/configuration.md) — the config file and every collector flag
 - [First run](getting-started/first-run.md) — the smallest working config, run in the foreground
+- [Verify & troubleshoot](operate/troubleshooting.md) — confirm a new cluster is
+  being collected, and work out why a metric you expect is not there
+- [Reading the metrics](metrics/reading.md) — gauges and counters, and why a
+  panel can be empty rather than flat at zero
 - [Metrics reference](metrics/index.md) — the full catalog
 
 Deploying it:
 
-- [Docker](deployment/docker.md) · [Kubernetes](deployment/kubernetes.md) · [systemd](deployment/systemd.md)
+- [systemd](deployment/systemd.md) · [Docker](deployment/docker.md) · [Kubernetes](deployment/kubernetes.md)
 
-Upgrading from an older major: [from v1](migration-v2.md) and
-[to v3](migration-v3.md) — both are breaking changes with old→new metric tables.
+Upgrading from an older major: [Upgrading](operate/upgrading.md) says which
+migration guide applies to the version you are on. Start there rather than in a
+rename table — the two guides are alternatives, not steps, and following both in
+sequence renames metrics twice.
+
+Why the exporter behaves the way it does — absent metrics rather than zeros,
+per-cluster degradation, the opt-in collectors — is recorded in
+[Design decisions](adr/index.md).

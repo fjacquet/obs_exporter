@@ -21,13 +21,19 @@ the same snapshot.
 
 ## Does it fit your cluster
 
-Built against the ObjectScale **4.1.0.0** management REST API. The dashboard
-endpoints and fields it reads are verified unchanged through **4.3**, and the
-surface is backward compatible with the ECS **3.x** dashboards that 4.1 extends.
+Built against the ObjectScale **4.1.0.0** management REST API reference, and
+backward compatible with the ECS **3.x** dashboards that 4.1 extends. On **4.3**
+the answer is not simply "unchanged": where a live 4.3 cluster contradicted that
+reference the code follows the cluster, and the opt-in Flux collector targets 4.3
+sources the dashboard API does not serve. The [documentation
+home](https://fjacquet.github.io/obs_exporter/) carries the current statement of
+what runs against what.
 
-It needs one management account with read rights, reaching the management port —
-4443 by default. Nothing it does writes to the cluster, and one process covers as
-many clusters as you list.
+In short, it needs one management account with read rights, reaching the
+management port — 4443 by default. Nothing it does writes to the cluster, and one
+process covers as many clusters as you list. The complete prerequisite list,
+including the extra role and the extra ports the two opt-in collectors need, is
+in [Installation](docs/getting-started/installation.md#ecs-prerequisites).
 
 ## What it exports
 
