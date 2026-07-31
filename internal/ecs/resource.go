@@ -22,7 +22,7 @@ func Registry(cl config.Cluster) []ResourceCollector {
 	rcs := []ResourceCollector{
 		Cluster{},
 		Replication{},
-		// When Flux is enabled it owns the three per-node performance names the
+		// When Flux is enabled it owns the four per-node performance names the
 		// dashboard payloads no longer carry on 4.3. Deciding here, once, keeps a
 		// single answer to "who emits this name" and makes it true before any
 		// request is issued.

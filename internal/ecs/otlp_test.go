@@ -130,3 +130,51 @@ func TestOTLPExporterRegistersCounters(t *testing.T) {
 		t.Errorf("cpu_utilization registered as %q, want gauge", kinds["ecs_node_cpu_utilization_percent"])
 	}
 }
+
+// TestOTLPExporterCarriesLeAttribute is the OTLP mirror of
+// TestPromCollectorAcceptsLeAsVariableLabel: a histogram bucket sample's le
+// label must survive as an ordinary attribute on the counter data point.
+func TestOTLPExporterCarriesLeAttribute(t *testing.T) {
+	store := NewSnapshotStore()
+	store.Store(&Snapshot{Clusters: []*ClusterSnapshot{{
+		Cluster: "c1",
+		Samples: []Sample{
+			{
+				Name:   "ecs_node_transaction_latency_milliseconds_bucket",
+				Labels: []Label{{"node", "n1"}, {"op", "read"}, {"le", "+Inf"}},
+				Value:  5, Type: Counter,
+			},
+		},
+	}}})
+
+	reader := sdkmetric.NewManualReader()
+	exp := newOTLPExporter(reader, store, "test")
+	if err := exp.EnsureInstruments(); err != nil {
+		t.Fatal(err)
+	}
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &rm); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "ecs_node_transaction_latency_milliseconds_bucket" {
+				continue
+			}
+			sum, ok := m.Data.(metricdata.Sum[float64])
+			if !ok {
+				t.Fatalf("bucket registered as %T, want Sum[float64]", m.Data)
+			}
+			for _, dp := range sum.DataPoints {
+				if v, ok := dp.Attributes.Value(attribute.Key("le")); ok && v.AsString() == "+Inf" {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Error("le attribute missing from the bucket data point")
+	}
+}

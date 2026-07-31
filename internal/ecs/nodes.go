@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
@@ -39,7 +40,7 @@ type nodeInstance struct {
 }
 
 // Nodes collects per-node health, capacity, utilization, and transaction stats
-// from the dashboard API. FluxOwnsPerf suppresses the three names the Flux
+// from the dashboard API. FluxOwnsPerf suppresses the four names the Flux
 // collector takes over, so exactly one source emits each per cycle (ADR-0006).
 type Nodes struct{ FluxOwnsPerf bool }
 
@@ -95,7 +96,18 @@ func (nc Nodes) Collect(ctx context.Context, c ecsclient.Client) ([]Sample, erro
 		out = appendSeries(out, "ecs_node_nic_bandwidth", n.NodeNicTransmittedBandwidth, node, Label{"direction", "transmitted"})
 		out = appendSeries(out, "ecs_node_nic_utilization_percent", n.NodeNicUtilization, node)
 
-		out = append(out, n.transactionFields.samples("ecs_node", node)...)
+		tx := n.transactionFields.samples("ecs_node", node)
+		if nc.FluxOwnsPerf {
+			// Flux serves this family as a histogram, and Prometheus reads
+			// ecs_node_transaction_latency_milliseconds_bucket as belonging to a
+			// histogram of that name — so the gauge and the histogram cannot both
+			// hold it (ADR-0006). The bandwidth and TPS names have no Flux
+			// equivalent and stay here.
+			tx = slices.DeleteFunc(tx, func(s Sample) bool {
+				return s.Name == "ecs_node_transaction_latency_milliseconds"
+			})
+		}
+		out = append(out, tx...)
 	}
 	return out, nil
 }
