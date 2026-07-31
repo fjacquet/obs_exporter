@@ -30,14 +30,13 @@ nav:
   - Metrics:
       - Reference: metrics/index.md
       - The Flux collector: metrics/flux.md
-  - Migrating from v1: migration-v2.md
-  - Migrating to v3: migration-v3.md
   - Deployment:
       - Docker: deployment/docker.md
       - Kubernetes: deployment/kubernetes.md
       - systemd: deployment/systemd.md
   - Operate:
       - Verify & troubleshoot: operate/troubleshooting.md
+      - Upgrading: operate/upgrading.md
   - Architecture decisions:
       - Overview: adr/index.md
       - 0001 Supply-chain hardening: adr/0001-ci-supply-chain-hardening.md
