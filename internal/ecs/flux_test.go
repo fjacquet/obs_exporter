@@ -188,6 +188,39 @@ func TestFluxCollectClusterScopedDT(t *testing.T) {
 	}
 }
 
+// TestFluxClusterDTFieldMappingIsDistinct covers the same measurement as
+// TestFluxCollectClusterScopedDT above, from a different angle. The real
+// capture behind flux_dt_status.json happens to be a healthy cluster: unready
+// and unknown are both genuinely 0, which is exactly what that test needs to
+// prove a real zero survives as a present sample rather than being dropped
+// (ADR-0007, absent-never-zero). But two zeros can't also prove the fields
+// land on the right names — a bug that swapped the unready/unknown mapping,
+// or mixed total into either, would pass that test silently. This test
+// hand-builds three distinct field values instead of reading a fixture, so
+// such a mix-up fails here even though the live data can't exercise it.
+func TestFluxClusterDTFieldMappingIsDistinct(t *testing.T) {
+	var dtStatus fluxQuery
+	for _, q := range fluxQueries {
+		if q.measurement == "dtquery_dt_status" {
+			dtStatus = q
+		}
+	}
+	rows := []fluxRow{
+		{cols: map[string]string{"_field": "total", "_value": "10"}},
+		{cols: map[string]string{"_field": "unready", "_value": "20"}},
+		{cols: map[string]string{"_field": "unknown", "_value": "30"}},
+	}
+	// Cluster-wide (perNode is false for this measurement), so samples never
+	// dereferences the mapper: nil stands in for "no node join needed."
+	samples, unmapped := dtStatus.samples(rows, nil)
+	if unmapped != 0 {
+		t.Fatalf("unmapped = %v, want 0: dtquery_dt_status carries no host to map", unmapped)
+	}
+	mustSample(t, samples, "ecs_cluster_dt_total", 10)
+	mustSample(t, samples, "ecs_cluster_dt_unready", 20)
+	mustSample(t, samples, "ecs_cluster_dt_unknown", 30)
+}
+
 func TestFluxQueryScriptShape(t *testing.T) {
 	var cpu fluxQuery
 	for _, q := range fluxQueries {
