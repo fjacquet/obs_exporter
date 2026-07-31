@@ -90,6 +90,27 @@ operation; the other three exist for the work on this page.
 `--debug` and `--trace` are independent of each other and of `--once`. Each one
 is described below with what it is actually good for.
 
+Every example on this page invokes a local binary, because that is the shortest
+form. If your exporter runs as a container, run a second throwaway one with the
+same config mounted and put the flags after the image name — the image's
+entrypoint is the exporter itself, so anything you pass is appended to its
+command line:
+
+```bash
+docker run --rm -v /etc/obs_exporter/config.yaml:/etc/obs_exporter/config.yaml:ro \
+  ghcr.io/fjacquet/obs_exporter:latest \
+  --config /etc/obs_exporter/config.yaml --once --debug
+```
+
+That is safe to do while the real one is running: `--once` binds no port, so the
+two do not collide. Put redirections such as `2>trace.log` on the `docker run`
+command rather than trying to write inside the container — the container's output
+is the host command's output, so the file lands on the host where you can read
+it, and the image is a distroless one running as a non-root user with nowhere
+writable to put it anyway. Every later example on this page substitutes the same
+way: replace `obs_exporter` with the `docker run …` prefix above and keep the
+flags.
+
 ### `--once` — does the cluster answer at all
 
 ```bash
@@ -153,13 +174,14 @@ combined run below relies on.
 ### `--trace` — see what the cluster actually returned
 
 ```bash
-obs_exporter --config config.yaml --once --trace
+obs_exporter --config config.yaml --once --trace 2>trace.log
 ```
 
 `--trace` logs the full response body of every management API call the exporter
 makes, with the cluster name, the HTTP method, the URL and the status code. It
 is the only way to see the raw payload, and therefore the only way to settle the
-two-possibilities question above.
+two-possibilities question above. Send it to a file — it is far too much output
+to read as it scrolls past, and every recipe below greps `trace.log`.
 
 Two things to know before you run it against production:
 
@@ -171,9 +193,14 @@ is skipped entirely: it is the one call whose result is a credential, and there
 is nothing else in it worth reading.
 
 **Everything else in the payload is real.** Node names, management and data IP
-addresses, namespace names, capacity figures, your cluster's topology. The trace
-is safe to log; it is not automatically safe to share. See [sharing a
-trace](#sharing-a-trace-safely) before you attach one to anything.
+addresses, namespace names, capacity figures, your cluster's topology. No
+credential is ever in there, but that is the only guarantee: everything that
+describes your estate is. Bear in mind where the output ends up — run under
+systemd or a container runtime it goes to the journal, and on most sites the
+journal ships to a central log aggregator that a much wider audience can read
+than you intended when you turned the flag on. Redirecting to a file, as above,
+keeps it on the one host. See [sharing a trace](#sharing-a-trace-safely) before
+it goes anywhere further.
 
 The output is verbose — one full JSON body per API call, several calls per
 collector, every cycle. Pair it with `--once` so it stops after a single pass.
@@ -407,14 +434,24 @@ which explains when disabling it costs you nothing.
 node, or the measurement returned no rows at all. These have different causes and
 one metric tells them apart.
 
-**What to run.** Check the housekeeping counter first:
+**What to run.** Check the housekeeping counter first. Look it up wherever you
+normally query — the Prometheus expression browser or a Grafana panel — asking
+for this:
 
 ```promql
 ecs_collector_unmapped_nodes{collector="flux"}
 ```
 
-It is published every cycle, including as `0`, so a flat zero genuinely means
-"the mapping is working" rather than "the metric is missing".
+If you would rather not leave the shell, the same value is in a single-cycle run,
+in the sample dump `--debug` produces:
+
+```bash
+obs_exporter --config config.yaml --once --debug | grep ecs_collector_unmapped_nodes
+```
+
+Either way you get one number per cluster. It is published every cycle,
+including as `0`, so a flat zero genuinely means "the mapping is working" rather
+than "the metric is missing".
 
 **Above zero** means the monitoring store reported rows for hosts that matched no
 node in the `/vdc/nodes` inventory. Those rows were dropped rather than attached

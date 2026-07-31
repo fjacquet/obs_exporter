@@ -26,8 +26,12 @@ released. If you see it referenced, it means 3.2.0.)
 
 For what changed in one specific release, read the
 [CHANGELOG](https://github.com/fjacquet/obs_exporter/blob/main/CHANGELOG.md). It
-records added, changed, fixed and removed metrics per version, and it states at
-the top of each entry whether the release is breaking.
+records added, changed, fixed and removed metrics per version, and it marks
+breaking changes **in the section headings** — `Removed — BREAKING`,
+`Changed — BREAKING`. Read the headings rather than the opening line: some
+entries begin with a sentence saying whether the release is breaking and some go
+straight into their sections, so an entry with nothing at the top is not an entry
+with nothing to worry about.
 
 ## The order to do a major upgrade in
 
@@ -88,13 +92,21 @@ Historical data is not rewritten either. Series recorded under an old name stay
 in Prometheus under that name, queryable for as long as your retention keeps
 them; they simply stop gaining new samples. A dashboard switched to the new
 names starts its history at the upgrade. If you need one important panel to draw
-a continuous line across the cutover, ask for both names in one query and let
-Prometheus fall back to whichever has data — `or` returns the series on its left
-wherever they exist and the ones on its right only where the left side is empty:
+a continuous line across the cutover, ask for both names in one query. `or`
+returns everything on its left, plus anything on its right that does not already
+appear on the left — which is what fills the gap, since only one of the two names
+has data at any given moment.
+
+The catch is that "already appears on the left" is decided by comparing the whole
+label set, metric name included. The old and new names differ in both — `state`
+exists only on the new one — so writing them side by side gives you two
+differently-labelled series and two broken half-lines, not one continuous one.
+Reduce both sides to the same shape first:
 
 ```promql
-ecs_cluster_disks{state="good"} or ecs_cluster_good_disks
+sum by (cluster) (ecs_cluster_disks{state="good"}) or sum by (cluster) (ecs_cluster_good_disks)
 ```
 
-That is worth doing for a long-run capacity trend and rarely worth it for
-anything else; most panels are fine starting fresh.
+Now both halves are labelled `{cluster="…"}` and nothing else, so Grafana joins
+them into a single line. That is worth doing for a long-run capacity trend and
+rarely worth it for anything else; most panels are fine starting fresh.
