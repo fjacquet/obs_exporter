@@ -6,7 +6,7 @@
 never answer non-200, in every repo in the exporter family, not just
 obs_exporter. `/livez`/`/readyz` already solved the probe-coupling problem
 where they exist; this closes the same gap for anything that scrapes
-`/health` directly (dashboards, curl, manual checks) and, for the 6 repos
+`/health` directly (dashboards, curl, manual checks) and, for the 7 repos
 that never got the ADR-0013 treatment, adds `/livez`/`/readyz` at the same
 time.
 
@@ -20,11 +20,15 @@ down at exactly the moment its data is most needed.
 
 ## Scope — 8 repos, 3 buckets (verified against each repo, not assumed)
 
+Corrected 2026-08-01 after per-repo verification: ppdd_exporter and
+ppdm_exporter already have JSON bodies (bucket B), not plain text. Bucket C
+is 4 repos, not 6.
+
 | Bucket | Repos | Current state |
 |---|---|---|
 | A — probes done, /health still 503s | obs_exporter | `/livez` `/readyz` → `staticOKHandler` (`main.go:149-150`, ADR-0013). `/health` (`main.go:292-316`) still writes `http.StatusServiceUnavailable` when `len(snap.Clusters)==0` or any cluster's `OK` is false. |
-| B — JSON body already, no probes | pmax_exporter | Only `/health` exists (`main.go:86`, handler `main.go:204-227`). Same JSON shape as obs_exporter (`built_at`, `servers: [{server, ok, last_scrape, err}]`). 503 via `main.go:225` on `healthy==false` (`main.go:216`). No `/livez`/`/readyz` at all. |
-| C — text-only, no probes | nbu_exporter, pflex_exporter, ppdd_exporter, ppdm_exporter, pscale_exporter, pstore_exporter | `/health` returns plain text, no `/livez`/`/readyz`. nbu_exporter's handler additionally makes a **live** `TestConnectivity` network call inline instead of reading cached state — the same anti-pattern ADR-0013 ruled out for probes, present here on the informational endpoint too. |
+| B — JSON body already, no probes | pmax_exporter, ppdd_exporter, ppdm_exporter | pmax_exporter: `/health` (`main.go:86`, handler `main.go:204-227`) — `built_at`, `servers: [{server, ok, last_scrape, err}]`, 503 via `main.go:225`. ppdd_exporter: `/health` (`main.go:121-123` wrapper → `healthHandler`, `main.go:234-256`) — `built_at`, `systems: [{system, ok, last_scrape, err}]`, 503 via `main.go:254`. ppdm_exporter: `/health` (`main.go:86` wrapper → `healthHandler`, `main.go:197-219`) — `built_at`, `servers: [{server, ok, last_scrape, err}]`, 503 via `main.go:218`. None of the three has `/livez`/`/readyz`. |
+| C — text-only, no probes | nbu_exporter, pflex_exporter, pscale_exporter, pstore_exporter | `/health` returns plain text (`"OK"`/`"OK (starting)"`/`"UNHEALTHY: ..."`), no `/livez`/`/readyz`. nbu_exporter's handler (`main.go:459-483`) additionally makes a **live** `TestConnectivity` network call inline (`main.go:469`) instead of reading cached state — the same anti-pattern ADR-0013 ruled out for probes, present here on the informational endpoint too. |
 
 ## Architecture
 
@@ -56,14 +60,14 @@ Smallest diff. Delete the `if !healthy { w.WriteHeader(...) }` block in
 `healthHandler` (`main.go:312-314`). JSON shape untouched. `/livez`/`/readyz`
 untouched (already correct).
 
-### Bucket B (pmax_exporter)
+### Bucket B (pmax_exporter, ppdd_exporter, ppdm_exporter)
 
-Two changes: add `staticOKHandler` + register `/livez`/`/readyz` (net-new,
-copy obs_exporter's verbatim), and drop the 503 branch in the existing
-`healthHandler` (`main.go:204-227`) the same way as bucket A. JSON shape
-(`servers` noun) untouched.
+Two changes per repo: add `staticOKHandler` + register `/livez`/`/readyz`
+(net-new, copy obs_exporter's verbatim), and drop the 503 branch in the
+existing `healthHandler` the same way as bucket A. JSON shape (`servers`
+noun for pmax/ppdm, `systems` for ppdd) untouched.
 
-### Bucket C (nbu, pflex, ppdd, ppdm, pscale, pstore)
+### Bucket C (nbu, pflex, pscale, pstore)
 
 Three changes per repo:
 
@@ -78,14 +82,14 @@ Three changes per repo:
    ```json
    {"built_at": "...", "<noun>": [{"<singular>": "...", "ok": true, "last_scrape": "...", "err": ""}]}
    ```
-3. Always 200 — same as bucket A/B, just never had a 503 branch to remove in
-   some cases (confirm per-repo during implementation; some may already lack
-   one despite returning text).
+3. Always 200 — drop the existing 503 branch (verified present in all four:
+   `nbu_exporter/main.go:475`, `pflex_exporter/main.go:395`,
+   `pscale_exporter/main.go:350`, `pstore_exporter/main.go:401`).
 
 **nbu_exporter extra fix:** the current handler calls `TestConnectivity`
-live against the target on every `/health` hit. Replace with a read from
-the cached snapshot store (`s.store.Load().Sites`), matching every other
-repo's pattern. A status endpoint must be O(1) and side-effect-free; a live
+live against the target on every `/health` hit (`main.go:469`). Replace with
+a read from the cached snapshot store (`s.store.Load().Sites`), matching
+every other repo's pattern. A status endpoint must be O(1) and side-effect-free; a live
 network call on every hit is the ADR-0013 mistake recurring on `/health`
 itself.
 
