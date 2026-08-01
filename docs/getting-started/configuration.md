@@ -18,6 +18,14 @@ otlp:
   insecure: true    # plaintext gRPC (use false + TLS in production)
   interval: "10s"   # push cadence
 
+# Optional custom labels stamped onto every exported sample, ecs_up included.
+# The top-level block declares the KEYS with their default values; a cluster
+# may override a VALUE but never introduce a key. See "Custom labels" below.
+# labels:
+#   env: prod
+#   site: geneva
+#   owner: ${TEAM_NAME}
+
 clusters:
   - name: ecs-prod-01            # the `cluster` label value (defaults to host)
     host: ecs01.example.com
@@ -32,6 +40,8 @@ clusters:
     collectFlux: false           # opt-in Flux monitoring-store queries (needs SYSTEM_MONITOR)
     # objPort: 9021              # only used by collectDT
     # dtPort: 9101               # only used by collectDT
+    # labels:
+    #   site: zurich              # overrides the global value for this cluster only
 ```
 
 ## Secrets
@@ -138,6 +148,59 @@ the exporter correctly emitted zero quota samples for 55 requests. Set
 `collectQuotas: false` there: usage, objects and MPU metrics are unaffected, and
 only `ecs_namespace_quota_hard_bytes` / `_soft_bytes` disappear — which were
 already absent.
+
+## Custom labels
+
+```yaml
+# Optional custom labels stamped onto every exported sample, ecs_up included.
+# The top-level block declares the KEYS with their default values; a cluster may
+# override a VALUE but never introduce a key, so every series carries the same
+# label-key set. Values accept ${ENV_VAR} interpolation.
+labels:
+  env: prod
+  site: geneva
+  owner: ${TEAM_NAME}
+clusters:
+  - name: obs-prod-01
+    # ...
+    labels:
+      site: zurich    # overrides the global value for this cluster only
+```
+
+Prometheus target relabeling cannot do this job: one exporter process serves
+many clusters behind a single scrape target, so any label a relabeling rule
+attaches applies to every series from every cluster alike. Only the exporter
+itself knows which cluster produced a given sample, so per-cluster label
+values have to be assigned inside it.
+
+The split is deliberate and mirrors ADR-0006's label-key invariant — a metric
+name carries exactly one ordered label-key set across all its series. The
+top-level `labels:` block is where the **keys** live, each with a default
+value; a cluster's own `labels:` block may only override a declared key's
+**value**. An undeclared key in a cluster block is a config-load error, and a
+key resolving to an empty value is rejected the same way — both by
+construction, not by a completion pass, so the key set stays uniform across
+every cluster the process serves. Keys must match `[a-zA-Z_][a-zA-Z0-9_]*` and
+may not start with `__`; values accept `${ENV_VAR}` interpolation exactly like
+`host`, `username` and `password` do.
+
+Labels are stamped onto **every** sample, including `ecs_up` and
+`ecs_collector_up`, by the same collection-loop choke point that already
+stamps the `cluster` identity label — so an `env` or `site` label is never
+missing from one metric while present on another.
+
+If a custom key collides with a name a collector already uses as its own
+label (for example a collector that has its own `env` dimension), the custom
+key is dropped for that metric family and the exporter logs it once per key
+per cluster:
+
+```text
+WARN[0000] custom label collides with collector dimension, dropped  cluster=ecs-prod-01 label=env
+```
+
+The collector's own dimension always wins; the collision is uniform per
+metric name, so it never produces a mixed series schema for that name. See
+[ADR-0014](../adr/0014-custom-labels.md) for the full decision record.
 
 ## Prometheus scrape config
 

@@ -12,6 +12,12 @@ and alerting syntax belong to Prometheus and change with Prometheus; the
 upstream documentation will always be better than anything kept here. What
 follows is only the part that is specific to reading *this* exporter.
 
+If the config sets a top-level `labels:` block, every metric documented on
+this page — and every metric this exporter serves, `ecs_up` included — may
+carry those operator-defined labels (site, environment, ownership, whatever
+was configured) in addition to the dimensions documented here. See
+[Configuration](../getting-started/configuration.md#custom-labels).
+
 ## Gauges and counters
 
 Almost every metric this exporter publishes is a **gauge**: a reading taken at a

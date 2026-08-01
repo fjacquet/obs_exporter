@@ -100,6 +100,12 @@ config: |
     endpoint: ""
     insecure: false
     interval: "10s"
+  # Optional custom labels stamped onto every exported sample, ecs_up included.
+  # The top-level block declares the KEYS with their default values; a cluster
+  # may override a VALUE but never introduce a key.
+  # labels:
+  #   env: prod
+  #   site: geneva
   clusters:
     - name: obs-prod-01
       host: "OBS1_HOSTNAME"
@@ -109,6 +115,8 @@ config: |
       # collectMetering: false
       # collectDT: true
       # collectFlux: true   # needs SYSTEM_MONITOR; no extra network access
+      # labels:
+      #   site: zurich   # overrides the global value for this cluster only
 
 env: []
 # - name: OBS1_HOSTNAME

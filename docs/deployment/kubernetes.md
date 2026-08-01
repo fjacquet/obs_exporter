@@ -41,6 +41,9 @@ config: |
     port: "9438"
   collection:
     interval: "5m"
+  # labels:
+  #   env: prod
+  #   site: geneva
   clusters:
     - name: obs-prod-01
       host: "OBS1_HOSTNAME"
@@ -48,6 +51,8 @@ config: |
       password: "OBS1_PASSWORD"
       # collectDT: true
       # collectFlux: true
+      # labels:
+      #   site: zurich
 ```
 
 That design has a consequence worth knowing before you go hunting for a chart
