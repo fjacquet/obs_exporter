@@ -43,11 +43,54 @@ func (s Sample) LabelValue(key string) string {
 // WithCluster returns a copy with a leading {cluster=name} identity label.
 // Collectors emit cluster-agnostic samples; the collection loop stamps the
 // cluster identity so one exporter process can serve many clusters.
-func (s Sample) WithCluster(name string) Sample {
-	labels := make([]Label, 0, len(s.Labels)+1)
+func (s Sample) WithCluster(name string) Sample { return s.WithIdentity(name, nil) }
+
+// WithIdentity returns a copy carrying the {cluster=name} identity label first,
+// then the operator's custom labels, then the sample's own collector labels.
+// The caller passes extra already sorted by key: ADR-0006 makes the ordered
+// label-key set part of a metric's schema.
+//
+// A custom label is skipped when its key is the reserved cluster identity or a
+// dimension the sample already carries — the collector's own dimension wins.
+// ADR-0006 guarantees one key set per metric name, so a skip applies uniformly
+// to every series of that name and the label-key invariant still holds; the
+// custom label is simply absent from that metric family. The collection loop
+// logs the skip, so it is not silent.
+func (s Sample) WithIdentity(name string, extra []Label) Sample {
+	labels := make([]Label, 0, len(s.Labels)+len(extra)+1)
 	labels = append(labels, Label{Key: "cluster", Value: name})
+	for _, l := range extra {
+		if l.Key == "cluster" || s.hasLabel(l.Key) {
+			continue
+		}
+		labels = append(labels, l)
+	}
 	labels = append(labels, s.Labels...)
 	return Sample{Name: s.Name, Labels: labels, Value: s.Value, Type: s.Type}
+}
+
+// CollidingLabels returns the keys of extra that WithIdentity will skip for this
+// sample, in the order they appear in extra.
+func (s Sample) CollidingLabels(extra []Label) []string {
+	var out []string
+	for _, l := range extra {
+		if l.Key == "cluster" || s.hasLabel(l.Key) {
+			out = append(out, l.Key)
+		}
+	}
+	return out
+}
+
+// hasLabel reports whether the sample carries the key, regardless of its value.
+// LabelValue cannot answer this: a dimension with an empty value is still a
+// dimension.
+func (s Sample) hasLabel(key string) bool {
+	for _, l := range s.Labels {
+		if l.Key == key {
+			return true
+		}
+	}
+	return false
 }
 
 // copyLabels detaches a sample from the caller's label slice, as WithCluster
