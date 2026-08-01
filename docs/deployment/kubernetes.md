@@ -41,6 +41,9 @@ config: |
     port: "9438"
   collection:
     interval: "5m"
+  # labels:
+  #   env: prod
+  #   site: geneva
   clusters:
     - name: obs-prod-01
       host: "OBS1_HOSTNAME"
@@ -48,6 +51,8 @@ config: |
       password: "OBS1_PASSWORD"
       # collectDT: true
       # collectFlux: true
+      # labels:
+      #   site: zurich
 ```
 
 That design has a consequence worth knowing before you go hunting for a chart
@@ -138,18 +143,19 @@ over a cluster that happens to be unreachable, which no restart could fix
 anyway. [ADR-0013](../adr/0013-static-liveness-readiness-probes.md) has the
 full argument. No override is needed for a standard deployment.
 
-`/health` still exists, unchanged: it answers 503 while any configured cluster
-is failing, and 200 otherwise, with a JSON body naming every cluster's status.
-It is not what the chart's probes use, but it is still the right endpoint for
-a human checking in, or for a monitoring system that wants to know *which*
-cluster is degraded rather than just that the pod should stay in rotation.
+`/health` still exists and always answers 200, with a JSON body naming every
+cluster's status (`ok`/`err` per cluster). It is not what the chart's probes
+use, but it is still the right endpoint for a human checking in, or for a
+monitoring system that wants to know *which* cluster is degraded — read the
+body, not the status code ([ADR-0015](../adr/0015-health-always-200.md)).
 [Verify and troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
 covers it in full.
 
 Because `/livez` and `/readyz` don't wait on the first collection cycle, there
-is no startup window to cover with `initialDelaySeconds` or a `startupProbe` —
-unlike `/health`, which answers 503 until that first cycle finishes (bounded
-by `collection.timeout`, 60 seconds by default).
+is no startup window to cover with `initialDelaySeconds` or a `startupProbe`.
+`/health`'s body reports an empty `clusters` array until that first cycle
+finishes (bounded by `collection.timeout`, 60 seconds by default), but its
+status code is 200 throughout.
 
 Alert on `ecs_up` and `ecs_collector_up` rather than on any probe. The
 exporter is built to degrade per cluster and per collector instead of going

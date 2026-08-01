@@ -69,6 +69,16 @@
           "text": "All",
           "value": "$__all"
         }
+      },
+      {
+        "name": "custom",
+        "label": "Custom labels",
+        "type": "adhoc",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": []
       }
     ]
   },

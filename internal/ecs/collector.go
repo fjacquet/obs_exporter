@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
@@ -11,10 +12,13 @@ import (
 )
 
 // Target pairs a cluster client with its resource collectors (which depend on
-// per-cluster feature flags).
+// per-cluster feature flags) and the operator's custom labels for that cluster.
 type Target struct {
 	Client     ecsclient.Client
 	Collectors []ResourceCollector
+	// Labels are the resolved custom labels, already sorted by key, stamped onto
+	// every sample this target produces.
+	Labels []Label
 }
 
 // Collector runs the background loop: every interval it polls all clusters in
@@ -27,6 +31,13 @@ type Collector struct {
 	// PostCycle, when set, runs after every published snapshot (the OTLP exporter
 	// uses it to register instruments for newly appearing metric names).
 	PostCycle func()
+
+	// warnMu guards warned, which keeps the custom-label collision warning to one
+	// line per cluster and key for the process's lifetime instead of one per
+	// sample per cycle. collectAll runs clusters concurrently, so this is shared
+	// mutable state.
+	warnMu sync.Mutex
+	warned map[string]struct{}
 }
 
 // NewCollector wires the loop.
@@ -90,13 +101,20 @@ func (c *Collector) collectCluster(ctx context.Context, target Target) *ClusterS
 			log.WithFields(log.Fields{"cluster": name, "collector": rc.Name(), "err": err}).
 				Warn("collector failed")
 		}
-		cs.Samples = append(cs.Samples, Sample{
+		collectorUp := Sample{
 			Name:   "ecs_collector_up",
 			Labels: []Label{{Key: "collector", Value: rc.Name()}},
 			Value:  up,
-		}.WithCluster(name))
+		}
+		for _, k := range collectorUp.CollidingLabels(target.Labels) {
+			c.warnCollision(name, k, collectorUp.Name)
+		}
+		cs.Samples = append(cs.Samples, collectorUp.WithIdentity(name, target.Labels))
 		for _, s := range samples {
-			cs.Samples = append(cs.Samples, s.WithCluster(name))
+			for _, k := range s.CollidingLabels(target.Labels) {
+				c.warnCollision(name, k, s.Name)
+			}
+			cs.Samples = append(cs.Samples, s.WithIdentity(name, target.Labels))
 			// The Flux collector's unmapped-nodes counter is housekeeping, emitted
 			// unconditionally including as 0 (see flux.go). Counting it here would
 			// let it alone keep domainSamples non-zero — and therefore ecs_up=1 —
@@ -120,6 +138,24 @@ func (c *Collector) collectCluster(ctx context.Context, target Target) *ClusterS
 	if cs.OK {
 		up = 1
 	}
-	cs.Samples = append(cs.Samples, Sample{Name: "ecs_up", Value: up}.WithCluster(name))
+	cs.Samples = append(cs.Samples, Sample{Name: "ecs_up", Value: up}.WithIdentity(name, target.Labels))
 	return cs
+}
+
+// warnCollision logs a dropped custom label once per cluster and key. metric
+// names the first metric family the collision was seen on, which is enough for
+// the operator to recognise the dimension they clashed with.
+func (c *Collector) warnCollision(cluster, key, metric string) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+	if c.warned == nil {
+		c.warned = map[string]struct{}{}
+	}
+	id := cluster + "\x00" + key
+	if _, seen := c.warned[id]; seen {
+		return
+	}
+	c.warned[id] = struct{}{}
+	log.WithFields(log.Fields{"cluster": cluster, "label": key, "metric": metric}).
+		Warn("custom label collides with a collector dimension; dropped for that metric family")
 }

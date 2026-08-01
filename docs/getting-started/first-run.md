@@ -153,6 +153,11 @@ measurement for that cluster. It is not a ping and not a TCP check: a 1 means th
 exporter logged in, called the management API, and got numbers back. This is the
 metric to alert on later, one alert per cluster.
 
+If you set a top-level `labels:` block in `config.yaml`, you will see those
+labels on `ecs_up` too — custom labels are stamped onto every series from the
+first scrape onward, not just the domain metrics. See
+[Configuration](configuration.md#custom-labels).
+
 A 0 means the cycle produced nothing usable — in practice almost always
 credentials, name resolution, the management port, or TLS trust, because those
 four break every collector at once. The log line above will name which.

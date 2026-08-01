@@ -11,6 +11,14 @@ otlp:
   endpoint: ""
   insecure: false
   interval: "10s"
+# Optional custom labels stamped onto every exported sample, ecs_up included.
+# The top-level block declares the KEYS with their default values; a cluster may
+# override a VALUE but never introduce a key, so every series carries the same
+# label-key set. Values accept ${ENV_VAR} interpolation.
+# labels:
+#   env: prod
+#   site: geneva
+#   owner: ${TEAM_NAME}
 clusters:
   # Single-cluster quickstart: set OBS1_HOSTNAME, OBS1_USERNAME, OBS1_PASSWORD in
   # the environment (or a .env file) and the values below expand automatically.
@@ -47,3 +55,5 @@ clusters:
     # Requires the account to hold SYSTEM_MONITOR or SYSTEM_ADMIN. Off by
     # default.
     # collectFlux: true
+    # labels:
+    #   site: zurich    # overrides the global value for this cluster only

@@ -1,6 +1,9 @@
 package ecs
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // The append helpers are asserted through mustSample/findSample, by metric
 // identity rather than by position in the slice: real consumers look samples up
@@ -130,5 +133,70 @@ func TestSampleTypeZeroValueIsGauge(t *testing.T) {
 	// Every existing collector builds Samples without a Type; they must stay gauges.
 	if (Sample{}).Type != Gauge {
 		t.Error("the zero SampleType must be Gauge")
+	}
+}
+
+func TestWithIdentityOrder(t *testing.T) {
+	s := Sample{
+		Name:   "ecs_namespace_used_bytes",
+		Labels: []Label{{Key: "namespace", Value: "ns1"}},
+		Value:  42,
+	}
+	extra := []Label{{Key: "env", Value: "prod"}, {Key: "site", Value: "geneva"}}
+
+	got := s.WithIdentity("c1", extra)
+	want := []Label{
+		{Key: "cluster", Value: "c1"},
+		{Key: "env", Value: "prod"},
+		{Key: "site", Value: "geneva"},
+		{Key: "namespace", Value: "ns1"},
+	}
+	if !reflect.DeepEqual(got.Labels, want) {
+		t.Errorf("labels = %v, want %v", got.Labels, want)
+	}
+	if got.Name != s.Name || got.Value != s.Value {
+		t.Errorf("name/value not preserved: %+v", got)
+	}
+}
+
+func TestWithIdentitySkipsCollisions(t *testing.T) {
+	s := Sample{Name: "ecs_node_health_state", Labels: []Label{{Key: "node", Value: "n1"}}}
+	extra := []Label{
+		{Key: "cluster", Value: "wrong"},
+		{Key: "env", Value: "prod"},
+		{Key: "node", Value: "wrong"},
+	}
+
+	got := s.WithIdentity("c1", extra)
+	want := []Label{
+		{Key: "cluster", Value: "c1"},
+		{Key: "env", Value: "prod"},
+		{Key: "node", Value: "n1"},
+	}
+	if !reflect.DeepEqual(got.Labels, want) {
+		t.Errorf("labels = %v, want %v", got.Labels, want)
+	}
+
+	collisions := s.CollidingLabels(extra)
+	if !reflect.DeepEqual(collisions, []string{"cluster", "node"}) {
+		t.Errorf("CollidingLabels = %v, want [cluster node]", collisions)
+	}
+}
+
+func TestWithIdentityNilExtraMatchesWithCluster(t *testing.T) {
+	s := Sample{Name: "ecs_up", Labels: []Label{{Key: "collector", Value: "cluster"}}, Value: 1}
+	if !reflect.DeepEqual(s.WithIdentity("c1", nil).Labels, s.WithCluster("c1").Labels) {
+		t.Error("WithIdentity(name, nil) must match WithCluster(name)")
+	}
+}
+
+func TestWithIdentityKeepsEmptyValuedCollision(t *testing.T) {
+	// A collector dimension whose value is empty is still a dimension: the
+	// custom label must be skipped, not merged over it.
+	s := Sample{Name: "ecs_cluster_alerts", Labels: []Label{{Key: "severity", Value: ""}}}
+	got := s.WithIdentity("c1", []Label{{Key: "severity", Value: "critical"}})
+	want := []Label{{Key: "cluster", Value: "c1"}, {Key: "severity", Value: ""}}
+	if !reflect.DeepEqual(got.Labels, want) {
+		t.Errorf("labels = %v, want %v", got.Labels, want)
 	}
 }

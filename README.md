@@ -55,6 +55,9 @@ in [Installation](docs/getting-started/installation.md#ecs-prerequisites).
   the same management port and session as everything else. Flux covers fields
   the dashboard API does not serve on ObjectScale 4.3, and needs the
   `SYSTEM_MONITOR` or `SYSTEM_ADMIN` role.
+- **Custom labels** — an optional `labels:` block stamps operator-defined
+  labels (site, environment, ownership) onto every exported sample, with
+  global keys and per-cluster value overrides.
 
 Full catalog: [docs/metrics/index.md](docs/metrics/index.md).
 
@@ -78,7 +81,8 @@ image on GHCR, or a build from source — see
 ## Configuration
 
 One YAML file: `${ENV_VAR}` interpolation and `passwordFile` for secrets, one
-list entry per cluster, and per-cluster flags for the optional collectors. It
+list entry per cluster, per-cluster flags for the optional collectors, and an
+optional `labels:` block for operator-defined labels on every metric. It
 reloads on SIGHUP or when the file changes on disk, so adding a cluster or
 rotating a password does not need a restart.
 

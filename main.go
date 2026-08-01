@@ -244,8 +244,8 @@ func (r *collectorRunner) shutdownCurrent() {
 
 func (r *collectorRunner) stop() { r.shutdownCurrent() }
 
-// buildTargets constructs one ECS client (plus its collector set) per configured
-// cluster.
+// buildTargets constructs one ECS client (plus its collector set and resolved
+// custom labels) per configured cluster.
 func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 	targets := make([]ecs.Target, 0, len(cfg.Clusters))
 	for _, cl := range cfg.Clusters {
@@ -254,7 +254,14 @@ func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 			Password: cl.Password, InsecureSkipVerify: cl.InsecureSkipVerify.Bool(),
 			Trace: trace,
 		})
-		targets = append(targets, ecs.Target{Client: client, Collectors: ecs.Registry(cl)})
+		resolved := cfg.EffectiveLabels(cl)
+		labels := make([]ecs.Label, 0, len(resolved))
+		for _, l := range resolved {
+			labels = append(labels, ecs.Label{Key: l.Key, Value: l.Value})
+		}
+		targets = append(targets, ecs.Target{
+			Client: client, Collectors: ecs.Registry(cl), Labels: labels,
+		})
 	}
 	return targets
 }
@@ -301,17 +308,10 @@ func healthHandler(w http.ResponseWriter, store *ecs.SnapshotStore) {
 		BuiltAt  string          `json:"built_at"`
 		Clusters []clusterHealth `json:"clusters"`
 	}{BuiltAt: snap.BuiltAt.Format(time.RFC3339)}
-	healthy := len(snap.Clusters) > 0
 	for _, c := range snap.Clusters {
 		out.Clusters = append(out.Clusters, clusterHealth{c.Cluster, c.OK, c.LastScrape.Format(time.RFC3339), c.Err})
-		if !c.OK {
-			healthy = false
-		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if !healthy {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
 	_ = json.NewEncoder(w).Encode(out)
 }
 
