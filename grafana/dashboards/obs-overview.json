@@ -1,6 +1,6 @@
 {
   "uid": "obs-overview",
-  "title": "ObjectScale \u2014 Overview",
+  "title": "ObjectScale — Overview",
   "editable": true,
   "style": "dark",
   "timezone": "",
@@ -83,7 +83,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Health \u2014 is anything on fire?",
+      "title": "Health — is anything on fire?",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -649,7 +649,7 @@
       "id": 16,
       "type": "timeseries",
       "title": "Allocated space by purpose",
-      "description": "What the allocated space actually holds. These components do NOT sum to the allocated total \u2014 the breakdown is not exhaustive, so do not read percentages of the total from it.",
+      "description": "What the allocated space actually holds. These components do NOT sum to the allocated total — the breakdown is not exhaustive, so do not read percentages of the total from it.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1024,7 +1024,7 @@
     },
     {
       "type": "row",
-      "title": "Exporter health \u2014 is the exporter itself OK?",
+      "title": "Exporter health — is the exporter itself OK?",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1039,7 +1039,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "Collector health",
-      "description": "One series per collector per cluster. A collector at 0 has failed its domain while the others keep working \u2014 the exporter degrades per domain rather than going dark. Check the exporter log for which endpoint refused.",
+      "description": "One series per collector per cluster. A collector at 0 has failed its domain while the others keep working — the exporter degrades per domain rather than going dark. Check the exporter log for which endpoint refused.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1085,7 +1085,7 @@
       "id": 18,
       "type": "stat",
       "title": "Flux hosts that did not map to a node",
-      "description": "Flux tags its rows by host; the exporter maps those onto the /vdc/nodes nodename every other collector labels with. Anything above zero means rows were dropped because their host matched no node \u2014 those per-node Flux metrics are silently missing, and the collector still reports up. Zero is the healthy value and is always published, so a flat line at zero means mapping is working, not that the metric is absent. Only meaningful when collectFlux is enabled.",
+      "description": "Flux tags its rows by host; the exporter maps those onto the /vdc/nodes nodename every other collector labels with. Anything above zero means rows were dropped because their host matched no node — those per-node Flux metrics are silently missing, and the collector still reports up. Zero is the healthy value and is always published, so a flat line at zero means mapping is working, not that the metric is absent. Only meaningful when collectFlux is enabled.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

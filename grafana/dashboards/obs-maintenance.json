@@ -1,7 +1,7 @@
 {
   "schemaVersion": 39,
   "uid": "obs-maintenance",
-  "title": "ObjectScale \u2014 Maintenance & Directory Tables",
+  "title": "ObjectScale — Maintenance & Directory Tables",
   "editable": true,
   "style": "dark",
   "timezone": "",
@@ -321,7 +321,7 @@
     {
       "id": 7,
       "type": "row",
-      "title": "Directory Tables \u2014 cluster-wide (Flux, opt-in)",
+      "title": "Directory Tables — cluster-wide (Flux, opt-in)",
       "collapsed": false,
       "datasource": {
         "type": "prometheus",

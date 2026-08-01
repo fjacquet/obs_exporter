@@ -3,7 +3,7 @@
   "editable": true,
   "style": "dark",
   "timezone": "",
-  "title": "ObjectScale \u2014 Replication",
+  "title": "ObjectScale — Replication",
   "uid": "obs-replication",
   "version": 1,
   "refresh": "30s",

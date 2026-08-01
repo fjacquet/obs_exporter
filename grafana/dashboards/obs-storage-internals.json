@@ -3,7 +3,7 @@
   "editable": true,
   "style": "dark",
   "timezone": "",
-  "title": "ObjectScale \u2014 Storage internals",
+  "title": "ObjectScale — Storage internals",
   "uid": "obs-storage-internals",
   "version": 1,
   "refresh": "30s",
@@ -305,7 +305,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Allocated space by purpose",
-      "description": "These components do not sum to the allocated total \u2014 the breakdown is not exhaustive.",
+      "description": "These components do not sum to the allocated total — the breakdown is not exhaustive.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -411,7 +411,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Recovery throughput",
-      "description": "Throughput as the dashboard API reports it \u2014 Dell documents no unit. Already a rate: never wrap in rate().",
+      "description": "Throughput as the dashboard API reports it — Dell documents no unit. Already a rate: never wrap in rate().",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -456,7 +456,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Recovery time remaining",
-      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses \u2014 Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
+      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses — Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -501,7 +501,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Erasure-coding throughput",
-      "description": "Throughput as the dashboard API reports it \u2014 Dell documents no unit. Already a rate: never wrap in rate().",
+      "description": "Throughput as the dashboard API reports it — Dell documents no unit. Already a rate: never wrap in rate().",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -546,7 +546,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "Erasure-coding time remaining",
-      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses \u2014 Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
+      "description": "The cluster's own estimate of time remaining, in whatever unit the dashboard API uses — Dell documents none. Plotted apart from the throughput it accompanies, because a rate and a duration share no meaningful axis.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
