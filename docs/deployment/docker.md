@@ -3,23 +3,19 @@
 The published image is `ghcr.io/fjacquet/obs_exporter`. Tags follow the release
 version (`3.2.0`), plus `latest`.
 
-It is built `FROM gcr.io/distroless/static:nonroot` and contains the static
-binary and nothing else — **no shell, no `curl`, no package manager**. That is a
-deliberate trade: an image with nothing in it has almost nothing to exploit and
-almost nothing to patch, and it never appears in a CVE report for a package the
-exporter does not use. What you give up is the two habits you would otherwise
-reach for, and both come back later on this page. You cannot `docker exec -it …
-sh` into a running container to look around, because there is no shell for
-`exec` to start; debugging means running a second throwaway container with
-diagnostic flags instead. And you cannot write a Docker `HEALTHCHECK`, because
-that instruction runs a command *inside* the container and there is no command
-in there to run — the health check has to come from outside.
+It is built `FROM alpine:latest` and contains the exporter binary, the Alpine/
+busybox userland (a shell, `wget`, and the rest of the base image), and its CA
+bundle. Unlike a distroless image, you *can* `docker exec -it … sh` into a
+running container to look around, and the image ships a Docker `HEALTHCHECK`
+(see [Health check](#health-check) below) that runs `wget` against `/livez`
+from inside the container every 30 seconds.
 
-It runs as the `nonroot` user, so a mounted `config.yaml` must be world-readable
-or owned by uid 65532. A config file the container cannot read is a config file
-the exporter cannot load, and it refuses to start rather than run without one —
-so the symptom is a container that exits within a second of `docker run`, after
-the same file worked fine for a local binary you ran as yourself.
+It runs as the `obs` user (uid 10001), so a mounted `config.yaml` must be
+world-readable or owned by uid 10001. A config file the container cannot read
+is a config file the exporter cannot load, and it refuses to start rather than
+run without one — so the symptom is a container that exits within a second of
+`docker run`, after the same file worked fine for a local binary you ran as
+yourself.
 
 ## Run against a real cluster
 
@@ -68,13 +64,22 @@ curl -s localhost:9438/health | jq .
 
 ## Health check
 
-Docker's own `HEALTHCHECK` cannot probe the exporter, for the reason given at
-the top of this page: the instruction runs a command *inside* the container,
-and this image has no shell and no HTTP client to run. Probe it from outside
-instead — Kubernetes probes, a Compose-level external check, or your
-monitoring system.
+The image ships a Docker `HEALTHCHECK`:
 
-Point that check at **`/livez`** or **`/readyz`**. Both always answer 200 —
+```
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:9438/livez || exit 1
+```
+
+That's enough for `docker ps` to show `(healthy)`/`(unhealthy)` and for tools
+that key off Docker's own health state (e.g. `depends_on: condition:
+service_healthy` in Compose). It is **not** what Kubernetes uses — the kubelet
+never reads a Docker `HEALTHCHECK`; it always probes independently via the
+chart's own `livenessProbe`/`readinessProbe`. See
+[Kubernetes](kubernetes.md#probes) for that path.
+
+Point any check — the image's `HEALTHCHECK`, a Kubernetes probe, or your own
+monitoring — at **`/livez`** or **`/readyz`**. Both always answer 200 —
 neither depends on cluster reachability or on the collection cycle having run
 at all, so neither can flag a healthy process as failing over a cluster that
 happens to be unreachable, which no restart could fix anyway.

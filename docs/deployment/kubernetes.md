@@ -131,10 +131,12 @@ high.
 
 ## Probes
 
-The image is distroless — it contains the exporter binary and nothing else, no
-shell and no `curl` — so a probe that runs a command inside the container has
-nothing to run. Every probe has to be an HTTP request, which the kubelet — the
-Kubernetes agent running on each node — makes from outside the container.
+The image now ships a Docker `HEALTHCHECK` (see
+[Docker](docker.md#health-check)), but that's irrelevant here: Kubernetes
+never reads a Docker `HEALTHCHECK` — the kubelet always probes independently,
+via whatever `livenessProbe`/`readinessProbe` the pod spec configures. So
+configure those directly against the exporter's HTTP endpoints rather than
+relying on anything baked into the image.
 
 The chart's default `livenessProbe` and `readinessProbe` point at `/livez` and
 `/readyz`. Both always answer 200 — neither depends on cluster state or on the
