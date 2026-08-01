@@ -255,9 +255,9 @@ megabytes of JSON without knowing what you are looking for.
 ## Checking health without scraping
 
 The exporter serves `/health` alongside `/metrics`. It answers JSON describing
-every configured cluster, and it sets the HTTP status code so that something
-which cannot read JSON — a container health check, a load balancer, a monitoring
-probe — still gets a usable answer:
+every configured cluster and always answers `200 OK`
+([ADR-0015](../adr/0015-health-always-200.md)) — read the body's `ok`/`err`
+fields per cluster, don't gate on the status code:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' localhost:9438/health
@@ -275,32 +275,25 @@ curl -s localhost:9438/health | jq
 }
 ```
 
-The status code is **200 only when every configured cluster is healthy**, and
-**503 as soon as any one of them is not**. That answer is accurate — it means
-the last cycle got nothing usable out of at least one cluster — so what matters
-is which kind of check you wire it to, not how many clusters you run. As a
-*readiness* check, the sort that decides whether anything should be sent to this
-instance, it is right on one cluster and on five. As a *liveness* check, the
-sort that restarts the process when it fails, it is wrong on one cluster and on
-five, because no restart can make an unreachable cluster reachable; with a
-single cluster it is worse rather than milder, because the container then
-restart-loops until the exporter is dark and the `ecs_up 0` that was naming the
-problem has gone with it. Point liveness at `/metrics`, which answers 200
-whenever the process is up and serving. With several clusters a 503 also will
-not say *which* one is degraded, while the exporter keeps serving every healthy
-cluster's metrics regardless — so alert on `ecs_up` per cluster, or read the
-JSON body and decide for yourself.
+The status code is always **200**, whether every configured cluster is
+healthy or not — that was the mistake ADR-0013 fixed for `/livez`/`/readyz`
+and ADR-0015 fixed for `/health` itself: a cluster being unreachable is data
+the exporter reports, not a failure of the exporter. Read the JSON body's
+per-cluster `ok` and `err` fields to find out which cluster, if any, is
+degraded and why. Alert on `ecs_up` per cluster (or on `ok`/`err` in this
+body), not on `/health`'s HTTP status.
 
-`/health` also answers 503 before the first collection cycle finishes, because at
-that point it knows about no clusters at all. The HTTP server deliberately starts
-before the first cycle — logging in to every cluster and polling it can take
-longer than a scrape timeout, and a blocked `/metrics` looks like a dead process
-— so there is a real window at startup where `/metrics` answers with only
-`obs_exporter_build_info` and `/health` answers 503. Give a container health
-check a start period long enough to cover that first cycle. Its length is
-bounded by `collection.timeout` (60 seconds by default), not by
-`collection.interval`: clusters are polled in parallel, and the timeout is the
-per-cluster budget within one cycle.
+`/health`'s body reports an empty `clusters` array before the first
+collection cycle finishes, because at that point it knows about no clusters
+at all — but its status code is 200 throughout, including during that
+startup window. The HTTP server deliberately starts before the first cycle —
+logging in to every cluster and polling it can take longer than a scrape
+timeout, and a blocked `/metrics` looks like a dead process — so there is a
+real window at startup where `/metrics` answers with only
+`obs_exporter_build_info` and `/health`'s `clusters` array is empty. Its
+length is bounded by `collection.timeout` (60 seconds by default), not by
+`collection.interval`: clusters are polled in parallel, and the timeout is
+the per-cluster budget within one cycle.
 
 The path `/health` is fixed. Only the metrics path is configurable, through
 `server.uri` in the config file, so on a deployment that has moved `/metrics`
@@ -507,11 +500,12 @@ turn the flag on.
 
 ### `/metrics` returns 503
 
-**What it means.** You are probing `/health`, not `/metrics`. It is an easy
-mistake to make through a proxy or a health-check configuration that rewrites the
-path, and the two endpoints disagree by design: `/health` answers 503 while any
-single configured cluster is failing, whereas `/metrics` keeps answering 200 with
-whatever it has, including `ecs_up 0` for the cluster that is down.
+**What it means.** `/metrics` has no failure mode that produces a 503 — see
+below. If something reports a 503 "from the exporter," it is either probing
+the wrong path entirely, or hitting something in front of the exporter (a
+proxy, an ingress) that is itself unreachable. `/health` cannot be the source
+of a 503 either, as of [ADR-0015](../adr/0015-health-always-200.md) — it
+always answers 200.
 
 `/metrics` itself has no failure mode that produces a 503. A cluster that is
 completely unreachable still yields a 200 with `ecs_up{cluster="…"} 0` in the
@@ -527,13 +521,12 @@ curl -s -o /dev/null -w '%{http_code} %{url_effective}\n' localhost:9438/metrics
 curl -s localhost:9438/health | jq '.clusters[] | select(.ok == false)'
 ```
 
-If the first prints 200 and the second prints a cluster, your probe is hitting
-`/health`. Fix the probe, or fix the cluster it is complaining about — the
-chart's own probes no longer hit `/health` by default
-([ADR-0013](../adr/0013-static-liveness-readiness-probes.md)), so seeing this
-usually means a manual override predating that change. Remember that
-`/metrics` may have been moved by `server.uri` while `/health`, `/livez` and
-`/readyz` have not.
+If the first does not print 200, the exporter itself is unreachable —
+check the process, the port, and anything in front of it. The second is
+diagnostic regardless of the first's result: it lists any cluster currently
+reporting unhealthy, straight from `/health`'s body, which always answers
+200 ([ADR-0015](../adr/0015-health-always-200.md)) — the status code will
+never point you at a degraded cluster, the body will.
 
 ### `/metrics` returns 500
 

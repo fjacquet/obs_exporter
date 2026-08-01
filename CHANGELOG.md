@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   declared key's value (never introduce a new key). Applied to every exported
   sample, `ecs_up` and `ecs_collector_up` included. See ADR-0014.
 
+### Changed
+
+- `/health` always answers 200, never 503. The JSON body's per-cluster
+  `ok`/`err` fields are unchanged and remain the way to tell whether a
+  cluster is degraded — read the body, not the status code. See ADR-0015.
+  Not a breaking change: the path and JSON shape are unchanged.
+
 ## [3.4.0] - 2026-07-31
 
 ### Added

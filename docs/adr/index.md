@@ -52,3 +52,4 @@ The full set, in order:
 | [0012](0012-label-consolidation-and-sum-safety.md) | Consolidate one-measurement-many-names families into one name plus a label, bounded by the sum-safety rule: a whole and its parts never share a metric name |
 | [0013](0013-static-liveness-readiness-probes.md) | `/livez` and `/readyz`, always-200 probe endpoints decoupled from cluster state; chart defaults repointed away from `/health` |
 | [0014](0014-custom-labels.md) | Custom labels: global keys with per-cluster value overrides, stamped on every sample, amending the ADR-0006 label-key invariant |
+| [0015](0015-health-always-200.md) | `/health` always answers 200; the JSON body's per-cluster `ok`/`err` fields are the only status channel |
