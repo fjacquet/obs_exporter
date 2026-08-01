@@ -135,10 +135,10 @@ ADR-0013's /livez /readyz argument, applied to /health itself."
 
 ---
 
-### Task 2: ADR-0014 + docs updates
+### Task 2: ADR-0015 + docs updates
 
 **Files:**
-- Create: `docs/adr/0014-health-always-200.md`
+- Create: `docs/adr/0015-health-always-200.md`
 - Modify: `docs/adr/index.md:53` (append row after 0013)
 - Modify: `docs/deployment/kubernetes.md:141-145`
 - Modify: `docs/operate/troubleshooting.md:257-292`, `docs/operate/troubleshooting.md:294-303`, `docs/operate/troubleshooting.md:508-536`
@@ -148,9 +148,9 @@ ADR-0013's /livez /readyz argument, applied to /health itself."
 - Consumes: nothing (docs-only task).
 - Produces: nothing consumed by later tasks.
 
-- [ ] **Step 1: Write ADR-0014**
+- [ ] **Step 1: Write ADR-0015**
 
-Create `docs/adr/0014-health-always-200.md`:
+Create `docs/adr/0015-health-always-200.md`:
 
 ```markdown
 # `/health` always answers 200
@@ -202,7 +202,7 @@ duplicates that signal, and nothing that reads the body loses information.
 In `docs/adr/index.md`, after line 53 (`| [0013] ... |`), add:
 
 ```markdown
-| [0014](0014-health-always-200.md) | `/health` always answers 200; the JSON body's per-cluster `ok`/`err` fields are the only status channel |
+| [0015](0015-health-always-200.md) | `/health` always answers 200; the JSON body's per-cluster `ok`/`err` fields are the only status channel |
 ```
 
 - [ ] **Step 3: Update `docs/deployment/kubernetes.md`**
@@ -224,7 +224,7 @@ with:
 cluster's status (`ok`/`err` per cluster). It is not what the chart's probes
 use, but it is still the right endpoint for a human checking in, or for a
 monitoring system that wants to know *which* cluster is degraded — read the
-body, not the status code ([ADR-0014](../adr/0014-health-always-200.md)).
+body, not the status code ([ADR-0015](../../adr/0015-health-always-200.md)).
 ```
 
 Line 151 (`unlike /health, which answers 503 until that first cycle finishes`)
@@ -263,7 +263,7 @@ with:
 ```markdown
 The exporter serves `/health` alongside `/metrics`. It answers JSON describing
 every configured cluster and always answers `200 OK`
-([ADR-0014](../adr/0014-health-always-200.md)) — read the body's `ok`/`err`
+([ADR-0015](../../adr/0015-health-always-200.md)) — read the body's `ok`/`err`
 fields per cluster, don't gate on the status code:
 ```
 
@@ -272,7 +272,7 @@ Replace lines 278-292 (the "status code is 200 only when..." paragraph) with:
 ```markdown
 The status code is always **200**, whether every configured cluster is
 healthy or not — that was the mistake ADR-0013 fixed for `/livez`/`/readyz`
-and ADR-0014 fixed for `/health` itself: a cluster being unreachable is data
+and ADR-0015 fixed for `/health` itself: a cluster being unreachable is data
 the exporter reports, not a failure of the exporter. Read the JSON body's
 per-cluster `ok` and `err` fields to find out which cluster, if any, is
 degraded and why. Alert on `ecs_up` per cluster (or on `ok`/`err` in this
@@ -315,7 +315,7 @@ with:
 below. If something reports a 503 "from the exporter," it is either probing
 the wrong path entirely, or hitting something in front of the exporter (a
 proxy, an ingress) that is itself unreachable. `/health` cannot be the source
-of a 503 either, as of [ADR-0014](../adr/0014-health-always-200.md) — it
+of a 503 either, as of [ADR-0015](../../adr/0015-health-always-200.md) — it
 always answers 200.
 ```
 
@@ -330,7 +330,7 @@ If the first does not print 200, the exporter itself is unreachable —
 check the process, the port, and anything in front of it. The second is
 diagnostic regardless of the first's result: it lists any cluster currently
 reporting unhealthy, straight from `/health`'s body, which always answers
-200 ([ADR-0014](../adr/0014-health-always-200.md)) — the status code will
+200 ([ADR-0015](../../adr/0015-health-always-200.md)) — the status code will
 never point you at a degraded cluster, the body will.
 ```
 
@@ -347,7 +347,7 @@ Insert above `## [3.4.0] - 2026-07-31` in `CHANGELOG.md` a new unreleased entry:
 
 - `/health` always answers 200, never 503. The JSON body's per-cluster
   `ok`/`err` fields are unchanged and remain the way to tell whether a
-  cluster is degraded — read the body, not the status code. See ADR-0014.
+  cluster is degraded — read the body, not the status code. See ADR-0015.
   Not a breaking change: the path and JSON shape are unchanged.
 
 ```
@@ -360,7 +360,7 @@ Expected: exits 0, no broken nav/link errors from the new ADR file.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add docs/adr/0014-health-always-200.md docs/adr/index.md \
+git add docs/adr/0015-health-always-200.md docs/adr/index.md \
   docs/deployment/kubernetes.md docs/operate/troubleshooting.md CHANGELOG.md
-git commit -m "docs: record ADR-0014, update probe/health docs for always-200 /health"
+git commit -m "docs: record ADR-0015, update probe/health docs for always-200 /health"
 ```

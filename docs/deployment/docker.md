@@ -82,12 +82,13 @@ happens to be unreachable, which no restart could fix anyway.
 argument. Because they don't wait on the first collection cycle, there's no
 startup window to cover for them.
 
-`/health` still exists, unchanged: it returns per-cluster JSON and **HTTP 503
-while any cluster is failing**. It's not what an external health check should
-use, but it's the right endpoint for a human checking in, or for a monitoring
-system that wants to know *which* cluster is degraded. Alert on `ecs_up` and
-`ecs_collector_up` rather than on any probe endpoint. [Verify and
-troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
+`/health` still exists and always answers 200, with a JSON body naming every
+cluster's status (`ok`/`err` per cluster). It's not what an external health
+check should use, but it's the right endpoint for a human checking in, or for
+a monitoring system that wants to know *which* cluster is degraded — read the
+body, not the status code ([ADR-0015](../adr/0015-health-always-200.md)).
+Alert on `ecs_up` and `ecs_collector_up` rather than on any probe endpoint.
+[Verify and troubleshoot](../operate/troubleshooting.md#checking-health-without-scraping)
 sets out the full argument and what the `/health` JSON body contains.
 
 `/metrics` carries only `obs_exporter_build_info` until the first collection
