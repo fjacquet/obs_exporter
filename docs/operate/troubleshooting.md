@@ -112,10 +112,9 @@ That is safe to do while the real one is running: `--once` binds no port, so the
 two do not collide. Put redirections such as `2>trace.log` on the `docker run`
 command rather than trying to write inside the container — the container's output
 is the host command's output, so the file lands on the host where you can read
-it, and the image is a distroless one running as a non-root user with nowhere
-writable to put it anyway. Every later example on this page substitutes the same
-way: replace `obs_exporter` with the `docker run …` prefix above and keep the
-flags.
+it directly, without having to `docker cp` it out afterward. Every later
+example on this page substitutes the same way: replace `obs_exporter` with the
+`docker run …` prefix above and keep the flags.
 
 ### `--once` — does the cluster answer at all
 

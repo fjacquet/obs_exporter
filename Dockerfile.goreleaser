@@ -14,6 +14,9 @@ COPY config.yaml /etc/obs_exporter/config.yaml
 
 EXPOSE 9438
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:9438/livez || exit 1
+
 USER obs
 
 ENTRYPOINT ["/usr/bin/obs_exporter"]
