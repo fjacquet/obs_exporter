@@ -308,17 +308,10 @@ func healthHandler(w http.ResponseWriter, store *ecs.SnapshotStore) {
 		BuiltAt  string          `json:"built_at"`
 		Clusters []clusterHealth `json:"clusters"`
 	}{BuiltAt: snap.BuiltAt.Format(time.RFC3339)}
-	healthy := len(snap.Clusters) > 0
 	for _, c := range snap.Clusters {
 		out.Clusters = append(out.Clusters, clusterHealth{c.Cluster, c.OK, c.LastScrape.Format(time.RFC3339), c.Err})
-		if !c.OK {
-			healthy = false
-		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if !healthy {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
 	_ = json.NewEncoder(w).Encode(out)
 }
 
