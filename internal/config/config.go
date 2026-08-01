@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,6 +43,11 @@ type Cluster struct {
 	// (one bulk billing POST) while dropping the quota metrics. Pointer so
 	// "unset" defaults to enabled.
 	CollectQuotas *bool `yaml:"collectQuotas"`
+	// Labels holds this cluster's overrides for the globally declared custom
+	// label values. A key absent from the top-level labels block is a config
+	// error: the key set stays uniform across clusters (ADR-0006), only values
+	// vary.
+	Labels map[string]string `yaml:"labels"`
 }
 
 // enabled reads a default-true flag: unset (nil) means on, so a collector can be
@@ -85,10 +91,22 @@ type Config struct {
 	Server     Server     `yaml:"server"`
 	Collection Collection `yaml:"collection"`
 	OTLP       OTLP       `yaml:"otlp"`
-	Clusters   []Cluster  `yaml:"clusters"`
+	// Labels declares the custom label KEYS with their default values. Clusters
+	// may override a value; they may never add a key. Declaring the key set once
+	// is what keeps "no value is ever empty" true by construction.
+	Labels   map[string]string `yaml:"labels"`
+	Clusters []Cluster         `yaml:"clusters"`
+}
+
+// Label is one resolved custom label. Values reach here already interpolated.
+type Label struct {
+	Key   string
+	Value string
 }
 
 var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+var labelKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // interpolate replaces every ${VAR} in s with its environment value, returning an
 // error if any referenced variable is unset. Failing fast turns a typo'd secret
@@ -109,6 +127,67 @@ func interpolate(s string) (string, error) {
 	return out, nil
 }
 
+// interpolateLabels resolves ${ENV} references in a label map in place. Keys are
+// never interpolated: they are part of the metric schema, not a secret.
+func interpolateLabels(labels map[string]string, what string) error {
+	for k, v := range labels {
+		iv, err := interpolate(v)
+		if err != nil {
+			return fmt.Errorf("%s label %s: %w", what, k, err)
+		}
+		labels[k] = iv
+	}
+	return nil
+}
+
+// validateLabels enforces the custom-label model: globally declared keys with
+// non-empty values, and per-cluster overrides that may only restate a declared
+// key. Rejecting an undeclared cluster key at load is what keeps the label-key
+// set identical across clusters, as ADR-0006 requires.
+func validateLabels(cfg *Config) error {
+	for k, v := range cfg.Labels {
+		if !labelKeyRE.MatchString(k) {
+			return fmt.Errorf("label %q: key must match [a-zA-Z_][a-zA-Z0-9_]*", k)
+		}
+		if strings.HasPrefix(k, "__") {
+			return fmt.Errorf("label %q: keys starting with __ are reserved by Prometheus", k)
+		}
+		if v == "" {
+			return fmt.Errorf("label %q: value must not be empty", k)
+		}
+	}
+	for _, c := range cfg.Clusters {
+		for k, v := range c.Labels {
+			if _, ok := cfg.Labels[k]; !ok {
+				return fmt.Errorf("cluster %q: unknown label key %q (declare it in the top-level labels block)", c.Name, k)
+			}
+			if v == "" {
+				return fmt.Errorf("cluster %q: label %q: value must not be empty", c.Name, k)
+			}
+		}
+	}
+	return nil
+}
+
+// EffectiveLabels returns one cluster's custom labels: the global block with
+// that cluster's value overrides applied, sorted by key. Sorted because ADR-0006
+// makes the ordered label-key set part of a metric's schema, so the order must
+// not depend on YAML authoring order or Go map iteration order.
+func (c Config) EffectiveLabels(cl Cluster) []Label {
+	if len(c.Labels) == 0 {
+		return nil
+	}
+	out := make([]Label, 0, len(c.Labels))
+	for k, v := range c.Labels {
+		if ov, ok := cl.Labels[k]; ok {
+			v = ov
+		}
+		out = append(out, Label{Key: k, Value: v})
+	}
+	slices.SortFunc(out, func(a, b Label) int { return strings.Compare(a.Key, b.Key) })
+	return out
+}
+
 // Load reads, interpolates ${ENV} references, applies defaults, and validates.
 func Load(path string) (*Config, error) {
 	raw, err := os.ReadFile(path)
@@ -118,6 +197,9 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	if err := interpolateLabels(cfg.Labels, "global"); err != nil {
+		return nil, err
 	}
 	for i := range cfg.Clusters {
 		c := &cfg.Clusters[i]
@@ -145,6 +227,9 @@ func Load(path string) (*Config, error) {
 		}
 		if err := c.InsecureSkipVerify.Resolve(interpolate); err != nil {
 			return nil, fmt.Errorf("cluster %s insecureSkipVerify: %w", c.Name, err)
+		}
+		if err := interpolateLabels(c.Labels, "cluster "+c.Name); err != nil {
+			return nil, err
 		}
 		if c.MgmtPort == 0 {
 			c.MgmtPort = 4443
@@ -176,6 +261,9 @@ func Load(path string) (*Config, error) {
 	}
 	if len(cfg.Clusters) == 0 {
 		return nil, fmt.Errorf("no clusters configured")
+	}
+	if err := validateLabels(&cfg); err != nil {
+		return nil, err
 	}
 	return &cfg, nil
 }

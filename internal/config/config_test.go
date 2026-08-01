@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -312,6 +314,132 @@ clusters:
 `)
 	if _, err := Load(p); err == nil {
 		t.Fatal("expected error for non-boolean insecureSkipVerify env value")
+	}
+}
+
+func TestLoadLabels(t *testing.T) {
+	t.Setenv("TEAM_NAME", "storage-ops")
+	p := write(t, `
+labels:
+  site: geneva
+  env: prod
+  owner: ${TEAM_NAME}
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    labels:
+      site: zurich
+  - name: ecs2
+    host: ecs2.example.com
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := cfg.EffectiveLabels(cfg.Clusters[0])
+	want := []Label{{"env", "prod"}, {"owner", "storage-ops"}, {"site", "zurich"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("EffectiveLabels(ecs1) = %v, want %v", got, want)
+	}
+
+	got = cfg.EffectiveLabels(cfg.Clusters[1])
+	want = []Label{{"env", "prod"}, {"owner", "storage-ops"}, {"site", "geneva"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("EffectiveLabels(ecs2) = %v, want %v", got, want)
+	}
+}
+
+func TestEffectiveLabelsEmptyWithoutGlobalBlock(t *testing.T) {
+	p := write(t, `
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+`)
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.EffectiveLabels(cfg.Clusters[0]); got != nil {
+		t.Errorf("EffectiveLabels = %v, want nil", got)
+	}
+}
+
+func TestLoadLabelsRejected(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{
+			name: "invalid key",
+			yaml: "labels:\n  \"my-site\": geneva\n",
+			want: "must match",
+		},
+		{
+			name: "reserved prefix",
+			yaml: "labels:\n  __site: geneva\n",
+			want: "reserved",
+		},
+		{
+			name: "empty global value",
+			yaml: "labels:\n  site: \"\"\n",
+			want: "must not be empty",
+		},
+		{
+			name: "undeclared cluster key",
+			yaml: "labels:\n  site: geneva\n",
+			want: "unknown label key",
+		},
+		{
+			name: "cluster labels without global block",
+			yaml: "",
+			want: "unknown label key",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := "clusters:\n  - name: ecs1\n    host: ecs1.example.com\n"
+			switch tc.name {
+			case "undeclared cluster key", "cluster labels without global block":
+				cluster += "    labels:\n      rack: r12\n"
+			}
+			_, err := Load(write(t, tc.yaml+cluster))
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error = %q, want it to contain %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadLabelsEmptyClusterValue(t *testing.T) {
+	p := write(t, `
+labels:
+  site: geneva
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+    labels:
+      site: ""
+`)
+	if _, err := Load(p); err == nil || !strings.Contains(err.Error(), "must not be empty") {
+		t.Fatalf("err = %v, want an empty-value error", err)
+	}
+}
+
+func TestLoadLabelsUnsetEnvVar(t *testing.T) {
+	p := write(t, `
+labels:
+  owner: ${OBS_LABELS_UNSET_VAR}
+clusters:
+  - name: ecs1
+    host: ecs1.example.com
+`)
+	if _, err := Load(p); err == nil || !strings.Contains(err.Error(), "unset environment variable") {
+		t.Fatalf("err = %v, want an unset-variable error", err)
 	}
 }
 
