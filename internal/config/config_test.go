@@ -443,6 +443,22 @@ clusters:
 	}
 }
 
+func TestLoadClusterLabelsUnsetEnvVarNamesDefaultedCluster(t *testing.T) {
+	p := write(t, `
+clusters:
+  - host: ecs1.example.com
+    labels:
+      owner: ${OBS_LABELS_UNSET_VAR}
+`)
+	_, err := Load(p)
+	if err == nil || !strings.Contains(err.Error(), "unset environment variable") {
+		t.Fatalf("err = %v, want an unset-variable error", err)
+	}
+	if !strings.Contains(err.Error(), "cluster ecs1.example.com") {
+		t.Fatalf("err = %v, want it to name the host-defaulted cluster (ecs1.example.com), not an empty name", err)
+	}
+}
+
 func TestWatcherTrigger(t *testing.T) {
 	p := write(t, `
 clusters:

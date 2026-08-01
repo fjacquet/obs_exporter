@@ -228,9 +228,6 @@ func Load(path string) (*Config, error) {
 		if err := c.InsecureSkipVerify.Resolve(interpolate); err != nil {
 			return nil, fmt.Errorf("cluster %s insecureSkipVerify: %w", c.Name, err)
 		}
-		if err := interpolateLabels(c.Labels, "cluster "+c.Name); err != nil {
-			return nil, err
-		}
 		if c.MgmtPort == 0 {
 			c.MgmtPort = 4443
 		}
@@ -242,6 +239,9 @@ func Load(path string) (*Config, error) {
 		}
 		if c.Name == "" {
 			c.Name = c.Host
+		}
+		if err := interpolateLabels(c.Labels, "cluster "+c.Name); err != nil {
+			return nil, err
 		}
 	}
 	if cfg.Server.Port == "" {
