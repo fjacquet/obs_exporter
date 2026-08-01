@@ -53,3 +53,4 @@ The full set, in order:
 | [0013](0013-static-liveness-readiness-probes.md) | `/livez` and `/readyz`, always-200 probe endpoints decoupled from cluster state; chart defaults repointed away from `/health` |
 | [0014](0014-custom-labels.md) | Custom labels: global keys with per-cluster value overrides, stamped on every sample, amending the ADR-0006 label-key invariant |
 | [0015](0015-health-always-200.md) | `/health` always answers 200; the JSON body's per-cluster `ok`/`err` fields are the only status channel |
+| [0016](0016-alpine-standard.md) | Alpine as the sole container-image standard, family-wide; obs_exporter's local Dockerfile fixed to match its published image |

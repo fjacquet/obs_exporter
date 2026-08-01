@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `HEALTHCHECK` added to both the published and local Docker images, checking
+  `/livez`. The demo Compose stacks (`docker-compose.yml`,
+  `docker-compose.ghcr.yml`) gain a matching `healthcheck:`. See ADR-0016.
+
+### Fixed
+
+- The local dev Docker image (`make docker`, `./Dockerfile`) now matches the
+  published image: Alpine instead of distroless. Previously the two diverged
+  within this repo. See ADR-0016.
+
 ## [3.5.0] - 2026-08-01
 
 ### Added
