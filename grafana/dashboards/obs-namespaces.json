@@ -1,6 +1,6 @@
 {
   "uid": "obs-namespaces",
-  "title": "ObjectScale — Namespaces",
+  "title": "ObjectScale \u2014 Namespaces",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
@@ -68,6 +68,16 @@
           "text": "All",
           "value": "$__all"
         }
+      },
+      {
+        "name": "custom",
+        "label": "Custom labels",
+        "type": "adhoc",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": []
       }
     ]
   },

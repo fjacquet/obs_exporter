@@ -1,6 +1,6 @@
 {
   "uid": "obs-performance",
-  "title": "ObjectScale — Performance",
+  "title": "ObjectScale \u2014 Performance",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
@@ -68,6 +68,16 @@
           "text": "All",
           "value": "$__all"
         }
+      },
+      {
+        "name": "custom",
+        "label": "Custom labels",
+        "type": "adhoc",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": []
       }
     ]
   },
@@ -381,7 +391,7 @@
           ]
         }
       },
-      "description": "Two mutually exclusive sources, disambiguated in the legend: clusters without collectFlux publish the gauge (\"gauge\" series); clusters with collectFlux publish it as a histogram instead, charted here as a p95 estimate (\"p95\" series). A cluster only ever contributes one or the other — see ADR for collectFlux.",
+      "description": "Two mutually exclusive sources, disambiguated in the legend: clusters without collectFlux publish the gauge (\"gauge\" series); clusters with collectFlux publish it as a histogram instead, charted here as a p95 estimate (\"p95\" series). A cluster only ever contributes one or the other \u2014 see ADR for collectFlux.",
       "targets": [
         {
           "datasource": {

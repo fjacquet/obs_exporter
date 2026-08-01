@@ -3,7 +3,7 @@
   "editable": true,
   "style": "dark",
   "timezone": "",
-  "title": "ObjectScale — Replication",
+  "title": "ObjectScale \u2014 Replication",
   "uid": "obs-replication",
   "version": 1,
   "refresh": "30s",
@@ -68,6 +68,16 @@
           "text": "All",
           "value": "$__all"
         }
+      },
+      {
+        "name": "custom",
+        "label": "Custom labels",
+        "type": "adhoc",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": []
       }
     ]
   },

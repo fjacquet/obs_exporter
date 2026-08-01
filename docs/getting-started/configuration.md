@@ -202,6 +202,17 @@ The collector's own dimension always wins; the collision is uniform per
 metric name, so it never produces a mixed series schema for that name. See
 [ADR-0014](../adr/0014-custom-labels.md) for the full decision record.
 
+### Ad hoc filters in Grafana
+
+Custom labels can be filtered directly on dashboards using the ad hoc filters variable. Two
+limits apply:
+
+- **Ad hoc filters apply to panel queries, not to variable queries**, so the `cluster`
+  picker still lists every cluster even while filtering on `env=prod`. Confirm the
+  behaviour against the Grafana version in use — it has changed across releases.
+- **Filters do not group**: `sum by (env)` remains the user's responsibility; ad hoc filters
+  simply restrict which series match a query, they do not aggregate.
+
 ## Prometheus scrape config
 
 The v1 `/query?target=` pattern is gone — point Prometheus at `/metrics`:
