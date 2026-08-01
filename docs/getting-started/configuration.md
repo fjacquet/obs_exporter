@@ -202,6 +202,10 @@ The collector's own dimension always wins; the collision is uniform per
 metric name, so it never produces a mixed series schema for that name. See
 [ADR-0014](../adr/0014-custom-labels.md) for the full decision record.
 
+`cluster` is a reserved key: it always collides with the identity label the
+collection loop stamps first, so a custom label named `cluster` is dropped
+from every sample on every cycle — don't use it as a custom-label key.
+
 ### Ad hoc filters in Grafana
 
 Custom labels can be filtered directly on dashboards using the ad hoc filters variable. Two
