@@ -206,3 +206,35 @@ func TestPromCollectorAcceptsLeAsVariableLabel(t *testing.T) {
 		t.Errorf("le label = %q,%v, want %q,true", le, leFound, "+Inf")
 	}
 }
+
+func TestPromCollectorExportsCustomLabels(t *testing.T) {
+	targets := testTargets(t)
+	targets[0].Labels = []Label{{Key: "env", Value: "prod"}}
+
+	store := NewSnapshotStore()
+	col := NewCollector(targets, store, time.Minute, 10*time.Second)
+	col.CollectOnce(t.Context())
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(NewPromCollector(store))
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mfs) == 0 {
+		t.Fatal("no metric families gathered")
+	}
+	for _, mf := range mfs {
+		for _, m := range mf.GetMetric() {
+			var found bool
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "env" && lp.GetValue() == "prod" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("metric %s exported without env=prod", mf.GetName())
+			}
+		}
+	}
+}

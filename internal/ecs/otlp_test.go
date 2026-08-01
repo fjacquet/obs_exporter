@@ -178,3 +178,44 @@ func TestOTLPExporterCarriesLeAttribute(t *testing.T) {
 		t.Error("le attribute missing from the bucket data point")
 	}
 }
+
+func TestOTLPExporterExportsCustomLabels(t *testing.T) {
+	targets := testTargets(t)
+	targets[0].Labels = []Label{{Key: "env", Value: "prod"}}
+
+	store := NewSnapshotStore()
+	col := NewCollector(targets, store, time.Minute, 10*time.Second)
+	reader := sdkmetric.NewManualReader()
+	exp := newOTLPExporter(reader, store, "test")
+	col.PostCycle = func() {
+		if err := exp.EnsureInstruments(); err != nil {
+			t.Errorf("EnsureInstruments: %v", err)
+		}
+	}
+	col.CollectOnce(context.Background())
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &rm); err != nil {
+		t.Fatal(err)
+	}
+
+	var points int
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			g, ok := m.Data.(metricdata.Gauge[float64])
+			if !ok {
+				continue
+			}
+			for _, dp := range g.DataPoints {
+				points++
+				v, ok := dp.Attributes.Value(attribute.Key("env"))
+				if !ok || v.AsString() != "prod" {
+					t.Fatalf("metric %s data point without env=prod", m.Name)
+				}
+			}
+		}
+	}
+	if points == 0 {
+		t.Fatal("no gauge data points observed")
+	}
+}

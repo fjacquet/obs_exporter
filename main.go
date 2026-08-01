@@ -244,8 +244,8 @@ func (r *collectorRunner) shutdownCurrent() {
 
 func (r *collectorRunner) stop() { r.shutdownCurrent() }
 
-// buildTargets constructs one ECS client (plus its collector set) per configured
-// cluster.
+// buildTargets constructs one ECS client (plus its collector set and resolved
+// custom labels) per configured cluster.
 func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 	targets := make([]ecs.Target, 0, len(cfg.Clusters))
 	for _, cl := range cfg.Clusters {
@@ -254,7 +254,14 @@ func buildTargets(cfg *config.Config, trace bool) []ecs.Target {
 			Password: cl.Password, InsecureSkipVerify: cl.InsecureSkipVerify.Bool(),
 			Trace: trace,
 		})
-		targets = append(targets, ecs.Target{Client: client, Collectors: ecs.Registry(cl)})
+		resolved := cfg.EffectiveLabels(cl)
+		labels := make([]ecs.Label, 0, len(resolved))
+		for _, l := range resolved {
+			labels = append(labels, ecs.Label{Key: l.Key, Value: l.Value})
+		}
+		targets = append(targets, ecs.Target{
+			Client: client, Collectors: ecs.Registry(cl), Labels: labels,
+		})
 	}
 	return targets
 }
