@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fjacquet/obs_exporter/internal/config"
 	"github.com/fjacquet/obs_exporter/internal/ecsclient"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func boolPtr(b bool) *bool { return &b }
@@ -286,6 +289,74 @@ func TestRegistryGivesDTOwnershipToTheDTCollector(t *testing.T) {
 	}
 	if find(fluxOnly).DTOwnedByDT {
 		t.Error("with collectDT off, Flux must own the per-node name")
+	}
+}
+
+func labelKeys(s Sample) []string {
+	keys := make([]string, len(s.Labels))
+	for i, l := range s.Labels {
+		keys[i] = l.Key
+	}
+	return keys
+}
+
+func TestCollectStampsCustomLabels(t *testing.T) {
+	targets := testTargets(t)
+	targets[0].Labels = []Label{{Key: "env", Value: "prod"}, {Key: "site", Value: "geneva"}}
+
+	store := NewSnapshotStore()
+	col := NewCollector(targets, store, time.Minute, 10*time.Second)
+	snap := col.CollectOnce(context.Background())
+
+	var checked int
+	for _, s := range snap.Clusters[0].Samples {
+		if s.LabelValue("env") != "prod" || s.LabelValue("site") != "geneva" {
+			t.Fatalf("sample %s missing custom labels: %v", s.Name, s.Labels)
+		}
+		if s.Name == "ecs_up" || s.Name == "ecs_collector_up" {
+			checked++
+			want := []string{"cluster", "env", "site"}
+			if s.Name == "ecs_collector_up" {
+				want = append(want, "collector")
+			}
+			if !slices.Equal(labelKeys(s), want) {
+				t.Errorf("%s label keys = %v, want %v", s.Name, labelKeys(s), want)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("neither ecs_up nor ecs_collector_up was present")
+	}
+	assertLabelKeySchema(t, snap.Clusters[0].Samples)
+}
+
+func TestCollectWarnsOnceOnLabelCollision(t *testing.T) {
+	hook := test.NewGlobal()
+	defer hook.Reset()
+
+	targets := testTargets(t)
+	targets[0].Labels = []Label{{Key: "collector", Value: "mine"}}
+
+	store := NewSnapshotStore()
+	col := NewCollector(targets, store, time.Minute, 10*time.Second)
+	col.CollectOnce(context.Background())
+	col.CollectOnce(context.Background())
+
+	var warnings int
+	for _, e := range hook.AllEntries() {
+		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "custom label collides") {
+			warnings++
+		}
+	}
+	if warnings != 1 {
+		t.Errorf("collision warnings = %d over two cycles, want 1", warnings)
+	}
+
+	snap := store.Load()
+	for _, s := range snap.Clusters[0].Samples {
+		if s.Name == "ecs_collector_up" && s.LabelValue("collector") == "mine" {
+			t.Fatal("custom label overwrote the collector dimension")
+		}
 	}
 }
 
