@@ -195,7 +195,7 @@ key is dropped for that metric family and the exporter logs it once per key
 per cluster:
 
 ```text
-WARN[0000] custom label collides with collector dimension, dropped  cluster=ecs-prod-01 label=env
+WARN[0000] custom label collides with a collector dimension; dropped for that metric family  cluster=ecs-prod-01 label=env metric=ecs_up
 ```
 
 The collector's own dimension always wins; the collision is uniform per
