@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.26.5 AS build
+FROM docker.io/library/golang:1.26.5 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -7,7 +7,7 @@ COPY . .
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION}" -o /out/obs_exporter .
 
-FROM alpine:latest
+FROM docker.io/library/alpine:latest
 
 # Create the runtime user and log dir. These are busybox builtins (no network).
 RUN adduser -D -u 10001 obs && \
