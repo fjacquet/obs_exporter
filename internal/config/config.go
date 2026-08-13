@@ -104,25 +104,66 @@ type Label struct {
 	Value string
 }
 
-var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(:-[^}]*)?\}`)
 
 var labelKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // interpolate replaces every ${VAR} in s with its environment value, returning an
 // error if any referenced variable is unset. Failing fast turns a typo'd secret
 // name into a config-load error instead of repeated runtime auth failures.
+//
+// A reference may carry a fallback as ${VAR:-default}, borrowing the shell /
+// docker-compose syntax and its meaning: unset OR empty falls back, and the reference
+// never errors. That lets a shipped config.yaml drive a non-secret setting from the
+// environment while still starting on a host that never exported it. Use it only where a
+// safe default exists.
+//
+// A bare ${VAR} fails when the variable is UNSET; an exported-but-empty one expands to
+// the empty string, as it always has. Credential fields get the stricter treatment —
+// see interpolateSecret.
 func interpolate(s string) (string, error) {
 	var missing []string
 	out := envRef.ReplaceAllStringFunc(s, func(m string) string {
-		name := envRef.FindStringSubmatch(m)[1]
+		sub := envRef.FindStringSubmatch(m)
+		name, fallback := sub[1], sub[2]
 		v, ok := os.LookupEnv(name)
+		if ok && v != "" {
+			return v
+		}
+		if fallback != "" {
+			return fallback[len(":-"):] // group 2 keeps its ":-" prefix, so "" means absent
+		}
 		if !ok {
 			missing = append(missing, name)
 		}
-		return v
+		return ""
 	})
 	if len(missing) > 0 {
 		return "", fmt.Errorf("unset environment variable(s): %s", strings.Join(missing, ", "))
+	}
+	return out, nil
+}
+
+// interpolateSecret expands like interpolate, but additionally rejects a credential that was
+// written as an env reference yet resolves to nothing. A stray `OBS1_PASSWORD=` line in
+// a .env file is a plausible typo, and without this the exporter would authenticate with an
+// empty credential and report a failure that names the wrong cause.
+//
+// It fires only when the field actually contains a ${...} reference: a literal value is
+// passed through untouched and an omitted optional credential stays omitted, so it cannot
+// break a config that never referenced the environment in the first place.
+func interpolateSecret(field, s string) (string, error) {
+	out, err := interpolate(s)
+	if err != nil {
+		return "", err
+	}
+	// The message names the FIELD and nothing else. Config-load errors are logged, and
+	// every part of s is potentially secret — even the variable name is a substring of a
+	// credential field, which is why it is not echoed either. The offending reference is
+	// visible in config.yaml next to the field this names.
+	if out == "" && envRef.MatchString(s) {
+		return "", fmt.Errorf("%s is set from an environment reference that resolved to an "+
+			"empty value; export the variable or remove the reference", field)
 	}
 	return out, nil
 }
@@ -203,17 +244,17 @@ func Load(path string) (*Config, error) {
 	}
 	for i := range cfg.Clusters {
 		c := &cfg.Clusters[i]
-		host, err := interpolate(c.Host)
+		host, err := interpolateSecret("host", c.Host)
 		if err != nil {
 			return nil, fmt.Errorf("cluster %s host: %w", c.Name, err)
 		}
 		c.Host = host
-		username, err := interpolate(c.Username)
+		username, err := interpolateSecret("username", c.Username)
 		if err != nil {
 			return nil, fmt.Errorf("cluster %s username: %w", c.Name, err)
 		}
 		c.Username = username
-		pw, err := interpolate(c.Password)
+		pw, err := interpolateSecret("password", c.Password)
 		if err != nil {
 			return nil, fmt.Errorf("cluster %s password: %w", c.Name, err)
 		}
