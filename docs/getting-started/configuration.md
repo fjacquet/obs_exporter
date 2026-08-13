@@ -107,7 +107,9 @@ A bare `${VAR}` **fails at startup** when the variable is unset — misconfigura
 be loud rather than authenticate with an empty secret. Where a safe default exists, write
 `${VAR:-default}` instead: the reference then never errors, falling back when the variable
 is unset *or* empty, exactly as in the shell and in `docker-compose.yml`. That is why the
-shipped `config.yaml` can be env-driven and still start out of the box:
+shipped `config.yaml` can be env-driven and still start without this variable being
+exported (the cluster's own `OBS1_HOSTNAME`, `OBS1_USERNAME` and `OBS1_PASSWORD` are still
+required; only `OBS1_SKIP_CERTIFICATE` is optional, defaulting to `false`):
 
 ```yaml
 insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE:-false}"
