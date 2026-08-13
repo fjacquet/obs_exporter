@@ -34,8 +34,10 @@ clusters:
     # cluster with a self-signed certificate. Accepts a native boolean or a
     # ${OBS1_SKIP_CERTIFICATE} env reference, resolved at startup like host/
     # username/password. Defaults to false.
-    # insecureSkipVerify: true
-    # insecureSkipVerify: ${OBS1_SKIP_CERTIFICATE}
+    #   insecureSkipVerify: true
+    # The ":-false" fallback keeps startup working when the variable is not exported; a
+    # bare ${OBS1_SKIP_CERTIFICATE} would abort instead, as bare references do for secrets.
+    insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE:-false}"
     # collectMetering: namespace quota + billing usage (default true). Disable on
     # very large clusters if the billing query is too slow for the interval.
     # collectMetering: false

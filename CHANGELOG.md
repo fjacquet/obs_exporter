@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `${VAR:-default}` fallbacks in config env references, ported from `pscale_exporter`.
+  Shell / docker-compose semantics: the variable falls back when unset *or* empty, and
+  such a reference never aborts startup. A bare `${VAR}` still fails loudly, which is
+  what protects secrets from resolving to an empty string. The shipped `config.yaml` now uses
+  `insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE:-false}"`, so the setting is env-driven out of the box
+  yet still resolves to `false` — this repo's original shipped default — on a host that
+  never exported the variable.
+
 ## [3.6.0] - 2026-08-01
 
 ### Added

@@ -101,6 +101,24 @@ avoid editing the file for each environment.
 values or with per-cluster env refs (e.g. `${OBS1_PASSWORD}`, `${OBS2_PASSWORD}`)
 — there is no implicit discovery of clusters from env vars.
 
+## Fallback values: `${VAR:-default}`
+
+A bare `${VAR}` **fails at startup** when the variable is unset — misconfiguration should
+be loud rather than authenticate with an empty secret. Where a safe default exists, write
+`${VAR:-default}` instead: the reference then never errors, falling back when the variable
+is unset *or* empty, exactly as in the shell and in `docker-compose.yml`. That is why the
+shipped `config.yaml` can be env-driven and still start out of the box:
+
+```yaml
+insecureSkipVerify: "${OBS1_SKIP_CERTIFICATE:-false}"
+```
+
+`false` is this exporter's original shipped default, so a host that never exported
+`OBS1_SKIP_CERTIFICATE` behaves exactly as before.
+
+Use it for settings, not for secrets — a `${OBS1_PASSWORD:-}` would silently turn a missing
+password into an empty one.
+
 ## Hot reload
 
 The exporter reloads the config on **SIGHUP** or when the file changes on disk

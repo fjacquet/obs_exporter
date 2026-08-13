@@ -104,22 +104,35 @@ type Label struct {
 	Value string
 }
 
-var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(:-[^}]*)?\}`)
 
 var labelKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // interpolate replaces every ${VAR} in s with its environment value, returning an
 // error if any referenced variable is unset. Failing fast turns a typo'd secret
 // name into a config-load error instead of repeated runtime auth failures.
+//
+// A reference may carry a fallback as ${VAR:-default}, borrowing the shell /
+// docker-compose syntax and its meaning: unset OR empty falls back, and the reference
+// never errors. That lets a shipped config.yaml drive a non-secret setting from the
+// environment while still starting on a host that never exported it. Use it only where a
+// safe default exists — a bare ${VAR} keeps the fail-loud behaviour that protects secrets.
 func interpolate(s string) (string, error) {
 	var missing []string
 	out := envRef.ReplaceAllStringFunc(s, func(m string) string {
-		name := envRef.FindStringSubmatch(m)[1]
+		sub := envRef.FindStringSubmatch(m)
+		name, fallback := sub[1], sub[2]
 		v, ok := os.LookupEnv(name)
+		if ok && v != "" {
+			return v
+		}
+		if fallback != "" {
+			return fallback[len(":-"):] // group 2 keeps its ":-" prefix, so "" means absent
+		}
 		if !ok {
 			missing = append(missing, name)
 		}
-		return v
+		return ""
 	})
 	if len(missing) > 0 {
 		return "", fmt.Errorf("unset environment variable(s): %s", strings.Join(missing, ", "))
